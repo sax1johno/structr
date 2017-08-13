@@ -27,7 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.Value;
 import org.structr.core.property.PropertyKey;
 import org.structr.rest.RestMethodResult;
@@ -72,7 +72,7 @@ public class ViewFilterResource extends WrappingResource {
 	}
 
 	@Override
-	public Result doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
+	public QueryResult doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
 
 		if (wrappedResource != null) {
 

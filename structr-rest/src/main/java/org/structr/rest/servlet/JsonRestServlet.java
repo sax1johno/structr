@@ -48,7 +48,7 @@ import org.structr.core.GraphObject;
 import org.structr.core.IJsonInput;
 import org.structr.core.JsonInput;
 import org.structr.core.JsonSingleInput;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.Services;
 import org.structr.core.Value;
 import org.structr.core.app.App;
@@ -759,7 +759,7 @@ public class JsonRestServlet extends HttpServlet implements HttpServiceServlet {
 
 		SecurityContext securityContext = null;
 		Authenticator authenticator     = null;
-		Result result                   = null;
+		QueryResult result                   = null;
 		Resource resource               = null;
 
 		try {

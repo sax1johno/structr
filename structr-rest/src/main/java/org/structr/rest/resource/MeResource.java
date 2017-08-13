@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.entity.Principal;
 import org.structr.core.property.PropertyKey;
 import org.structr.rest.RestMethodResult;
@@ -76,7 +76,7 @@ public class MeResource extends TypedIdResource {
 	}
 
 	@Override
-	public Result doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
+	public QueryResult doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
 
 		Principal user = securityContext.getUser(true);
 		if (user != null) {
@@ -84,7 +84,7 @@ public class MeResource extends TypedIdResource {
 			List<GraphObject> resultList = new LinkedList<>();
 			resultList.add(user);
 
-			return new Result(resultList, null,  isCollectionResource(), isPrimitiveArray());
+			return new QueryResult(resultList, null,  isCollectionResource(), isPrimitiveArray());
 
 		} else {
 

@@ -34,7 +34,7 @@ import org.structr.common.error.FrameworkException;
 import org.structr.core.Export;
 import org.structr.core.GraphObject;
 import org.structr.core.GraphObjectMap;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
@@ -136,8 +136,8 @@ public class ODSExporter extends ODFExporter {
 		try {
 
 			final App app = StructrApp.getInstance();
-			final Result result = app.nodeQuery(AbstractNode.class).and(GraphObject.id, uuid).getResult();
-			final Result transformedResult = transformation.transformOutput(securityContext, AbstractNode.class, result);
+			final QueryResult result = app.nodeQuery(AbstractNode.class).and(GraphObject.id, uuid).getResult();
+			final QueryResult transformedResult = transformation.transformOutput(securityContext, AbstractNode.class, result);
 
 			Map<String, Object> nodeProperties = new HashMap<>();
 			GraphObjectMap node = (GraphObjectMap) transformedResult.get(0);

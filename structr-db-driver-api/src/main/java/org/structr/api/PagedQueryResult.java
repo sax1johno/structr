@@ -39,8 +39,8 @@ public class PagedQueryResult<T> implements QueryResult<T> {
 	}
 
 	@Override
-	public long resultCount() {
-		return result.resultCount();
+	public int size() {
+		return result.size();
 	}
 
 	@Override

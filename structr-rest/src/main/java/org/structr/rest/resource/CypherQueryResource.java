@@ -25,7 +25,7 @@ import javax.servlet.http.HttpServletRequest;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.app.StructrApp;
 import org.structr.core.graph.CypherQueryCommand;
 import org.structr.core.property.PropertyKey;
@@ -54,7 +54,7 @@ public class CypherQueryResource extends Resource {
 	}
 
 	@Override
-	public Result doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
+	public QueryResult doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
 
 		// Admins only
 		if (!securityContext.isSuperUser()) {
@@ -71,7 +71,7 @@ public class CypherQueryResource extends Resource {
 				String query                 = queryObject.toString();
 				List<GraphObject> resultList = StructrApp.getInstance(securityContext).command(CypherQueryCommand.class).execute(query, Collections.EMPTY_MAP);
 
-				return new Result(resultList, resultList.size(), true, false);
+				return new QueryResult(resultList, resultList.size(), true, false);
 			}
 
 		} catch (org.structr.api.NotFoundException nfe) {
@@ -79,7 +79,7 @@ public class CypherQueryResource extends Resource {
 			throw new NotFoundException("Entity not found for the given query");
 		}
 
-		return new Result(Collections.EMPTY_LIST, 0, false, false);
+		return new QueryResult(Collections.EMPTY_LIST, 0, false, false);
 	}
 
 	@Override

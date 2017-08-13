@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory;
 import org.structr.common.PagingHelper;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.app.Query;
 import org.structr.core.app.StructrApp;
 import org.structr.core.property.PropertyKey;
@@ -90,7 +90,7 @@ public class GetByTypeCommand extends AbstractCommand {
 		try {
 
 			// do search
-			Result result = query.getResult();
+			QueryResult result = query.getResult();
 
 			// save raw result count
 			int resultCountBeforePaging = result.size();

@@ -31,7 +31,7 @@ import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObjectMap;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.AbstractRelationship;
@@ -92,7 +92,7 @@ public class SchemaResource extends Resource {
 	}
 
 	@Override
-	public Result doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
+	public QueryResult doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
 		return getSchemaOverviewResult();
 	}
 
@@ -144,7 +144,7 @@ public class SchemaResource extends Resource {
 	}
 
 	// ----- public static methods -----
-	public static Result getSchemaOverviewResult() throws FrameworkException {
+	public static QueryResult getSchemaOverviewResult() throws FrameworkException {
 
 		final List<GraphObjectMap> resultList = new LinkedList<>();
 		final ConfigurationProvider config    = StructrApp.getConfiguration();
@@ -224,7 +224,7 @@ public class SchemaResource extends Resource {
 
 		}
 
-		return new Result(resultList, resultList.size(), false, false);
+		return new QueryResult(resultList, resultList.size(), false, false);
 
 	}
 

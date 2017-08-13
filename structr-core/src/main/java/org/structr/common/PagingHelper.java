@@ -22,8 +22,8 @@ import java.util.Collections;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.structr.core.GraphObject;
-import org.structr.core.Result;
+import org.structr.api.PagedQueryResult;
+import org.structr.api.QueryResult;
 
 //~--- classes ----------------------------------------------------------------
 
@@ -46,7 +46,7 @@ public class PagingHelper {
 	 * @param page
 	 * @return subList
 	 */
-	public static List<? extends GraphObject> subList(final List<? extends GraphObject> list, int pageSize, int page) {
+	public static <T> List<T> subList(final List<T> list, int pageSize, int page) {
 
 		if (pageSize <= 0 || page == 0) {
 
@@ -93,58 +93,7 @@ public class PagingHelper {
 	 * @param page
 	 * @return subResult
 	 */
-	public static Result subResult(final Result result, int pageSize, int page) {
-
-		if (pageSize <= 0 || page == 0) {
-
-			return result;
-		}
-
-		int pageCount = getPageCount(result.getRawResultCount(), pageSize);
-
-		if (pageCount > 0) {
-
-			result.setPageCount(pageCount);
-		}
-
-		if (page > pageCount) {
-
-			page = pageCount;
-		}
-
-		result.setPage(page);
-		result.setPageSize(pageSize);
-
-		return new Result(subList(result.getResults(), pageSize, page), result.getResults().size(), result.isCollection(), result.isPrimitiveArray());
-
+	public static QueryResult subResult(final QueryResult result, int pageSize, int page) {
+		return new PagedQueryResult(result, page, pageSize);
 	}
-
-	public static Result addPagingParameter(Result result, int pageSize, int page) {
-
-		if (pageSize > 0 && pageSize < Integer.MAX_VALUE) {
-
-			int pageCount = getPageCount(result.getRawResultCount(), pageSize);
-
-			if (pageCount > 0) {
-
-				result.setPageCount(pageCount);
-			}
-
-			result.setPage(page);
-			result.setPageSize(pageSize);
-
-		}
-
-		return result;
-
-	}
-
-	//~--- get methods ----------------------------------------------------
-
-	private static int getPageCount(int resultCount, int pageSize) {
-
-		return (int) Math.rint(Math.ceil((double) resultCount / (double) pageSize));
-
-	}
-
 }

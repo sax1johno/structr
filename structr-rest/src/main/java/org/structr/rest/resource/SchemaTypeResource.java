@@ -24,7 +24,7 @@ import javax.servlet.http.HttpServletRequest;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObjectMap;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.property.PropertyKey;
 import org.structr.rest.RestMethodResult;
 import org.structr.rest.exception.IllegalMethodException;
@@ -58,7 +58,7 @@ public class SchemaTypeResource extends Resource {
 	}
 
 	@Override
-	public Result doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
+	public QueryResult doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
 		Class type = typeResource.getEntityClass();
 		return getSchemaTypeResult(securityContext, type, propertyView);
 
@@ -116,11 +116,11 @@ public class SchemaTypeResource extends Resource {
 	}
 
 	// ----- public static methods -----
-	public static Result getSchemaTypeResult(final SecurityContext securityContext, final Class type, final String propertyView) throws FrameworkException {
+	public static QueryResult getSchemaTypeResult(final SecurityContext securityContext, final Class type, final String propertyView) throws FrameworkException {
 
 		List<GraphObjectMap> resultList = SchemaHelper.getSchemaTypeInfo(securityContext, rawType, type, propertyView);
 
-		return new Result(resultList, resultList.size(), false, false);
+		return new QueryResult(resultList, resultList.size(), false, false);
 
 	}
 

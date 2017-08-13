@@ -39,7 +39,7 @@ import org.structr.common.QueryRange;
 import org.structr.common.SecurityContext;
 import org.structr.common.View;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.Value;
 import org.structr.core.app.StructrApp;
 import org.structr.core.converter.PropertyConverter;
@@ -124,7 +124,7 @@ public abstract class StreamingWriter {
 
 	}
 
-	public void stream(final SecurityContext securityContext, final Writer output, final Result result, final String baseUrl) throws IOException {
+	public void stream(final SecurityContext securityContext, final Writer output, final QueryResult result, final String baseUrl) throws IOException {
 
 		long t0 = System.nanoTime();
 

@@ -23,7 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.app.StructrApp;
 import org.structr.core.graph.CreateRelationshipCommand;
 import org.structr.core.property.PropertyMap;
@@ -86,7 +86,7 @@ public class FixComponentsCommand extends AbstractCommand {
 
 		Page hiddenDoc                            = CreateComponentCommand.getOrCreateHiddenDocument();
 		SecurityContext securityContext           = SecurityContext.getSuperUserInstance();
-		Result<DOMNode> result                    = StructrApp.getInstance(securityContext).nodeQuery(DOMNode.class).getResult();
+		QueryResult<DOMNode> result                    = StructrApp.getInstance(securityContext).nodeQuery(DOMNode.class).getResult();
 		final CreateRelationshipCommand createRel = StructrApp.getInstance(securityContext).command(CreateRelationshipCommand.class);
 
 		for (DOMNode node : result.getResults()) {

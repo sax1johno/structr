@@ -23,7 +23,7 @@ import javax.servlet.http.HttpServletRequest;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.graph.search.SearchCommand;
 import org.structr.core.property.PropertyKey;
 import org.structr.rest.RestMethodResult;
@@ -59,8 +59,8 @@ public class TypedIdResource extends FilterableResource {
 	}
 
 	@Override
-	public Result doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
-		return new Result(getEntity(), isPrimitiveArray());
+	public QueryResult doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
+		return new QueryResult(getEntity(), isPrimitiveArray());
 	}
 
 	@Override

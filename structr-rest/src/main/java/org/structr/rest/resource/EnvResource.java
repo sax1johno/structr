@@ -27,7 +27,7 @@ import org.structr.common.SecurityContext;
 import org.structr.common.VersionHelper;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObjectMap;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.Services;
 import org.structr.core.property.GenericProperty;
 import org.structr.core.property.PropertyKey;
@@ -55,7 +55,7 @@ public class EnvResource extends Resource {
 	}
 
 	@Override
-	public Result doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
+	public QueryResult doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
 
 		final List<GraphObjectMap> resultList             = new LinkedList<>();
 		final GraphObjectMap info                         = new GraphObjectMap();
@@ -83,7 +83,7 @@ public class EnvResource extends Resource {
 
 		resultList.add(info);
 
-		return new Result(resultList, resultList.size(), false, false);
+		return new QueryResult(resultList, resultList.size(), false, false);
 	}
 
 	@Override

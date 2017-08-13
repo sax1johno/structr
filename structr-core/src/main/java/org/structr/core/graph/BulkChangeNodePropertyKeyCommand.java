@@ -74,7 +74,7 @@ public class BulkChangeNodePropertyKeyCommand extends NodeServiceCommand impleme
 				try (final Tx tx = StructrApp.getInstance().tx()) {
 
 					// create iterator
-					nodeIterator = StructrApp.getInstance(securityContext).nodeQuery(SchemaHelper.getEntityClassForRawType(type)).getResult().getResults().iterator();
+					nodeIterator = StructrApp.getInstance(securityContext).nodeQuery(SchemaHelper.getEntityClassForRawType(type)).getResult().iterator();
 					tx.success();
 				}
 

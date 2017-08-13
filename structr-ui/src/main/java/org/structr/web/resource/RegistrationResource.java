@@ -36,7 +36,7 @@ import org.structr.api.config.Settings;
 import org.structr.common.MailHelper;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.app.App;
 import org.structr.core.app.Query;
 import org.structr.core.app.StructrApp;
@@ -93,7 +93,7 @@ public class RegistrationResource extends Resource {
 	}
 
 	@Override
-	public Result doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
+	public QueryResult doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
 		throw new NotAllowedException("GET not allowed on " + getResourceSignature());
 	}
 
@@ -120,7 +120,7 @@ public class RegistrationResource extends Resource {
 			final String localeString = (String) propertySet.get(MailTemplate.locale.jsonName());
 			final String confKey      = UUID.randomUUID().toString();
 
-			final Result result = StructrApp.getInstance().nodeQuery(User.class).and(User.eMail, emailString).getResult();
+			final QueryResult result = StructrApp.getInstance().nodeQuery(User.class).and(User.eMail, emailString).getResult();
 			if (!result.isEmpty()) {
 
 				user = (Principal) result.get(0);

@@ -27,7 +27,6 @@ import org.structr.common.error.FrameworkException;
 import org.structr.common.error.PropertiesNotFoundToken;
 import org.structr.common.error.TypeToken;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.graph.NodeInterface;
@@ -81,7 +80,7 @@ public class TypeAndPropertySetDeserializationStrategy<S, T extends NodeInterfac
 
 		if (source != null && source instanceof String && Pattern.matches("[a-fA-F0-9]{32}", (String) source)) {
 
-			return (T) getTypedResult(new Result(StructrApp.getInstance(securityContext).getNodeById((String) source), false), type);
+			return (T) getTypedResult((T)StructrApp.getInstance(securityContext).getNodeById((String) source), type);
 
 		}
 
@@ -94,12 +93,12 @@ public class TypeAndPropertySetDeserializationStrategy<S, T extends NodeInterfac
 
 		if (attributes != null) {
 
-			Result<T> result = Result.EMPTY_RESULT;
+			T obj = null;
 
 			// Check if properties contain the UUID attribute
 			if (attributes.containsKey(GraphObject.id)) {
 
-				result = new Result(app.getNodeById(attributes.get(GraphObject.id)), false);
+				obj = (T)app.getNodeById(attributes.get(GraphObject.id));
 
 			} else {
 
@@ -124,51 +123,45 @@ public class TypeAndPropertySetDeserializationStrategy<S, T extends NodeInterfac
 						}
 					}
 
-					result = app.nodeQuery(type).and(searchAttributes).getResult();
+					obj = app.nodeQuery(type).and(searchAttributes).getFirst();
 
 				}
 			}
 
 			// just check for existance
 			String errorMessage = null;
-			final int size = result.size();
-			switch (size) {
 
-				case 0:
+			if (obj == null) {
 
-					if (createIfNotExisting) {
+				if (createIfNotExisting) {
 
-						// create node and return it
-						T newNode = app.create(type, attributes);
-						if (newNode != null) {
+					// create node and return it
+					T newNode = app.create(type, attributes);
+					if (newNode != null) {
 
-							return newNode;
-						}
+						return newNode;
 					}
+				}
 
-					errorMessage = "No node found for the given properties and auto-creation not enabled";
+				errorMessage = "No node found for the given properties and auto-creation not enabled";
 
-					break;
+			} else {
 
-				case 1:
+				final T relatedNode = getTypedResult(obj, type);
+				if (!attributes.isEmpty()) {
 
-					final T relatedNode = getTypedResult(result, type);
-					if (!attributes.isEmpty()) {
+					// set properties on related node?
+					setProperties(securityContext, relatedNode, attributes);
+				}
 
-						// set properties on related node?
-						setProperties(securityContext, relatedNode, attributes);
-					}
-
-					return relatedNode;
-
-				default:
-
-					errorMessage = "Found " + size + " nodes for given type and properties, property set is ambiguous";
-					logger.error(""
-						+ "This is often due to wrong modeling, or you should consider creating a uniquness constraint for " + type.getName(), size);
-
-					break;
+				return relatedNode;
 			}
+
+			/*
+
+				errorMessage = "Found " + size + " nodes for given type and properties, property set is ambiguous";
+				logger.error("This is often due to wrong modeling, or you should consider creating a uniquness constraint for " + type.getName(), size);
+			*/
 
 			throw new FrameworkException(404, errorMessage, new PropertiesNotFoundToken(type.getSimpleName(), null, attributes));
 		}
@@ -176,15 +169,13 @@ public class TypeAndPropertySetDeserializationStrategy<S, T extends NodeInterfac
 		return null;
 	}
 
-	private T getTypedResult(Result<T> result, Class<T> type) throws FrameworkException {
-
-		final GraphObject obj = result.get(0);
+	private T getTypedResult(final T obj, final Class<T> type) throws FrameworkException {
 
 		if (!type.isAssignableFrom(obj.getClass())) {
 			throw new FrameworkException(422, "Node type mismatch", new TypeToken(type.getSimpleName(), null, type.getSimpleName()));
 		}
 
-		return result.get(0);
+		return obj;
 	}
 
 

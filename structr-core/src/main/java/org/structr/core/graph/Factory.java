@@ -27,14 +27,15 @@ import java.util.concurrent.Executors;
 import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.PagedQueryResult;
 import org.structr.api.QueryResult;
 import org.structr.api.graph.Relationship;
+import org.structr.api.util.QueryUtils;
 import org.structr.common.FactoryDefinition;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.Adapter;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
 import org.structr.core.app.StructrApp;
 import org.structr.schema.SchemaHelper;
 
@@ -84,21 +85,6 @@ public abstract class Factory<S, T extends GraphObject> implements Adapter<S, T>
 	public abstract T instantiateDummy(final S entity, final String entityType) throws FrameworkException;
 
 	/**
-	 * Create structr nodes from all given underlying database nodes
-	 * No paging, but security check
-	 *
-	 * @param input
-	 * @return result
-	 * @throws org.structr.common.error.FrameworkException
-	 */
-	public Result instantiateAll(final Iterable<S> input) throws FrameworkException {
-
-		List<T> objects = bulkInstantiate(input);
-
-		return new Result(objects, objects.size(), true, false);
-	}
-
-	/**
 	 * Create structr nodes from the underlying database nodes
 	 *
 	 * Include only nodes which are readable in the given security context.
@@ -109,9 +95,10 @@ public abstract class Factory<S, T extends GraphObject> implements Adapter<S, T>
 	 * @return result
 	 * @throws org.structr.common.error.FrameworkException
 	 */
-	public Result instantiate(final QueryResult<S> input) throws FrameworkException {
+	public QueryResult<T> instantiate(final QueryResult<S> input) throws FrameworkException {
 
 		if (input != null) {
+
 			final int pageSize = factoryProfile.getPageSize();
 			final int page     = factoryProfile.getPage();
 			int fromIndex;
@@ -133,18 +120,22 @@ public abstract class Factory<S, T extends GraphObject> implements Adapter<S, T>
 
 				// We've run completely through the iterator,
 				// so the overall count from here is accurate.
-				return new Result(nodes, size, true, false);
+				return QueryUtils.fromList(nodes);
 
 			} else {
 
-				fromIndex = pageSize == Integer.MAX_VALUE ? 0 : (page - 1) * pageSize;
+				if (!input.isLimited() && pageSize < Integer.MAX_VALUE) {
 
-				// The overall count may be inaccurate
-				return page(input, fromIndex, pageSize);
+					return new PagedQueryResult<>(QueryUtils.filterNullValues(QueryUtils.map(this, input)), page, pageSize);
+
+				} else {
+
+					return QueryUtils.filterNullValues(QueryUtils.map(this, input));
+				}
 			}
 		}
 
-		return Result.EMPTY_RESULT;
+		return QueryResult.EMPTY_RESULT;
 
 	}
 
@@ -190,9 +181,9 @@ public abstract class Factory<S, T extends GraphObject> implements Adapter<S, T>
 	}
 
 	// <editor-fold defaultstate="collapsed" desc="private methods">
-	protected List<S> read(final Iterable<S> iterable) {
+	protected List<S> read(final QueryResult<S> iterable) {
 
-		final List<S> nodes  = new ArrayList();
+		final List<S> nodes  = new ArrayList(iterable.size() + 1);
 		final Iterator<S> it = iterable.iterator();
 
 		while (it.hasNext()) {
@@ -202,53 +193,6 @@ public abstract class Factory<S, T extends GraphObject> implements Adapter<S, T>
 		return nodes;
 
 	}
-
-	protected Result page(final QueryResult<S> input, final int offset, final int limit) throws FrameworkException {
-
-		final long resultCount = input.resultCount();
-		final int overallCount = Long.valueOf(resultCount).intValue();
-		final List<T> nodes    = new ArrayList<>(Math.min(limit, overallCount) + 1);
-		int position           = 0;
-		int count              = 0;
-
-		try (final QueryResult<S> tmp = input) {
-
-			if (tmp.isLimited()) {
-
-				final Iterator<S> iterator = tmp.iterator();
-				while (iterator.hasNext()) {
-
-					nodes.add(instantiate(iterator.next()));
-				}
-
-			} else {
-
-				final Iterator<S> iterator = tmp.iterator();
-				while (iterator.hasNext()) {
-
-					T n = instantiate(iterator.next());
-					if (n != null) {
-
-						position++;
-
-						if (position > offset && position <= offset + limit) {
-
-							nodes.add(n);
-
-							// stop if we got enough nodes
-							if (++count == limit) {
-								break;
-							}
-						}
-					}
-				}
-			}
-		}
-
-		// The overall count may be inaccurate
-		return new Result(nodes, overallCount, true, false);
-	}
-
 
 	// ----- nested classes -----
 	protected class FactoryProfile {

@@ -34,7 +34,7 @@ import org.structr.common.Permission;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.Services;
 import org.structr.core.Value;
 import org.structr.core.app.App;
@@ -82,7 +82,7 @@ public abstract class Resource {
 	public abstract String getResourceSignature();
 	public abstract boolean isCollectionResource() throws FrameworkException;
 
-	public abstract Result doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException;
+	public abstract QueryResult doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException;
 	public abstract RestMethodResult doPost(final Map<String, Object> propertySet) throws FrameworkException;
 
 	@Override
@@ -125,7 +125,7 @@ public abstract class Resource {
 
 	public RestMethodResult doPut(final Map<String, Object> propertySet) throws FrameworkException {
 
-		final Result<GraphObject> result = doGet(null, false, NodeFactory.DEFAULT_PAGE_SIZE, NodeFactory.DEFAULT_PAGE);
+		final QueryResult<GraphObject> result = doGet(null, false, NodeFactory.DEFAULT_PAGE_SIZE, NodeFactory.DEFAULT_PAGE);
 		final List<GraphObject> results  = result.getResults();
 
 		if (results != null && !results.isEmpty()) {
@@ -159,7 +159,7 @@ public abstract class Resource {
 	public void configurePropertyView(final Value<String> propertyView) {
 	}
 
-	public void postProcessResultSet(final Result result) {
+	public void postProcessResultSet(final QueryResult result) {
 	}
 
 	public boolean isPrimitiveArray() {

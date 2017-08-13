@@ -36,13 +36,13 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.api.DatabaseService;
+import org.structr.api.QueryResult;
 import org.structr.api.Transaction;
 import org.structr.api.graph.Label;
 import org.structr.api.graph.Node;
 import org.structr.api.util.Iterables;
 import org.structr.common.StructrTest;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.Result;
 import org.structr.core.entity.Group;
 import org.structr.core.entity.TestEleven;
 import org.structr.core.entity.TestOne;
@@ -222,10 +222,10 @@ public class MaintenanceTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				final Result<TestEleven> result = app.nodeQuery(TestEleven.class).getResult();
+				final QueryResult<TestEleven> result = app.nodeQuery(TestEleven.class).getResult();
 				assertEquals(10, result.size());
 
-				for (final TestEleven node : result.getResults()) {
+				for (final TestEleven node : result) {
 
 					Iterable<Label> labels = node.getNode().getLabels();
 					final Set<Label> set   = new HashSet<>(Iterables.toList(labels));

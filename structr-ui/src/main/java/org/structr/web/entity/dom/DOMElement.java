@@ -34,7 +34,7 @@ import org.structr.common.ValidationHelper;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.AbstractRelationship;
@@ -349,7 +349,7 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 		final String _tag        = getProperty(DOMElement.tag);
 
 		// non-final variables
-		Result localResult                 = renderContext.getResult();
+		QueryResult localResult                 = renderContext.getResult();
 		boolean anyChildNodeCreatesNewLine = false;
 
 		renderStructrAppLib(out, securityContext, renderContext, depth);

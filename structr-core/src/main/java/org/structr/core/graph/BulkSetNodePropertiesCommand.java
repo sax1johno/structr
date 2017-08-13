@@ -73,7 +73,7 @@ public class BulkSetNodePropertiesCommand extends NodeServiceCommand implements 
 
 				try (final Tx tx = StructrApp.getInstance().tx()) {
 
-					nodeIterator = StructrApp.getInstance(securityContext).nodeQuery(cls).getResult().getResults().iterator();
+					nodeIterator = StructrApp.getInstance(securityContext).nodeQuery(cls).getResult().iterator();
 					tx.success();
 				}
 

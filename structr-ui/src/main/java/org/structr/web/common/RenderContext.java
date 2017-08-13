@@ -28,7 +28,7 @@ import org.structr.api.config.Settings;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.Principal;
 import org.structr.core.graph.NodeInterface;
@@ -64,7 +64,7 @@ public class RenderContext extends ActionContext {
 	private HttpServletRequest request                 = null;
 	private HttpServletResponse response               = null;
 	private ResourceProvider resourceProvider          = null;
-	private Result result                              = null;
+	private QueryResult result                              = null;
 	private boolean anyChildNodeCreatesNewLine         = false;
 	private boolean indentHtml                         = true;
 
@@ -163,7 +163,7 @@ public class RenderContext extends ActionContext {
 		this.listSource = listSource;
 	}
 
-	public void setResult(Result result) {
+	public void setResult(QueryResult result) {
 		this.result = result;
 	}
 
@@ -347,7 +347,7 @@ public class RenderContext extends ActionContext {
 		return (page != null ? page.getUuid() : null);
 	}
 
-	public Result getResult() {
+	public QueryResult getResult() {
 		return result;
 	}
 
@@ -458,7 +458,7 @@ public class RenderContext extends ActionContext {
 					case "result_count":
 					case "result_size":
 
-						final Result sizeResult = this.getResult();
+						final QueryResult sizeResult = this.getResult();
 						if (sizeResult != null) {
 
 							return sizeResult.getRawResultCount();
@@ -467,7 +467,7 @@ public class RenderContext extends ActionContext {
 
 					case "page_size":
 
-						final Result pageSizeResult = this.getResult();
+						final QueryResult pageSizeResult = this.getResult();
 						if (pageSizeResult != null) {
 
 							return pageSizeResult.getPageSize();
@@ -477,7 +477,7 @@ public class RenderContext extends ActionContext {
 
 					case "page_count":
 
-						final Result pageCountResult = this.getResult();
+						final QueryResult pageCountResult = this.getResult();
 						if (pageCountResult != null) {
 
 							Integer pageCount = result.getPageCount();
@@ -495,7 +495,7 @@ public class RenderContext extends ActionContext {
 
 					case "page_no":
 
-						final Result pageNoResult = this.getResult();
+						final QueryResult pageNoResult = this.getResult();
 						if (pageNoResult != null) {
 
 							return pageNoResult.getPage();

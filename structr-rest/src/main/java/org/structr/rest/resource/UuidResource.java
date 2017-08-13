@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.property.PropertyKey;
@@ -49,12 +49,12 @@ public class UuidResource extends FilterableResource {
 	//~--- methods --------------------------------------------------------
 
 	@Override
-	public Result doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
+	public QueryResult doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
 
 		GraphObject obj = getEntity();
 		if (obj != null) {
 
-			return new Result(obj, isPrimitiveArray());
+			return new QueryResult(obj, isPrimitiveArray());
 
 		}
 

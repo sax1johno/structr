@@ -33,7 +33,7 @@ import org.structr.common.error.EmptyPropertyToken;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.app.App;
 import org.structr.core.app.Query;
 import org.structr.core.app.StructrApp;
@@ -117,7 +117,7 @@ public class TypeResource extends SortableResource {
 	}
 
 	@Override
-	public Result doGet(final PropertyKey sortKey, final boolean sortDescending, final int pageSize, final int page) throws FrameworkException {
+	public QueryResult doGet(final PropertyKey sortKey, final boolean sortDescending, final int pageSize, final int page) throws FrameworkException {
 
 		boolean includeDeletedAndHidden        = true;
 		boolean publicOnly                     = false;
@@ -158,14 +158,14 @@ public class TypeResource extends SortableResource {
 			}
 			if (virtualType != null) {
 
-				final Result untransformedResult = query
+				final QueryResult untransformedResult = query
 					.includeDeletedAndHidden(includeDeletedAndHidden)
 					.publicOnly(publicOnly)
 					.sort(actualSortKey)
 					.order(actualSortOrder)
 					.getResult();
 
-				final Result result = virtualType.transformOutput(securityContext, entityClass, untransformedResult);
+				final QueryResult result = virtualType.transformOutput(securityContext, entityClass, untransformedResult);
 
 				return PagingHelper.subResult(result, pageSize, page);
 
@@ -187,7 +187,7 @@ public class TypeResource extends SortableResource {
 		}
 
 		List emptyList = Collections.emptyList();
-		return new Result(emptyList, null, isCollectionResource(), isPrimitiveArray());
+		return new QueryResult(emptyList, null, isCollectionResource(), isPrimitiveArray());
 	}
 
 	@Override

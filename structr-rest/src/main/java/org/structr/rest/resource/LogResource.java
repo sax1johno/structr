@@ -55,7 +55,7 @@ import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.GraphObjectMap;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.graph.Tx;
@@ -139,7 +139,7 @@ public class LogResource extends Resource {
 	}
 
 	@Override
-	public Result doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
+	public QueryResult doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
 
 		final HttpServletRequest request = securityContext.getRequest();
 		if (request != null) {
@@ -204,7 +204,7 @@ public class LogResource extends Resource {
 				overviewMap.put(firstEntryProperty, new Date(logState.beginTimestamp()));
 				overviewMap.put(lastEntryProperty, new Date(logState.endTimestamp()));
 
-				return new Result(overviewMap, false);
+				return new QueryResult(overviewMap, false);
 
 			} else if (logState.doHistogram()) {
 
@@ -221,7 +221,7 @@ public class LogResource extends Resource {
 				// sort result
 				logState.sortEntries();
 
-				return new Result(wrap(logState.entries()), logState.size(), true, false);
+				return new QueryResult(wrap(logState.entries()), logState.size(), true, false);
 			}
 		}
 
@@ -528,7 +528,7 @@ public class LogResource extends Resource {
 		return buf.toString();
 	}
 
-	private Result aggregate(final LogState state) throws FrameworkException {
+	private QueryResult aggregate(final LogState state) throws FrameworkException {
 
 		// sort entries before aggregation
 		state.sortEntries();
@@ -576,10 +576,10 @@ public class LogResource extends Resource {
 			result.put(new GenericProperty(Long.toString(current)), sum);
 		}
 
-		return new Result(result, false);
+		return new QueryResult(result, false);
 	}
 
-	private Result histogram(final LogState state) throws FrameworkException {
+	private QueryResult histogram(final LogState state) throws FrameworkException {
 
 		// sort entries before creating the histogram
 		state.sortEntries();
@@ -628,7 +628,7 @@ public class LogResource extends Resource {
 			result.put(new GenericProperty(Long.toString(current)), sum);
 		}
 
-		return new Result(result, false);
+		return new QueryResult(result, false);
 	}
 
 	private long alignDateOnFormat(final String dateFormat, final long timestamp) {

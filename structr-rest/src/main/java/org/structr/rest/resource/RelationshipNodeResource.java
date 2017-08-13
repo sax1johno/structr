@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.entity.AbstractRelationship;
 import org.structr.core.property.PropertyKey;
 import org.structr.rest.RestMethodResult;
@@ -56,7 +56,7 @@ public class RelationshipNodeResource extends WrappingResource {
 	}
 
 	@Override
-	public Result doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
+	public QueryResult doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
 
 		List<? extends GraphObject> results = wrappedResource.doGet(sortKey, sortDescending, pageSize, page).getResults();
 		if(results != null && !results.isEmpty()) {
@@ -79,7 +79,7 @@ public class RelationshipNodeResource extends WrappingResource {
 					}
 				}
 
-				return new Result(resultList, null, isCollectionResource(), isPrimitiveArray());
+				return new QueryResult(resultList, null, isCollectionResource(), isPrimitiveArray());
 
 			} catch(Throwable t) {
 

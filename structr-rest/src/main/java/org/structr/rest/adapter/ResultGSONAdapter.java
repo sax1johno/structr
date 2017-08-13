@@ -32,8 +32,8 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.List;
 import java.util.Locale;
+import org.structr.api.QueryResult;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
 import org.structr.core.Value;
 import org.structr.core.rest.GraphObjectGSONAdapter;
 
@@ -42,7 +42,7 @@ import org.structr.core.rest.GraphObjectGSONAdapter;
  *
  *
  */
-public class ResultGSONAdapter implements JsonSerializer<Result>, JsonDeserializer<Result> {
+public class ResultGSONAdapter implements JsonSerializer<QueryResult>, JsonDeserializer<QueryResult> {
 
 	private final DecimalFormat decimalFormat             = new DecimalFormat("0.000000000", DecimalFormatSymbols.getInstance(Locale.ENGLISH));
 	private GraphObjectGSONAdapter graphObjectGsonAdapter = null;
@@ -52,7 +52,7 @@ public class ResultGSONAdapter implements JsonSerializer<Result>, JsonDeserializ
 	}
 
 	@Override
-	public JsonElement serialize(Result src, Type typeOfSrc, JsonSerializationContext context) {
+	public JsonElement serialize(QueryResult src, Type typeOfSrc, JsonSerializationContext context) {
 
 		long t0 = System.nanoTime();
 
@@ -60,15 +60,15 @@ public class ResultGSONAdapter implements JsonSerializer<Result>, JsonDeserializ
 
 		// result fields in alphabetical order
 		List<? extends GraphObject> results = src.getResults();
-		Integer page = src.getPage();
-		Integer pageCount = src.getPageCount();
-		Integer pageSize = src.getPageSize();
-		String queryTime = src.getQueryTime();
-		Integer resultCount = src.getRawResultCount();
-		String searchString = src.getSearchString();
-		String sortKey = src.getSortKey();
-		String sortOrder = src.getSortOrder();
-		GraphObject metaData = src.getMetaData();
+		Integer page                        = src.getPage();
+		Integer pageCount                   = src.getPageCount();
+		Integer pageSize                    = src.getPageSize();
+		String queryTime                    = src.getQueryTime();
+		Integer resultCount                 = src.getRawResultCount();
+		String searchString                 = src.getSearchString();
+		String sortKey                      = src.getSortKey();
+		String sortOrder                    = src.getSortOrder();
+		GraphObject metaData                = src.getMetaData();
 
 		if(page != null) {
 			result.add("page", new JsonPrimitive(page));
@@ -188,7 +188,7 @@ public class ResultGSONAdapter implements JsonSerializer<Result>, JsonDeserializ
 	}
 
 	@Override
-	public Result deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
+	public QueryResult deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
 		return null;
 	}
 

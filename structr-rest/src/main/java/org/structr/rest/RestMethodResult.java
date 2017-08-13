@@ -32,7 +32,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 
 /**
  * Encapsulates the result of a REST HTTP method call, i.e. headers, response
@@ -102,7 +102,7 @@ public class RestMethodResult {
 			if (content != null) {
 
 				// serialize result set
-				gson.toJson(new Result(this.content, this.content.size(), this.content.size() > 1 || serializeSingleObjectAsCollection, serializeAsPrimitiveArray), writer);
+				gson.toJson(new QueryResult(this.content, this.content.size(), this.content.size() > 1 || serializeSingleObjectAsCollection, serializeAsPrimitiveArray), writer);
 			}
 
 			if (content == null) {
@@ -114,7 +114,7 @@ public class RestMethodResult {
 				} else {
 
 					// serialize result set
-					gson.toJson(new Result(nonGraphObjectResult), writer);
+					gson.toJson(new QueryResult(nonGraphObjectResult), writer);
 				}
 
 			}

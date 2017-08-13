@@ -24,7 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.app.Query;
 import org.structr.core.app.StructrApp;
 import org.structr.core.property.PropertyKey;
@@ -103,7 +103,7 @@ public class ListCommand extends AbstractCommand {
 		try {
 
 			// do search
-			final Result result = query.getResult();
+			final QueryResult result = query.getResult();
 
 			// save raw result count
 			int resultCountBeforePaging = result.getRawResultCount(); // filteredResults.size();

@@ -33,9 +33,10 @@ import static org.junit.Assert.fail;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.QueryResult;
+import org.structr.api.util.QueryUtils;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
 import org.structr.core.app.App;
 import org.structr.core.app.Query;
 import org.structr.core.app.StructrApp;
@@ -95,11 +96,11 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result<TestOne> result = app.nodeQuery(type).getResult();
+				QueryResult<TestOne> result = app.nodeQuery(type).getResult();
 
 				assertEquals(4, result.size());
 
-				for (NodeInterface node : result.getResults()) {
+				for (NodeInterface node : result) {
 					System.out.println(node);
 				}
 
@@ -153,7 +154,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result result = app.nodeQuery(type).and(TestOne.name, "TestOne-13").getResult();
+				QueryResult result = app.nodeQuery(type).and(TestOne.name, "TestOne-13").getResult();
 
 				assertEquals(1, result.size());
 
@@ -204,7 +205,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result result = app.nodeQuery(type).and(TestOne.name, "testone", false).getResult();
+				QueryResult result = app.nodeQuery(type).and(TestOne.name, "testone", false).getResult();
 
 				assertEquals(4, result.size());
 
@@ -255,7 +256,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result result = app.nodeQuery(type).and(TestOne.name, "TestOne", false).getResult();
+				QueryResult result = app.nodeQuery(type).and(TestOne.name, "TestOne", false).getResult();
 
 				assertEquals(4, result.size());
 
@@ -306,7 +307,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result result = app.nodeQuery(type).and(TestOne.stringWithDefault, "default value", false).getResult();
+				QueryResult result = app.nodeQuery(type).and(TestOne.stringWithDefault, "default value", false).getResult();
 
 				assertEquals(4, result.size());
 
@@ -399,7 +400,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 				long t0 = System.currentTimeMillis();
 
-				Result<? extends GraphObject> result = app.nodeQuery(NodeInterface.class).getResult();
+				QueryResult<? extends GraphObject> result = app.nodeQuery(NodeInterface.class).getResult();
 
 				long t1 = System.currentTimeMillis();
 				logger.info("Query with inexact type took {} ms", t1-t0);
@@ -544,7 +545,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result result = app.nodeQuery(type).getResult();
+				List<NodeInterface> result = app.nodeQuery(type).getAsList();
 
 				assertEquals(number, result.size());
 
@@ -553,10 +554,10 @@ public class SearchAndSortingTest extends StructrTest {
 				int pageSize        = 10;
 				int page            = 1;
 
-				result = app.nodeQuery(type).sort(sortKey).order(sortDesc).page(page).pageSize(pageSize).getResult();
+				result = app.nodeQuery(type).sort(sortKey).order(sortDesc).page(page).pageSize(pageSize).getAsList();
 
-				logger.info("Raw result size: {}, expected: {}", new Object[] { result.getRawResultCount(), number });
-				assertEquals(number, (int) result.getRawResultCount());
+				logger.info("Raw result size: {}, expected: {}", new Object[] { result.size(), number });
+				assertEquals(number, (int) result.size());
 				logger.info("Result size: {}, expected: {}", new Object[] { result.size(), Math.min(number, pageSize) });
 				assertEquals(Math.min(number, pageSize), result.size());
 
@@ -614,7 +615,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result result = app.nodeQuery(type).getResult();
+				QueryResult<NodeInterface> result = app.nodeQuery(type).getResult();
 
 				assertEquals(number, result.size());
 
@@ -625,15 +626,18 @@ public class SearchAndSortingTest extends StructrTest {
 
 				result = app.nodeQuery(type).sort(sortKey).order(sortDesc).page(page).pageSize(pageSize).getResult();
 
-				logger.info("Raw result size: {}, expected: {}", new Object[] { result.getRawResultCount(), number });
-				assertTrue(result.getRawResultCount() == number);
-				logger.info("Result size: {}, expected: {}", new Object[] { result.size(), Math.min(number, pageSize) });
-				assertTrue(result.size() == Math.min(number, pageSize));
+				logger.info("Raw result size: {}, expected: {}", new Object[] { result.size(), number });
+				assertTrue(result.size() == number);
+
+				final List<NodeInterface> list = QueryUtils.toList(result);
+
+				logger.info("Result size: {}, expected: {}", new Object[] { list.size(), Math.min(number, pageSize) });
+				assertTrue(list.size() == Math.min(number, pageSize));
 
 				for (int j = 0; j < Math.min(result.size(), pageSize); j++) {
 
 					int expectedNumber = number + offset - 1 - j;
-					String gotName     = result.get(j).getProperty(AbstractNode.name);
+					String gotName     = list.get(j).getProperty(AbstractNode.name);
 
 					System.out.println(expectedNumber + ", got: " + gotName);
 					assertEquals(Integer.toString(expectedNumber), gotName);
@@ -688,7 +692,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result result = app.nodeQuery(type).getResult();
+				QueryResult<NodeInterface> result = app.nodeQuery(type).getResult();
 
 				assertEquals(number, result.size());
 
@@ -699,15 +703,18 @@ public class SearchAndSortingTest extends StructrTest {
 
 				result = app.nodeQuery(type).sort(sortKey).order(sortDesc).page(page).pageSize(pageSize).getResult();
 
-				logger.info("Raw result size: {}, expected: {}", new Object[] { result.getRawResultCount(), number });
-				assertTrue(result.getRawResultCount() == number);
-				logger.info("Result size: {}, expected: {}", new Object[] { result.size(), pageSize });
-				assertTrue(result.size() == Math.min(number, pageSize));
+				logger.info("Raw result size: {}, expected: {}", new Object[] { result.size(), number });
+				assertTrue(result.size() == number);
+
+				final List<NodeInterface> list = QueryUtils.toList(result);
+
+				logger.info("Result size: {}, expected: {}", new Object[] { list.size(), pageSize });
+				assertTrue(list.size() == Math.min(number, pageSize));
 
 				for (int j = 0; j < Math.min(result.size(), pageSize); j++) {
 
 					String expectedName = "TestOne-" + (offset + j);
-					String gotName     = result.get(j).getProperty(AbstractNode.name);
+					String gotName     = list.get(j).getProperty(AbstractNode.name);
 
 					System.out.println(expectedName + ", got: " + gotName);
 					assertEquals(expectedName, gotName);
@@ -759,7 +766,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result result = app.nodeQuery(type).getResult();
+				QueryResult<NodeInterface> result = app.nodeQuery(type).getResult();
 
 				assertEquals(number, result.size());
 
@@ -770,15 +777,18 @@ public class SearchAndSortingTest extends StructrTest {
 
 				result = app.nodeQuery(type).sort(sortKey).order(sortDesc).page(page).pageSize(pageSize).getResult();
 
-				logger.info("Raw result size: {}, expected: {}", new Object[] { result.getRawResultCount(), number });
-				assertTrue(result.getRawResultCount() == number);
-				logger.info("Result size: {}, expected: {}", new Object[] { result.size(), pageSize });
-				assertTrue(result.size() == Math.min(number, pageSize));
+				logger.info("Raw result size: {}, expected: {}", new Object[] { result.size(), number });
+				assertTrue(result.size() == number);
+
+				final List<NodeInterface> list = QueryUtils.toList(result);
+
+				logger.info("Result size: {}, expected: {}", new Object[] { list.size(), pageSize });
+				assertTrue(list.size() == Math.min(number, pageSize));
 
 				for (int j = 0; j < pageSize; j++) {
 
 					int expectedNumber = number + offset - 1 - j;
-					String gotName     = result.get(j).getProperty(AbstractNode.name);
+					String gotName     = list.get(j).getProperty(AbstractNode.name);
 
 					System.out.println(expectedNumber + ", got: " + gotName);
 					assertEquals(Integer.toString(expectedNumber), gotName);
@@ -826,7 +836,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result result = app.nodeQuery(type).getResult();
+				QueryResult<NodeInterface> result = app.nodeQuery(type).getResult();
 
 				assertEquals(number, result.size());
 
@@ -837,15 +847,18 @@ public class SearchAndSortingTest extends StructrTest {
 
 				result = app.nodeQuery(type).sort(sortKey).order(sortDesc).page(page).pageSize(pageSize).getResult();
 
-				logger.info("Raw result size: {}, expected: {}", new Object[] { result.getRawResultCount(), number });
-				assertTrue(result.getRawResultCount() == number);
-				logger.info("Result size: {}, expected: {}", new Object[] { result.size(), pageSize });
-				assertTrue(result.size() == Math.min(number, pageSize));
+				logger.info("Raw result size: {}, expected: {}", new Object[] { result.size(), number });
+				assertTrue(result.size() == number);
+
+				final List<NodeInterface> list = QueryUtils.toList(result);
+
+				logger.info("Result size: {}, expected: {}", new Object[] { list.size(), pageSize });
+				assertTrue(list.size() == Math.min(number, pageSize));
 
 				for (int j = 0; j < pageSize; j++) {
 
 					int expectedNumber = offset + j;
-					int gotNumber      = (Integer) result.get(j).getProperty(key);
+					int gotNumber      = (Integer) list.get(j).getProperty(key);
 
 					System.out.println("expected: " + expectedNumber + ", got: " + gotNumber);
 					assertEquals(expectedNumber, gotNumber);
@@ -907,7 +920,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result result = app.nodeQuery(type).getResult();
+				QueryResult<NodeInterface> result = app.nodeQuery(type).getResult();
 
 				assertEquals(number, result.size());
 
@@ -918,15 +931,18 @@ public class SearchAndSortingTest extends StructrTest {
 
 				result = app.nodeQuery(type).sort(sortKey).order(sortDesc).page(page).pageSize(pageSize).getResult();
 
-				logger.info("Raw result size: {}, expected: {}", new Object[] { result.getRawResultCount(), number });
-				assertTrue(result.getRawResultCount() == number);
-				logger.info("Result size: {}, expected: {}", new Object[] { result.size(), pageSize });
-				assertTrue(result.size() == Math.min(number, pageSize));
+				logger.info("Raw result size: {}, expected: {}", new Object[] { result.size(), number });
+				assertTrue(result.size() == number);
 
-				for (int j = 0; j < Math.min(result.size(), pageSize); j++) {
+				final List<NodeInterface> list = QueryUtils.toList(result);
+
+				logger.info("Result size: {}, expected: {}", new Object[] { list.size(), pageSize });
+				assertTrue(list.size() == Math.min(number, pageSize));
+
+				for (int j = 0; j < Math.min(list.size(), pageSize); j++) {
 
 					String expectedName = "TestOne-" + (30 - (j+1)*2);
-					String gotName     = result.get(j).getProperty(AbstractNode.name);
+					String gotName     = list.get(j).getProperty(AbstractNode.name);
 
 					System.out.println(j + ": " +  expectedName + ", got: " + gotName);
 					assertEquals(expectedName, gotName);
@@ -1039,14 +1055,16 @@ public class SearchAndSortingTest extends StructrTest {
 
 			final AbstractNode node = createTestNode(TestOne.class, props);
 
-			Result result = null;
+			List result = null;
 
 			try (final Tx tx = app.tx()) {
 
-				result = app.nodeQuery(TestOne.class).andName(name).includeDeletedAndHidden().getResult();
+				result = app.nodeQuery(TestOne.class).andName(name).includeDeletedAndHidden().getAsList();
 
 				assertTrue(result.size() == 1);
 				assertTrue(result.get(0).equals(node));
+
+				tx.success();
 			}
 
 			// Change name attribute and search again
@@ -1060,10 +1078,12 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				result = app.nodeQuery(TestOne.class).andName(name2).includeDeletedAndHidden().getResult();
+				result = app.nodeQuery(TestOne.class).andName(name2).includeDeletedAndHidden().getAsList();
 
 				assertTrue(result.size() == 1);
 				assertTrue(result.get(0).equals(node));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException ex) {
@@ -1093,10 +1113,12 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result result = app.nodeQuery(type).and(key, date).includeDeletedAndHidden().getResult();
+				List result = app.nodeQuery(type).and(key, date).includeDeletedAndHidden().getAsList();
 
 				assertEquals(1, result.size());
 				assertTrue(result.get(0).equals(node));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException ex) {
@@ -1120,7 +1142,7 @@ public class SearchAndSortingTest extends StructrTest {
 			final Class type          = NodeHasLocation.class;
 			final String val1         = "54354354546806849870";
 
-			final Result<RelationshipInterface> result;
+			final List<RelationshipInterface> result;
 
 			try (final Tx tx = app.tx()) {
 
@@ -1132,10 +1154,12 @@ public class SearchAndSortingTest extends StructrTest {
 
 				assertTrue(rel.getProperty(key1).equals(val1));
 
-				result = app.relationshipQuery(type).and(key1, val1).getResult();
+				result = app.relationshipQuery(type).and(key1, val1).getAsList();
 
 				assertTrue(result.size() == 1);
 				assertTrue(result.get(0).equals(rel));
+
+				tx.success();
 			}
 
 			final String val2 = "ölllldjöoa8w4rasf";
@@ -1178,10 +1202,12 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result result = app.nodeQuery(type).location("Hanauer Landstraße", "200", "60314", "Frankfurt", "Germany", 10.0).includeDeletedAndHidden().getResult();
+				List result = app.nodeQuery(type).location("Hanauer Landstraße", "200", "60314", "Frankfurt", "Germany", 10.0).includeDeletedAndHidden().getAsList();
 
 				assertEquals(1, result.size());
 				assertTrue(result.get(0).equals(node));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException ex) {
@@ -1242,9 +1268,11 @@ public class SearchAndSortingTest extends StructrTest {
 
 		try (final Tx tx = app.tx()) {
 
-			Result result = app.nodeQuery(TestOne.class).location("Hanauer Landstraße", "200", "60314", "Frankfurt", "Germany", 10.0).includeDeletedAndHidden().getResult();
+			List result = app.nodeQuery(TestOne.class).location("Hanauer Landstraße", "200", "60314", "Frankfurt", "Germany", 10.0).includeDeletedAndHidden().getAsList();
 
 			assertEquals(0, result.size());
+
+			tx.success();
 
 		} catch (FrameworkException ex) {
 
@@ -1272,10 +1300,12 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result result = app.nodeQuery(TestOne.class).andName(name).includeDeletedAndHidden().getResult();
+				List result = app.nodeQuery(TestOne.class).andName(name).includeDeletedAndHidden().getAsList();
 
 				assertTrue(result.size() == 1);
 				assertTrue(result.get(0).equals(node));
+
+				tx.success();
 			}
 
 
@@ -1304,10 +1334,12 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result result = app.nodeQuery(TestOne.class).andName(name).includeDeletedAndHidden().getResult();
+				List result = app.nodeQuery(TestOne.class).andName(name).includeDeletedAndHidden().getAsList();
 
 				assertTrue(result.size() == 1);
 				assertTrue(result.get(0).equals(node));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException ex) {
@@ -1335,9 +1367,11 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result result = app.nodeQuery(TestOne.class).andName(null).includeDeletedAndHidden().getResult();
+				List result = app.nodeQuery(TestOne.class).andName(null).includeDeletedAndHidden().getAsList();
 
 				assertTrue(result.isEmpty());
+
+				tx.success();
 			}
 
 		} catch (FrameworkException ex) {
@@ -1361,10 +1395,12 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result result = app.nodeQuery(TestOne.class).and(TestOne.aString, null).includeDeletedAndHidden().getResult();
+				List result = app.nodeQuery(TestOne.class).and(TestOne.aString, null).includeDeletedAndHidden().getAsList();
 
 				assertTrue(result.size() == 1);
 				assertTrue(result.get(0).equals(node));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException ex) {
@@ -1388,10 +1424,12 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result result = app.nodeQuery(TestOne.class).and(TestOne.aDate, null).includeDeletedAndHidden().getResult();
+				List result = app.nodeQuery(TestOne.class).and(TestOne.aDate, null).includeDeletedAndHidden().getAsList();
 
 				assertTrue(result.size() == 1);
 				assertTrue(result.get(0).equals(node));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException ex) {
@@ -1415,10 +1453,12 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result result = app.nodeQuery(TestOne.class).and(TestOne.anInt, null).includeDeletedAndHidden().getResult();
+				List result = app.nodeQuery(TestOne.class).and(TestOne.anInt, null).includeDeletedAndHidden().getAsList();
 
 				assertTrue(result.size() == 1);
 				assertTrue(result.get(0).equals(node));
+
+				tx.success();
 			}
 
 		} catch (Throwable ex) {
@@ -1442,10 +1482,12 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result result = app.nodeQuery(TestOne.class).and(TestOne.aLong, null).includeDeletedAndHidden().getResult();
+				List result = app.nodeQuery(TestOne.class).and(TestOne.aLong, null).includeDeletedAndHidden().getAsList();
 
 				assertTrue(result.size() == 1);
 				assertTrue(result.get(0).equals(node));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException ex) {
@@ -1469,7 +1511,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result result = app.nodeQuery(TestOne.class).and(TestOne.aDouble, null).includeDeletedAndHidden().getResult();
+				List result = app.nodeQuery(TestOne.class).and(TestOne.aDouble, null).includeDeletedAndHidden().getAsList();
 				assertTrue(result.size() == 1);
 				assertTrue(result.get(0).equals(node));
 
@@ -1500,21 +1542,25 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result result = app.nodeQuery(type).getResult();
+				final QueryResult<NodeInterface> initialResult = app.nodeQuery(type).getResult();
 
-				assertTrue(result.size() == number);
+				assertTrue(initialResult.size() == number);
 
 				PropertyKey sortKey = AbstractNode.name;
 				boolean sortDesc    = false;
 				int pageSize        = 10;
 				int page            = 1;
 
-				result = app.nodeQuery(type).includeDeletedAndHidden().sort(sortKey).order(sortDesc).page(page).pageSize(pageSize).getResult();
+				final QueryResult<NodeInterface> result = app.nodeQuery(type).includeDeletedAndHidden().sort(sortKey).order(sortDesc).page(page).pageSize(pageSize).getResult();
+				final List<NodeInterface> list          = QueryUtils.toList(result);
 
-				logger.info("Raw result size: {}, expected: {}", new Object[] { result.getRawResultCount(), number });
-				assertTrue(result.getRawResultCount() == number);
-				logger.info("Result size: {}, expected: {}", new Object[] { result.size(), pageSize });
-				assertTrue(result.size() == pageSize);
+				logger.info("Raw result size: {}, expected: {}", new Object[] { result.size(), number });
+				assertTrue(result.size() == number);
+
+				logger.info("Result size: {}, expected: {}", new Object[] { list.size(), pageSize });
+				assertTrue(list.size() == pageSize);
+
+				tx.success();
 			}
 
               } catch (FrameworkException ex) {
@@ -1557,12 +1603,13 @@ public class SearchAndSortingTest extends StructrTest {
 
 					node.setProperty(AbstractNode.name, _name);
 				}
+
 				tx.success();
 			}
 
 			try (final Tx tx = app.tx()) {
 
-				Result result = app.nodeQuery(type).getResult();
+				QueryResult result = app.nodeQuery(type).getResult();
 
 				assertEquals(number, result.size());
 
@@ -1580,6 +1627,8 @@ public class SearchAndSortingTest extends StructrTest {
 
 					}
 				}
+
+				tx.success();
 			}
 
 		} catch (FrameworkException ex) {
@@ -1850,9 +1899,9 @@ public class SearchAndSortingTest extends StructrTest {
 				final boolean sortDesc    = false;
 				final int pageSize        = 10;
 				final int page            = 22;
-				final Result result       = tester1App.nodeQuery(type).sort(sortKey).order(sortDesc).pageSize(pageSize).page(page).getResult();
+				final QueryResult result  = tester1App.nodeQuery(type).sort(sortKey).order(sortDesc).pageSize(pageSize).page(page).getResult();
 
-				assertEquals("Invalid paging result count with non-superuser security context", tester1NodeCount, (int)result.getRawResultCount());
+				assertEquals("Invalid paging result count with non-superuser security context", tester1NodeCount, (int)result.size());
 
 				tx.success();
 			}
@@ -1863,9 +1912,89 @@ public class SearchAndSortingTest extends StructrTest {
 				final boolean sortDesc    = false;
 				final int pageSize        = 10;
 				final int page            = 22;
-				final Result result       = tester2App.nodeQuery(type).sort(sortKey).order(sortDesc).pageSize(pageSize).page(page).getResult();
+				final QueryResult result       = tester2App.nodeQuery(type).sort(sortKey).order(sortDesc).pageSize(pageSize).page(page).getResult();
 
-				assertEquals("Invalid paging result count with non-superuser security context", tester2NodeCount, (int)result.getRawResultCount());
+				assertEquals("Invalid paging result count with non-superuser security context", tester2NodeCount, (int)result.size());
+
+				tx.success();
+			}
+
+
+		} catch (FrameworkException ex) {
+
+			logger.error(ex.toString());
+			fail("Unexpected exception");
+
+		}
+	}
+
+	@Test
+	public void testSkipInvisibleNodes() {
+
+		Principal tester = null;
+
+		try (final Tx tx = app.tx()) {
+
+			// create non-admin user
+			tester = app.create(TestUser.class, "tester1");
+
+			tx.success();
+
+		} catch (FrameworkException fex) {
+
+			logger.warn("", fex);
+			fail("Unexpected exception");
+		}
+
+		try {
+
+			final SecurityContext tester1Context   = SecurityContext.getInstance(tester, AccessMode.Backend);
+			final App testerApp                    = StructrApp.getInstance(tester1Context);
+			final Class type                       = TestOne.class;
+			final int number                       = 200;
+			final List<NodeInterface> allNodes     = this.createTestNodes(type, number);
+			final List<NodeInterface> tester1Nodes = new LinkedList<>();
+			final int offset                       = 0;
+
+			try (final Tx tx = app.tx()) {
+
+				int i = offset;
+				for (NodeInterface node : allNodes) {
+
+					// System.out.println("Node ID: " + node.getNodeId());
+					String _name = "TestOne-" + StringUtils.leftPad(Integer.toString(i), 5, "0");
+
+					final double rand = Math.random();
+
+					if (rand < 0.5) {
+
+						node.setProperty(NodeInterface.owner, tester);
+						tester1Nodes.add(node);
+					}
+
+					i++;
+
+					node.setProperty(AbstractNode.name, _name);
+				}
+
+				tx.success();
+			}
+
+			final int tester1NodeCount   = tester1Nodes.size();
+
+			try (final Tx tx = app.tx()) {
+
+				final PropertyKey sortKey = AbstractNode.name;
+				final boolean sortDesc    = false;
+				final QueryResult result  = testerApp.nodeQuery(type).sort(sortKey).order(sortDesc).getResult();
+				int i                     = 0;
+
+				for (final Object o : result) {
+					assertEquals("User result is not equal to expected result", o, tester1Nodes.get(i++));
+				}
+
+				assertEquals("Invalid paging result count with non-superuser security context", tester1NodeCount, (int)result.size());
+
 
 				tx.success();
 			}
@@ -1937,10 +2066,10 @@ public class SearchAndSortingTest extends StructrTest {
 
 		try (final Tx tx = app.tx()) {
 
-			final Result<TestOne> result = app.nodeQuery(TestOne.class).includeDeletedAndHidden(false).getResult();
+			final QueryResult<TestOne> result = app.nodeQuery(TestOne.class).includeDeletedAndHidden(false).getResult();
 
-			assertEquals("Result count should not include deleted or hidden nodes", 7, (int)result.getRawResultCount());
-			assertEquals("Actual result size should be equal to result count", 7, (int)result.getResults().size());
+			assertEquals("Result count should not include deleted or hidden nodes", 7, (int)result.size());
+			assertEquals("Actual result size should be equal to result count", 7, (int)result.size());
 
 
 			tx.success();
@@ -1961,10 +2090,13 @@ public class SearchAndSortingTest extends StructrTest {
 			query.includeDeletedAndHidden();
 		}
 
-		final Result result = query.getResult();
+		final QueryResult<NodeInterface> result = query.getResult();
 
-		logger.info("===================================================\nRaw result size: {}, expected: {} (page size: {}, page: {})", new Object[] { result.getRawResultCount(), number, pageSize, page });
-		assertTrue(result.getRawResultCount() == ((pageSize == 0 || page == 0) ? 0 : number));
+		logger.info("===================================================\nRaw result size: {}, expected: {} (page size: {}, page: {})",
+			result.size(), number, pageSize, page
+		);
+
+		assertTrue(result.size() == ((pageSize == 0 || page == 0) ? 0 : number));
 
 		long expectedResultCount = (pageSize == 0 || page == 0)
 					   ? 0
@@ -1972,14 +2104,17 @@ public class SearchAndSortingTest extends StructrTest {
 
 		int startIndex = (Math.max(page, 1) - 1) * pageSize;
 
-		logger.info("Result size: {}, expected: {}, start index: {}", new Object[] { result.size(), expectedResultCount, startIndex });
-		assertTrue(result.size() == expectedResultCount);
+		final List<NodeInterface> list = QueryUtils.toList(result);
+
+
+		logger.info("Result size: {}, expected: {}, start index: {}", new Object[] { list.size(), expectedResultCount, startIndex });
+		assertTrue(list.size() == expectedResultCount);
 
 
 		for (int j = 0; j < expectedResultCount; j++) {
 
 			String expectedName = "TestOne-" + (offset + j + startIndex);
-			String gotName      = result.get(j).getProperty(AbstractNode.name);
+			String gotName      = list.get(j).getProperty(AbstractNode.name);
 
 			System.out.println(expectedName + ", got: " + gotName);
 			assertEquals(expectedName, gotName);

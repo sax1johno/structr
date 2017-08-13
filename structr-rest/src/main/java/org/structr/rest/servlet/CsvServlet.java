@@ -50,7 +50,7 @@ import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.JsonInput;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.Services;
 import org.structr.core.Value;
 import org.structr.core.app.App;
@@ -129,7 +129,7 @@ public class CsvServlet extends HttpServlet implements HttpServiceServlet {
 	protected void doGet(final HttpServletRequest request, final HttpServletResponse response) throws UnsupportedEncodingException {
 
 		Authenticator authenticator = null;
-		Result result = null;
+		QueryResult result = null;
 		Resource resource = null;
 
 		try {
@@ -608,7 +608,7 @@ public class CsvServlet extends HttpServlet implements HttpServiceServlet {
 	 * @param propertyView
 	 * @throws IOException
 	 */
-	public static void writeCsv(final Result result, final Writer out, final String propertyView) throws IOException {
+	public static void writeCsv(final QueryResult result, final Writer out, final String propertyView) throws IOException {
 
 		final List<GraphObject> list = result.getResults();
 		final StringBuilder row      = new StringBuilder();

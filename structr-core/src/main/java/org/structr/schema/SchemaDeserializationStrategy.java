@@ -27,7 +27,6 @@ import org.structr.common.error.FrameworkException;
 import org.structr.common.error.PropertiesNotFoundToken;
 import org.structr.common.error.TypeToken;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
@@ -86,7 +85,7 @@ public class SchemaDeserializationStrategy<S, T extends NodeInterface> implement
 
 		if (attributes != null) {
 
-			Result<T> result = Result.EMPTY_RESULT;
+			T obj = null;
 
 			// remove attributes that do not belong to the target node
 			final PropertyMap foreignProperties = new PropertyMap();
@@ -108,7 +107,7 @@ public class SchemaDeserializationStrategy<S, T extends NodeInterface> implement
 			// Check if properties contain the UUID attribute
 			if (attributes.containsKey(GraphObject.id)) {
 
-				result = new Result(app.getNodeById(attributes.get(GraphObject.id)), false);
+				obj = (T)app.getNodeById(attributes.get(GraphObject.id));
 
 			} else {
 
@@ -131,7 +130,7 @@ public class SchemaDeserializationStrategy<S, T extends NodeInterface> implement
 						identifyingKeyValues.put(key, attributes.get(key));
 					}
 
-					result = app.nodeQuery(type).and(identifyingKeyValues).getResult();
+					obj = app.nodeQuery(type).and(identifyingKeyValues).getFirst();
 
 				}
 			}
@@ -146,47 +145,43 @@ public class SchemaDeserializationStrategy<S, T extends NodeInterface> implement
 
 			// just check for existance
 			String errorMessage = null;
-			final int size = result.size();
-			switch (size) {
 
-				case 0:
+			if (obj == null) {
 
-					if (createIfNotExisting) {
+				if (createIfNotExisting) {
 
-						// create node and return it
-						T newNode = app.create(type, attributes);
-						if (newNode != null) {
+					// create node and return it
+					T newNode = app.create(type, attributes);
+					if (newNode != null) {
 
-							notionPropertyMap.put(getStorageKey(relationProperty, newNode, sourceTypeName), foreignProperties);
+						notionPropertyMap.put(getStorageKey(relationProperty, newNode, sourceTypeName), foreignProperties);
 
-							return newNode;
-						}
+						return newNode;
 					}
+				}
 
-					errorMessage = "No node found for the given properties and auto-creation not enabled";
-					break;
+				errorMessage = "No node found for the given properties and auto-creation not enabled";
 
-				case 1:
+			} else {
 
-					final T typedResult = getTypedResult(result, type);
+				final T typedResult = getTypedResult(obj, type);
 
-					notionPropertyMap.put(getStorageKey(relationProperty, typedResult, sourceTypeName), foreignProperties);
+				notionPropertyMap.put(getStorageKey(relationProperty, typedResult, sourceTypeName), foreignProperties);
 
-					// set properties on existing node (relationships)
-					for (final Entry<PropertyKey, Object> entry : attributes.entrySet()) {
-						typedResult.setProperty(entry.getKey(), entry.getValue());
-					}
+				// set properties on existing node (relationships)
+				for (final Entry<PropertyKey, Object> entry : attributes.entrySet()) {
+					typedResult.setProperty(entry.getKey(), entry.getValue());
+				}
 
-					return typedResult;
-
-				default:
-
-					errorMessage = "Found " + size + " nodes for given type and properties, property set is ambiguous";
-					logger.error("Found {} nodes for given type and properties, property set is ambiguous!\n"
-						+ "This is often due to wrong modeling, or you should consider creating a uniquness constraint for " + type.getName(), size);
-
-					break;
+				return typedResult;
 			}
+
+			/*
+
+				errorMessage = "Found " + size + " nodes for given type and properties, property set is ambiguous";
+				logger.error("Found {} nodes for given type and properties, property set is ambiguous!\n"
+					+ "This is often due to wrong modeling, or you should consider creating a uniquness constraint for " + type.getName(), size);
+			*/
 
 			throw new FrameworkException(404, errorMessage, new PropertiesNotFoundToken(type.getSimpleName(), AbstractNode.base, attributes));
 		}
@@ -194,15 +189,13 @@ public class SchemaDeserializationStrategy<S, T extends NodeInterface> implement
 		return null;
 	}
 
-	private T getTypedResult(Result<T> result, Class<T> type) throws FrameworkException {
-
-		GraphObject obj = result.get(0);
+	private T getTypedResult(T obj, Class<T> type) throws FrameworkException {
 
 		if (!type.isAssignableFrom(obj.getClass())) {
 			throw new FrameworkException(422, "Node type mismatch", new TypeToken(type.getSimpleName(), null, type.getSimpleName()));
 		}
 
-		return result.get(0);
+		return obj;
 	}
 
 	private String getStorageKey(final RelationProperty relationProperty, final NodeInterface newNode, final String sourceTypeName) {

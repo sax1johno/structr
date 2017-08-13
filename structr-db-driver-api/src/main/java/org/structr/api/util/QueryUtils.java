@@ -31,11 +31,12 @@ import org.structr.api.QueryResult;
 
 public class QueryUtils {
 
-	public static <T, C extends Collection<T>> C addAll(C collection, QueryResult<? extends T> iterable) {
+	public static <T, C extends Collection<T>> C addAll(C collection, QueryResult<T> iterable) {
 
-		final Iterator<? extends T> iterator = iterable.iterator();
 
-		try {
+		try (final QueryResult<T> tmp = iterable) {
+
+			final Iterator<T> iterator = tmp.iterator();
 			while (iterator.hasNext()) {
 
 				final T next = iterator.next();
@@ -46,21 +47,7 @@ public class QueryUtils {
 			}
 
 		} catch (Throwable t) {
-
 			t.printStackTrace();
-
-		} finally {
-
-			if (iterator instanceof AutoCloseable) {
-
-				try {
-
-					((AutoCloseable)iterator).close();
-
-				} catch (Exception e) {
-					// Ignore
-				}
-			}
 		}
 
 		return collection;
@@ -81,41 +68,35 @@ public class QueryUtils {
 		return !iterable.iterator().hasNext();
 	}
 
-	public static <X> QueryResult<X> filter(Predicate<? super X> specification, QueryResult<X> i) {
-		return new FilterIterable<>(i, specification);
-	}
-
-	public static <X> Iterator<X> filter(Predicate<? super X> specification, Iterator<X> i) {
-		return new FilterIterable.FilterIterator<>(i, specification);
-	}
-
 	public static <FROM, TO> QueryResult<TO> map(Function<? super FROM, ? extends TO> function, QueryResult<FROM> from) {
 		return new MapIterable<>(from, function);
 	}
 
-	public static <T> List<T> toList(QueryResult<T> iterable) {
-		return addAll(new ArrayList<T>(), iterable);
+	public static <FROM> QueryResult<FROM> filterNullValues(final QueryResult<FROM> from) {
+		return new FilterIterable<>(from, (value) -> value != null);
 	}
 
-	public static <T> List<T> toList(Iterator<T> iterator) {
-
-		final List<T> list = new ArrayList<>();
-		while (iterator.hasNext()) {
-
-			final T value = iterator.next();
-			if (value != null) {
-
-				list.add(value);
-			}
-		}
-
-		return list;
+	public static <T> List<T> toList(QueryResult<T> iterable) {
+		return addAll(new ArrayList<T>(iterable.size() + 1), iterable);
 	}
 
 	public static <T> Set<T> toSet(QueryResult<T> iterable) {
 		return addAll(new HashSet<T>(), iterable);
 	}
 
+	public static <T> QueryResult<T> emptyResult() {
+		return new EmptyResult<>();
+	}
+
+	public static <T> QueryResult<T> fromList(final List<T> list) {
+		return new ListBasedResult<>(list);
+	}
+
+	public static <T> QueryResult<T> emptyList() {
+		return new ListBasedResult<>(new ArrayList<>(1000));
+	}
+
+	// ----- nested classes -----
 	private static class MapIterable<FROM, TO> implements QueryResult<TO> {
 
 		private final QueryResult<FROM> from;
@@ -132,8 +113,8 @@ public class QueryUtils {
 		}
 
 		@Override
-		public long resultCount() {
-			return from.resultCount();
+		public int size() {
+			return from.size();
 		}
 
 		@Override
@@ -179,12 +160,17 @@ public class QueryUtils {
 	private static class FilterIterable<T> implements QueryResult<T> {
 
 		private final Predicate<? super T> specification;
-		private final QueryResult<T> iterable;
+		private final QueryResult <T> iterable;
 
-		public FilterIterable(QueryResult<T> iterable, Predicate<? super T> specification) {
+		public FilterIterable(QueryResult <T> iterable, Predicate<? super T> specification) {
 
 			this.specification = specification;
 			this.iterable      = iterable;
+		}
+
+		@Override
+		public Iterator<T> iterator() {
+			return new FilterIterator<>(iterable.iterator(), specification);
 		}
 
 		@Override
@@ -193,18 +179,13 @@ public class QueryUtils {
 		}
 
 		@Override
-		public long resultCount() {
-			return iterable.resultCount();
+		public int size() {
+			return iterable.size();
 		}
 
 		@Override
 		public boolean isLimited() {
 			return iterable.isLimited();
-		}
-
-		@Override
-		public Iterator<T> iterator() {
-			return new FilterIterator<>(iterable.iterator(), specification);
 		}
 
 		static class FilterIterator<T> implements Iterator<T> {
@@ -227,12 +208,12 @@ public class QueryUtils {
 
 				while (!found && iterator.hasNext()) {
 
-					final T currentValue = iterator.next();
+					final T current = iterator.next();
 
-					if (currentValue != null && specification.accept(currentValue)) {
+					if (current != null && specification.accept(current)) {
 
 						found             = true;
-						this.currentValue = currentValue;
+						this.currentValue = current;
 						nextConsumed      = false;
 					}
 				}
@@ -275,6 +256,76 @@ public class QueryUtils {
 			@Override
 			public void remove() {
 			}
+		}
+	}
+
+	private static class EmptyResult<T> implements QueryResult<T> {
+
+		@Override
+		public void close() {
+		}
+
+		@Override
+		public int size() {
+			return 0;
+		}
+
+		@Override
+		public boolean isLimited() {
+			return false;
+		}
+
+		@Override
+		public Iterator<T> iterator() {
+
+			return new Iterator<T>() {
+
+				@Override
+				public boolean hasNext() {
+					return false;
+				}
+
+				@Override
+				public T next() {
+					throw new NoSuchElementException("Empty iterator.");
+				}
+			};
+		}
+	}
+
+	private static class ListBasedResult<T> implements QueryResult<T> {
+
+		private List<T> list = null;
+
+		public ListBasedResult(final List<T> src) {
+			this.list = src;
+		}
+
+		@Override
+		public void close() {
+		}
+
+		@Override
+		public int size() {
+			return list.size();
+		}
+
+		@Override
+		public boolean isLimited() {
+			return false;
+		}
+
+		@Override
+		public Iterator<T> iterator() {
+			return list.iterator();
+		}
+
+		public void add(final T t) {
+			list.add(t);
+		}
+
+		public List<T> getList() {
+			return list;
 		}
 	}
 }

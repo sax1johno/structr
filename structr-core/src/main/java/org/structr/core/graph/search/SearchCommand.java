@@ -33,6 +33,7 @@ import org.structr.api.QueryResult;
 import org.structr.api.graph.PropertyContainer;
 import org.structr.api.index.Index;
 import org.structr.api.search.Occurrence;
+import org.structr.api.util.QueryUtils;
 import org.structr.common.GraphObjectComparator;
 import org.structr.common.PagingHelper;
 import org.structr.common.SecurityContext;
@@ -40,7 +41,6 @@ import org.structr.common.error.FrameworkException;
 import org.structr.common.geo.GeoCodingResult;
 import org.structr.common.geo.GeoHelper;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.AbstractRelationship;
@@ -99,11 +99,11 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 	public abstract boolean isRelationshipSearch();
 	public abstract Index<S> getIndex();
 
-	private Result<T> doSearch() throws FrameworkException {
+	private QueryResult<T> doSearch() throws FrameworkException {
 
 		if (page == 0 || pageSize <= 0) {
 
-			return Result.EMPTY_RESULT;
+			return QueryResult.EMPTY_RESULT;
 		}
 
 		final Factory<S, T> factory  = getFactory(securityContext, includeDeletedAndHidden, publicOnly, pageSize, page);
@@ -126,7 +126,7 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 		// At this point, all search attributes are ready
 		final List<SourceSearchAttribute> sources    = new ArrayList<>();
 		boolean hasEmptySearchFields                 = false;
-		Result intermediateResult                    = null;
+		QueryResult intermediateResult                    = null;
 
 		// check for optional-only queries
 		// (some query types seem to allow no MUST occurs)
@@ -190,7 +190,8 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 		// use filters to filter sources otherwise
 		if (!hasSpatialSource && !sources.isEmpty()) {
 
-			intermediateResult = new Result(new ArrayList<>(), null, false, false);
+			//intermediateResult = new QueryResult(new ArrayList<>(), null, false, false);
+			intermediateResult = QueryUtils.emptyList();
 
 		} else {
 
@@ -221,9 +222,9 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 		if (intermediateResult != null && (hasEmptySearchFields || hasGraphSources || hasSpatialSource)) {
 
 			// sorted result set
-			final Set<GraphObject> intermediateResultSet = new LinkedHashSet<>(intermediateResult.getResults());
-			final List<GraphObject> finalResult          = new ArrayList<>();
-			int resultCount                              = 0;
+			final Set<T> intermediateResultSet = new LinkedHashSet<>(QueryUtils.toList(intermediateResult));
+			final List<T> finalResult          = new ArrayList<>();
+			int resultCount                    = 0;
 
 			// We need to find out whether there was a source for any of the possible sets that we want to merge.
 			// If there was only a single source, the final result is the result of that source. If there are
@@ -232,7 +233,7 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 			if (hasGraphSources) {
 
 				// merge sources according to their occur flag
-				final Set<GraphObject> mergedSources = mergeSources(sources);
+				final Set<T> mergedSources = mergeSources(sources);
 
 				if (hasSpatialSource) {
 
@@ -246,7 +247,7 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 			}
 
 			// Filter intermediate result
-			for (final GraphObject obj : intermediateResultSet) {
+			for (final T obj : intermediateResultSet) {
 
 				boolean addToResult = true;
 
@@ -268,7 +269,7 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 			Collections.sort(finalResult, new GraphObjectComparator(sortKey, sortDescending));
 
 			// return paged final result
-			return new Result(PagingHelper.subList(finalResult, pageSize, page), resultCount, true, false);
+			return QueryUtils.fromList(PagingHelper.subList(finalResult, pageSize, page));
 
 		} else {
 
@@ -277,10 +278,10 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 		}
 	}
 
-	private Set<GraphObject> mergeSources(List<SourceSearchAttribute> sources) {
+	private Set<T> mergeSources(List<SourceSearchAttribute> sources) {
 
-		final Set<GraphObject> mergedResult = new LinkedHashSet<>();
-		boolean alreadyAdded                = false;
+		final Set<T> mergedResult = new LinkedHashSet<>();
+		boolean alreadyAdded      = false;
 
 		for (final Iterator<SourceSearchAttribute> it = sources.iterator(); it.hasNext();) {
 
@@ -317,17 +318,17 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 	}
 
 	@Override
-	public Result<T> getResult() throws FrameworkException {
+	public QueryResult<T> getResult() throws FrameworkException {
 		return doSearch();
 	}
 
 	@Override
 	public List<T> getAsList() throws FrameworkException {
 
-		final Result<T> result = getResult();
+		final QueryResult<T> result = getResult();
 		if (result != null) {
 
-			return result.getResults();
+			return QueryUtils.toList(result);
 		}
 
 		return Collections.emptyList();
@@ -336,14 +337,20 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 	@Override
 	public T getFirst() throws FrameworkException {
 
-		final Result<T> result = getResult();
+		final QueryResult<T> result = getResult();
+		if (result != null) {
 
-		if (result == null || result.isEmpty()) {
+			final Iterator<T> iterator = result.iterator();
+			if (iterator != null && iterator.hasNext()) {
 
-			return null;
+				final T first = iterator.next();
+				result.close();
+
+				return first;
+			}
 		}
 
-		return result.get(0);
+		return null;
 	}
 
 	// ----- builder methods -----

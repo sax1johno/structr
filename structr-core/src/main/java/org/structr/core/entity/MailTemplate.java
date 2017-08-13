@@ -18,6 +18,7 @@
  */
 package org.structr.core.entity;
 
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.PropertyView;
@@ -25,7 +26,6 @@ import org.structr.common.ValidationHelper;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.common.error.UniqueToken;
-import org.structr.core.Result;
 import org.structr.core.app.StructrApp;
 import org.structr.core.property.Property;
 import org.structr.core.property.StringProperty;
@@ -73,12 +73,12 @@ public class MailTemplate extends AbstractNode {
 		valid &= ValidationHelper.isValidStringNotBlank(this, locale, errorBuffer);
 
 		try {
-			Result<MailTemplate> res = StructrApp.getInstance(securityContext).nodeQuery(MailTemplate.class).andName(_name).and(locale, _locale).getResult();
+			List<MailTemplate> res = StructrApp.getInstance(securityContext).nodeQuery(MailTemplate.class).andName(_name).and(locale, _locale).getAsList();
 			if (res.size() > 1) {
 
 				errorBuffer.add(new UniqueToken(MailTemplate.class.getName(), name, _uuid));
 				errorBuffer.add(new UniqueToken(MailTemplate.class.getName(), locale, _uuid));
-				
+
 				valid = false;
 			}
 

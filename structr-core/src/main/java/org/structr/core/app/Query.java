@@ -20,9 +20,9 @@ package org.structr.core.app;
 
 import java.util.List;
 import org.structr.api.Predicate;
+import org.structr.api.QueryResult;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
 import org.structr.core.graph.search.SearchAttribute;
 import org.structr.core.graph.search.SearchAttributeGroup;
 import org.structr.core.property.PropertyKey;
@@ -35,7 +35,7 @@ import org.structr.core.property.PropertyMap;
  */
 public interface Query<T extends GraphObject> extends Iterable<T> {
 
-	public Result<T> getResult() throws FrameworkException;
+	public QueryResult<T> getResult() throws FrameworkException;
 	public List<T> getAsList() throws FrameworkException;
 	public T getFirst() throws FrameworkException;
 

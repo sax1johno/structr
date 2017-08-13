@@ -18,14 +18,16 @@
  */
 package org.structr.api;
 
-/**
- *
- */
+import org.structr.api.util.QueryUtils;
+
 public interface QueryResult<T> extends Iterable<T>, AutoCloseable {
+
+	public static final QueryResult EMPTY_RESULT = QueryUtils.emptyResult();
 
 	@Override
 	void close();
 
-	long resultCount();
+	int size();
+
 	boolean isLimited();
 }

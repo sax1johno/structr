@@ -28,7 +28,7 @@ import org.structr.common.PagingHelper;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.ViewTransformation;
 import org.structr.core.graph.NodeFactory;
 import org.structr.core.property.PropertyKey;
@@ -54,14 +54,14 @@ public class TransformationResource extends WrappingResource {
 	}
 
 	@Override
-	public Result doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
+	public QueryResult doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
 
 		if(wrappedResource != null && transformation != null) {
 
 			// allow view transformation to avoid evaluation of wrapped resource
 			if (transformation.evaluateWrappedResource()) {
 
-				Result result = wrappedResource.doGet(sortKey, sortDescending, NodeFactory.DEFAULT_PAGE_SIZE, NodeFactory.DEFAULT_PAGE);
+				QueryResult result = wrappedResource.doGet(sortKey, sortDescending, NodeFactory.DEFAULT_PAGE_SIZE, NodeFactory.DEFAULT_PAGE);
 
 				try {
 
@@ -80,7 +80,7 @@ public class TransformationResource extends WrappingResource {
 				List<? extends GraphObject> listToTransform = new LinkedList<GraphObject>();
 				transformation.apply(securityContext, listToTransform);
 
-				Result result = new Result(listToTransform, listToTransform.size(), wrappedResource.isCollectionResource(), wrappedResource.isPrimitiveArray());
+				QueryResult result = new QueryResult(listToTransform, listToTransform.size(), wrappedResource.isCollectionResource(), wrappedResource.isPrimitiveArray());
 
 				// apply paging later
 				return PagingHelper.subResult(result, pageSize, page);
@@ -89,7 +89,7 @@ public class TransformationResource extends WrappingResource {
 		}
 
 		List emptyList = Collections.emptyList();
-		return new Result(emptyList, null, isCollectionResource(), isPrimitiveArray());
+		return new QueryResult(emptyList, null, isCollectionResource(), isPrimitiveArray());
 	}
 
 	@Override

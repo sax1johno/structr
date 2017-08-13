@@ -38,7 +38,7 @@ import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.GraphObjectMap;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.app.App;
 import org.structr.core.app.Query;
 import org.structr.core.app.StructrApp;
@@ -89,7 +89,7 @@ public class StaticRelationshipResource extends SortableResource {
 
 	//~--- methods --------------------------------------------------------
 	@Override
-	public Result doGet(final PropertyKey sortKey, final boolean sortDescending, final int pageSize, final int page) throws FrameworkException {
+	public QueryResult doGet(final PropertyKey sortKey, final boolean sortDescending, final int pageSize, final int page) throws FrameworkException {
 
 		// ok, source node exists, fetch it
 		final GraphObject sourceEntity = typedIdResource.getEntity();
@@ -121,7 +121,7 @@ public class StaticRelationshipResource extends SortableResource {
 						applyDefaultSorting(finalResult, sortKey, sortDescending);
 
 						// return result
-						return new Result(PagingHelper.subList(finalResult, pageSize, page), finalResult.size(), isCollectionResource(), isPrimitiveArray());
+						return new QueryResult(PagingHelper.subList(finalResult, pageSize, page), finalResult.size(), isCollectionResource(), isPrimitiveArray());
 
 					} else {
 
@@ -175,7 +175,7 @@ public class StaticRelationshipResource extends SortableResource {
 
 							GraphObjectMap gObject = new GraphObjectMap();
 							gObject.setProperty(new ArrayProperty(this.typeResource.rawType, Object.class), propertyResults.toArray());
-							Result r = new Result(gObject, true);
+							QueryResult r = new QueryResult(gObject, true);
 							r.setRawResultCount(rawResultCount);
 							return r;
 
@@ -190,13 +190,13 @@ public class StaticRelationshipResource extends SortableResource {
 						applyDefaultSorting(finalResult, sortKey, sortDescending);
 
 						// return result
-						Result r = new Result(PagingHelper.subList(finalResult, pageSize, page), finalResult.size(), isCollectionResource(), isPrimitiveArray());
+						QueryResult r = new QueryResult(PagingHelper.subList(finalResult, pageSize, page), finalResult.size(), isCollectionResource(), isPrimitiveArray());
 						r.setRawResultCount(rawResultCount);
 						return r;
 
 					} else if (value instanceof GraphObject) {
 
-						return new Result((GraphObject) value, isPrimitiveArray());
+						return new QueryResult((GraphObject) value, isPrimitiveArray());
 
 					} else if (value != null) {
 
@@ -228,7 +228,7 @@ public class StaticRelationshipResource extends SortableResource {
 						}
 
 						gObject.setProperty(key, value);
-						Result r = new Result(gObject, true);
+						QueryResult r = new QueryResult(gObject, true);
 						r.setRawResultCount(resultCount);
 						return r;
 
@@ -243,14 +243,14 @@ public class StaticRelationshipResource extends SortableResource {
 				// check propertyKey to return the right variant of empty result
 				if (!(propertyKey instanceof StartNode || propertyKey instanceof EndNode)) {
 
-					return new Result(Collections.EMPTY_LIST, 1, false, true);
+					return new QueryResult(Collections.EMPTY_LIST, 1, false, true);
 
 				}
 
 			}
 		}
 
-		return new Result(Collections.EMPTY_LIST, 0, false, true);
+		return new QueryResult(Collections.EMPTY_LIST, 0, false, true);
 	}
 
 	@Override

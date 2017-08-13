@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 import org.structr.common.AccessMode;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractUser;
 import org.structr.core.entity.Principal;
@@ -71,7 +71,7 @@ public class StructrUserManager implements UserManager {
 
 			List<String> userNames = new ArrayList();
 
-			Result<Principal> result = Result.EMPTY_RESULT;
+			QueryResult<Principal> result = QueryResult.EMPTY_RESULT;
 
 			try {
 

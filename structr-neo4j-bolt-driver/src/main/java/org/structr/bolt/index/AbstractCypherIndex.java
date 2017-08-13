@@ -95,7 +95,7 @@ public abstract class AbstractCypherIndex<T extends PropertyContainer> implement
 		CONVERTERS.put(Double.class,  new DoubleTypeConverter());
 	}
 
-	protected final FixedSizeCache<Integer, Long> resultCountCache;
+	protected final FixedSizeCache<Integer, Integer> resultCountCache;
 	protected final BoltDatabaseService db;
 
 	public AbstractCypherIndex(final BoltDatabaseService db, final int queryCacheSize) {

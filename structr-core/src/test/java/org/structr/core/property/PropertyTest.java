@@ -39,7 +39,6 @@ import org.structr.common.AccessControllable;
 import org.structr.common.StructrTest;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
 import org.structr.core.app.StructrApp;
 import org.structr.core.converter.PropertyConverter;
 import org.structr.core.entity.AbstractNode;
@@ -119,12 +118,14 @@ public class PropertyTest extends StructrTest {
 			assertNotNull(testEntity);
 
 
-			Result<TestFour> result = null;
+			List<TestFour> result = null;
 			try (final Tx tx = app.tx()) {
 
-				result = app.nodeQuery(TestFour.class).and(key, new String[]{"one"}).getResult();
+				result = app.nodeQuery(TestFour.class).and(key, new String[]{"one"}).getAsList();
 				assertEquals(1, result.size());
 				assertEquals(result.get(0), testEntity);
+
+				tx.success();
 			}
 
 
@@ -135,30 +136,38 @@ public class PropertyTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				result = app.nodeQuery(TestFour.class).and(key, new String[]{"one"}).getResult();
+				result = app.nodeQuery(TestFour.class).and(key, new String[]{"one"}).getAsList();
 
 				assertEquals(1, result.size());
 				assertEquals(result.get(0), testEntity);
+
+				tx.success();
 			}
 
 			try (final Tx tx = app.tx()) {
 
-				result = app.nodeQuery(TestFour.class).and(key, new String[]{"one", "two"}).getResult();
+				result = app.nodeQuery(TestFour.class).and(key, new String[]{"one", "two"}).getAsList();
 				assertEquals(1, result.size());
 				assertEquals(result.get(0), testEntity);
+
+				tx.success();
 			}
 
 			try (final Tx tx = app.tx()) {
 
-				result = app.nodeQuery(TestFour.class).and(key, new String[]{"one", "foo"}).getResult();
+				result = app.nodeQuery(TestFour.class).and(key, new String[]{"one", "foo"}).getAsList();
 				assertEquals(0, result.size());
+
+				tx.success();
 			}
 
 			try (final Tx tx = app.tx()) {
 
-				result = app.nodeQuery(TestFour.class).and(key, new String[]{"one", "foo"}, false).getResult();
+				result = app.nodeQuery(TestFour.class).and(key, new String[]{"one", "foo"}, false).getAsList();
 				assertEquals(1, result.size());
 				assertEquals(result.get(0), testEntity);
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -192,6 +201,8 @@ public class PropertyTest extends StructrTest {
 
 				// check value from database
 				assertEquals(value, testEntity.getProperty(key));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -219,10 +230,12 @@ public class PropertyTest extends StructrTest {
 				// check value from database
 				assertEquals((Boolean)true, (Boolean)testEntity.getProperty(key));
 
-				Result<TestFour> result = app.nodeQuery(TestFour.class).and(key, true).getResult();
+				List<TestFour> result = app.nodeQuery(TestFour.class).and(key, true).getAsList();
 
 				assertEquals(1, result.size());
 				assertEquals(testEntity, result.get(0));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -259,10 +272,12 @@ public class PropertyTest extends StructrTest {
 				// check value from database
 				assertEquals((Boolean)true, (Boolean)testEntity.getProperty(key));
 
-				Result<OneFourOneToOne> result = app.relationshipQuery(OneFourOneToOne.class).and(key, true).getResult();
+				List<OneFourOneToOne> result = app.relationshipQuery(OneFourOneToOne.class).and(key, true).getAsList();
 
 				assertEquals(1, result.size());
 				assertEquals(testEntity, result.get(0));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -365,6 +380,8 @@ public class PropertyTest extends StructrTest {
 				// both entities should have the two related nodes
 				assertEquals(2, testOnesFromTestSix1.size());
 				assertEquals(2, testOnesFromTestSix2.size());
+
+				tx.success();
 			}
 
 			// create new list with one TestOne entity
@@ -479,6 +496,8 @@ public class PropertyTest extends StructrTest {
 
 				// check value from database
 				assertEquals(value, instance.getProperty(securityContext, testEntity, true));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -507,10 +526,12 @@ public class PropertyTest extends StructrTest {
 				// check value from database
 				assertEquals(value, testEntity.getProperty(key));
 
-				Result<TestFour> result = app.nodeQuery(TestFour.class).and(key, value).getResult();
+				List<TestFour> result = app.nodeQuery(TestFour.class).and(key, value).getAsList();
 
 				assertEquals(1, result.size());
 				assertEquals(testEntity, result.get(0));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -543,7 +564,7 @@ public class PropertyTest extends StructrTest {
 				// check value from database
 				assertEquals(value, testEntity.getProperty(key));
 
-				Result<TestFour> result = app.nodeQuery(TestFour.class).andRange(key, minValue, maxValue).getResult();
+				List<TestFour> result = app.nodeQuery(TestFour.class).andRange(key, minValue, maxValue).getAsList();
 
 				assertEquals(1, result.size());
 				assertEquals(testEntity, result.get(0));
@@ -553,7 +574,7 @@ public class PropertyTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result<TestFour> result = app.nodeQuery(TestFour.class).andRange(key, maxValue, maxMaxValue).getResult();
+				List<TestFour> result = app.nodeQuery(TestFour.class).andRange(key, maxValue, maxMaxValue).getAsList();
 
 				assertEquals(0, result.size());
 
@@ -591,6 +612,8 @@ public class PropertyTest extends StructrTest {
 
 				// check value from database
 				assertEquals(value, instance.getProperty(securityContext, testEntity, true));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -650,10 +673,12 @@ public class PropertyTest extends StructrTest {
 				// check value from database
 				assertEquals(3.141592653589793238, testEntity.getProperty(key), 0.0);
 
-				Result<TestFour> result = app.nodeQuery(TestFour.class).and(key, 3.141592653589793238).getResult();
+				List<TestFour> result = app.nodeQuery(TestFour.class).and(key, 3.141592653589793238).getAsList();
 
 				assertEquals(1, result.size());
 				assertEquals(testEntity, result.get(0));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -682,10 +707,10 @@ public class PropertyTest extends StructrTest {
 				// check value from database
 				assertEquals(Double.NaN, testEntity.getProperty(key));
 
-				Result<TestFour> result = app.nodeQuery(TestFour.class).and(key, Double.NaN).getResult();
+				Result<TestFour> result = app.nodeQuery(TestFour.class).and(key, Double.NaN).getAsList();
 
 				assertEquals(1, result.size());
-				assertEquals(testEntity, result.get(0));
+				assertEquals(testEntity, result.get(0);
 			}
 
 		} catch (FrameworkException fex) {
@@ -715,10 +740,12 @@ public class PropertyTest extends StructrTest {
 				// check value from database
 				assertEquals(Double.NEGATIVE_INFINITY, testEntity.getProperty(key), 0.0);
 
-				Result<TestFour> result = app.nodeQuery(TestFour.class).and(key, Double.NEGATIVE_INFINITY).getResult();
+				List<TestFour> result = app.nodeQuery(TestFour.class).and(key, Double.NEGATIVE_INFINITY).getAsList();
 
 				assertEquals(1, result.size());
 				assertEquals(testEntity, result.get(0));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -747,10 +774,12 @@ public class PropertyTest extends StructrTest {
 				// check value from database
 				assertEquals(Double.POSITIVE_INFINITY, testEntity.getProperty(key), 0.0);
 
-				Result<TestFour> result = app.nodeQuery(TestFour.class).and(key, Double.POSITIVE_INFINITY).getResult();
+				List<TestFour> result = app.nodeQuery(TestFour.class).and(key, Double.POSITIVE_INFINITY).getAsList();
 
 				assertEquals(1, result.size());
 				assertEquals(testEntity, result.get(0));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -787,10 +816,12 @@ public class PropertyTest extends StructrTest {
 				// check value from database
 				assertEquals(3.141592653589793238, testEntity.getProperty(key), 0.0);
 
-				Result<OneFourOneToOne> result = app.relationshipQuery(OneFourOneToOne.class).and(key, 3.141592653589793238).getResult();
+				List<OneFourOneToOne> result = app.relationshipQuery(OneFourOneToOne.class).and(key, 3.141592653589793238).getAsList();
 
 				assertEquals(1, result.size());
 				assertEquals(testEntity, result.get(0));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -818,7 +849,7 @@ public class PropertyTest extends StructrTest {
 				// check value from database
 				assertEquals((Double)123456.2, testEntity.getProperty(key));
 
-				Result<TestFour> result = app.nodeQuery(TestFour.class).andRange(key, 123455.1, 123457.6).getResult();
+				List<TestFour> result = app.nodeQuery(TestFour.class).andRange(key, 123455.1, 123457.6).getAsList();
 
 				assertEquals(1, result.size());
 				assertEquals(testEntity, result.get(0));
@@ -828,7 +859,7 @@ public class PropertyTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result<TestFour> result = app.nodeQuery(TestFour.class).andRange(key, 123456.3, 123456.7).getResult();
+				List<TestFour> result = app.nodeQuery(TestFour.class).andRange(key, 123456.3, 123456.7).getAsList();
 
 				assertEquals(0, result.size());
 
@@ -904,6 +935,8 @@ public class PropertyTest extends StructrTest {
 
 				assertTrue(verifyB != null && verifyB.equals(b));
 				assertTrue(verifyD != null && verifyD.equals(d));
+
+				tx.success();
 			}
 
 			try (final Tx tx = app.tx()) {
@@ -927,6 +960,8 @@ public class PropertyTest extends StructrTest {
 				// testSix2 should not have a testThree associated
 				TestThree vrfy4 = c.getProperty(TestSix.oneToOneTestThree);
 				assertNull(vrfy4);
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -993,6 +1028,8 @@ public class PropertyTest extends StructrTest {
 
 				assertTrue(verifyB != null && verifyB.get(0).equals(testThree1));
 				assertTrue(verifyD != null && verifyD.get(0).equals(testThree2));
+
+				tx.success();
 			}
 
 			try (final Tx tx = app.tx()) {
@@ -1017,6 +1054,8 @@ public class PropertyTest extends StructrTest {
 				// testSix2 should not have a testThree associated
 				List<TestThree> vrfy4 = testSix2.getProperty(TestSix.oneToManyTestThrees);
 				assertEquals(0, vrfy4.size());
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -1124,10 +1163,12 @@ public class PropertyTest extends StructrTest {
 				// check value from database
 				assertEquals(TestEnum.Status1, testEntity.getProperty(key));
 
-				Result<TestFour> result = app.nodeQuery(TestFour.class).and(key, TestEnum.Status1).getResult();
+				List<TestFour> result = app.nodeQuery(TestFour.class).and(key, TestEnum.Status1).getAsList();
 
 				assertEquals(1, result.size());
 				assertEquals(testEntity, result.get(0));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -1164,10 +1205,12 @@ public class PropertyTest extends StructrTest {
 				// check value from database
 				assertEquals(TestEnum.Status1, testEntity.getProperty(key));
 
-				Result<OneFourOneToOne> result = app.relationshipQuery(OneFourOneToOne.class).and(key, TestEnum.Status1).getResult();
+				List<OneFourOneToOne> result = app.relationshipQuery(OneFourOneToOne.class).and(key, TestEnum.Status1).getAsList();
 
 				assertEquals(1, result.size());
 				assertEquals(testEntity, result.get(0));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -1225,6 +1268,8 @@ public class PropertyTest extends StructrTest {
 
 				// check value from database
 				assertEquals(value, instance.getProperty(securityContext, testEntity, true));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -1252,10 +1297,12 @@ public class PropertyTest extends StructrTest {
 				// check value from database
 				assertEquals((Integer)2345, (Integer)testEntity.getProperty(key));
 
-				Result<TestFour> result = app.nodeQuery(TestFour.class).and(key, 2345).getResult();
+				List<TestFour> result = app.nodeQuery(TestFour.class).and(key, 2345).getAsList();
 
 				assertEquals(1, result.size());
 				assertEquals(testEntity, result.get(0));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -1292,10 +1339,12 @@ public class PropertyTest extends StructrTest {
 				// check value from database
 				assertEquals((Integer)2345, (Integer)testEntity.getProperty(key));
 
-				Result<OneFourOneToOne> result = app.relationshipQuery(OneFourOneToOne.class).and(key, 2345).getResult();
+				List<OneFourOneToOne> result = app.relationshipQuery(OneFourOneToOne.class).and(key, 2345).getAsList();
 
 				assertEquals(1, result.size());
 				assertEquals(testEntity, result.get(0));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -1323,7 +1372,7 @@ public class PropertyTest extends StructrTest {
 				// check value from database
 				assertEquals((Integer)123456, testEntity.getProperty(key));
 
-				Result<TestFour> result = app.nodeQuery(TestFour.class).andRange(key, 123455, 123457).getResult();
+				List<TestFour> result = app.nodeQuery(TestFour.class).andRange(key, 123455, 123457).getAsList();
 
 				assertEquals(1, result.size());
 				assertEquals(testEntity, result.get(0));
@@ -1333,7 +1382,7 @@ public class PropertyTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result<TestFour> result = app.nodeQuery(TestFour.class).andRange(key, 123457, 123458).getResult();
+				List<TestFour> result = app.nodeQuery(TestFour.class).andRange(key, 123457, 123458).getAsList();
 
 				assertEquals(0, result.size());
 
@@ -1371,6 +1420,8 @@ public class PropertyTest extends StructrTest {
 
 				// check value from database
 				assertEquals(value, instance.getProperty(securityContext, testEntity, true));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -1398,10 +1449,12 @@ public class PropertyTest extends StructrTest {
 				// check value from database
 				assertEquals((Long)2857312362L, (Long)testEntity.getProperty(key));
 
-				Result<TestFour> result = app.nodeQuery(TestFour.class).and(key, 2857312362L).getResult();
+				List<TestFour> result = app.nodeQuery(TestFour.class).and(key, 2857312362L).getAsList();
 
 				assertEquals(1, result.size());
 				assertEquals(testEntity, result.get(0));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -1438,10 +1491,12 @@ public class PropertyTest extends StructrTest {
 				// check value from database
 				assertEquals((Long)2857312362L, (Long)testEntity.getProperty(key));
 
-				Result<OneFourOneToOne> result = app.relationshipQuery(OneFourOneToOne.class).and(key, 2857312362L).getResult();
+				List<OneFourOneToOne> result = app.relationshipQuery(OneFourOneToOne.class).and(key, 2857312362L).getAsList();
 
 				assertEquals(1, result.size());
 				assertEquals(testEntity, result.get(0));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -1469,7 +1524,7 @@ public class PropertyTest extends StructrTest {
 				// check value from database
 				assertEquals((Long)123456L, testEntity.getProperty(key));
 
-				Result<TestFour> result = app.nodeQuery(TestFour.class).andRange(key, 123455L, 123457L).getResult();
+				List<TestFour> result = app.nodeQuery(TestFour.class).andRange(key, 123455L, 123457L).getAsList();
 
 				assertEquals(1, result.size());
 				assertEquals(testEntity, result.get(0));
@@ -1479,7 +1534,7 @@ public class PropertyTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				Result<TestFour> result = app.nodeQuery(TestFour.class).andRange(key, 123457L, 123458L).getResult();
+				List<TestFour> result = app.nodeQuery(TestFour.class).andRange(key, 123457L, 123458L).getAsList();
 
 				assertEquals(0, result.size());
 
@@ -1517,6 +1572,8 @@ public class PropertyTest extends StructrTest {
 
 				// check value from database
 				assertEquals(value, instance.getProperty(securityContext, testEntity, true));
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -1544,10 +1601,12 @@ public class PropertyTest extends StructrTest {
 				// check value from database
 				assertEquals("test", testEntity.getProperty(key));
 
-				Result<TestFour> result = app.nodeQuery(TestFour.class).and(key, "test").getResult();
+				List<TestFour> result = app.nodeQuery(TestFour.class).and(key, "test").getAsList();
 
 				assertEquals(result.size(), 1);
 				assertEquals(result.get(0), testEntity);
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -1584,10 +1643,12 @@ public class PropertyTest extends StructrTest {
 				// check value from database
 				assertEquals("test", testEntity.getProperty(key));
 
-				Result<OneFourOneToOne> result = app.relationshipQuery(OneFourOneToOne.class).and(key, "test").getResult();
+				List<OneFourOneToOne> result = app.relationshipQuery(OneFourOneToOne.class).and(key, "test").getAsList();
 
 				assertEquals(result.size(), 1);
 				assertEquals(result.get(0), testEntity);
+
+				tx.success();
 			}
 
 		} catch (FrameworkException fex) {
@@ -1650,6 +1711,8 @@ public class PropertyTest extends StructrTest {
 
 			// check labels after type change
 			assertTrue(Iterables.toSet(testEntity.getNode().getLabels()).containsAll(labelsAfter));
+
+			tx.success();
 
 		} catch (FrameworkException fex) {
 

@@ -63,10 +63,10 @@ public class CypherNodeIndex extends AbstractCypherIndex<Node> {
 		final NodeNodeMapper mapper    = new NodeNodeMapper(db);
 		final Map<String, Object> data = query.getParameters();
 
-		Long resultCount = resultCountCache.get(queryHashCode);
+		Integer resultCount = resultCountCache.get(queryHashCode);
 		if (resultCount == null) {
 
-			resultCount = tx.getLong(query.getStatement(true, false), data);
+			resultCount = tx.getInteger(query.getStatement(true, false), data);
 			resultCountCache.put(queryHashCode, resultCount);
 		}
 

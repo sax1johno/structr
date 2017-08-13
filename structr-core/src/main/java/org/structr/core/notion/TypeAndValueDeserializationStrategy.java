@@ -21,6 +21,7 @@ package org.structr.core.notion;
 import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.QueryResult;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.common.error.PropertiesNotFoundToken;
@@ -67,8 +68,8 @@ public class TypeAndValueDeserializationStrategy<S, T extends NodeInterface> imp
 	@Override
 	public T deserialize(final SecurityContext securityContext, Class<T> type, S source, final Object context) throws FrameworkException {
 
-		final App app    = StructrApp.getInstance(securityContext);
-		Result<T> result = Result.EMPTY_RESULT;
+		final App app         = StructrApp.getInstance(securityContext);
+		QueryResult<T> result = QueryResult.EMPTY_RESULT;
 
 		// default to UUID
 		if (propertyKey == null) {
@@ -130,7 +131,9 @@ public class TypeAndValueDeserializationStrategy<S, T extends NodeInterface> imp
 
 			case 1 :
 
-				T obj = result.get(0);
+				final T obj = result.iterator().next();
+
+				result.close();
 
 				//if(!type.getSimpleName().equals(node.getType())) {
 				if (!type.isAssignableFrom(obj.getClass())) {

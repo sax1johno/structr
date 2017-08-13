@@ -25,7 +25,7 @@ import org.structr.agent.Task;
 import org.structr.api.service.Command;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.Result;
+import org.structr.core.QueryResult;
 import org.structr.core.graph.BulkChangeNodePropertyKeyCommand;
 import org.structr.core.graph.BulkCopyRelationshipPropertyCommand;
 import org.structr.core.graph.BulkCreateLabelsCommand;
@@ -106,7 +106,7 @@ public class MaintenanceParameterResource extends Resource {
 	}
 
 	@Override
-	public Result doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
+	public QueryResult doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
 		throw new NotAllowedException("GET not allowed, use POST to run maintenance commands");
 	}
 
