@@ -44,6 +44,7 @@ import org.structr.core.Result;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.AbstractRelationship;
+import org.structr.core.entity.Principal;
 import org.structr.core.graph.Factory;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.NodeServiceCommand;
@@ -106,13 +107,13 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 		}
 
 		final Factory<S, T> factory  = getFactory(securityContext, includeDeletedAndHidden, publicOnly, pageSize, page);
+		final Principal user         = securityContext.getUser(false);
 		boolean hasGraphSources      = false;
 		boolean hasSpatialSource     = false;
 
-		if (securityContext.getUser(false) == null) {
+		if (user == null) {
 
 			rootGroup.add(new PropertySearchAttribute(GraphObject.visibleToPublicUsers, true, Occurrence.REQUIRED, true));
-
 		}
 
 		// special handling of deleted and hidden flags
@@ -177,9 +178,6 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 
 				sources.add((SourceSearchAttribute)attr);
 
-				// don't remove attribute from filter list
-				//it.remove();
-
 				hasGraphSources = true;
 			}
 
@@ -206,8 +204,16 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 			final Index<S> index = getIndex();
 			if (index != null) {
 
+				int limit  = -1;
+				int offset = -1;
+
+				if (user != null && user.isAdmin() && pageSize != Integer.MAX_VALUE) {
+					offset = (page-1) * pageSize;
+					limit = pageSize;
+				}
+
 				// do query
-				final QueryResult hits = getIndex().query(rootGroup);
+				final QueryResult hits = getIndex().query(rootGroup, limit, offset);
 				intermediateResult     = factory.instantiate(hits);
 			}
 		}

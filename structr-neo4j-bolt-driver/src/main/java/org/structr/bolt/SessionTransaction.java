@@ -239,13 +239,13 @@ public class SessionTransaction implements org.structr.api.Transaction {
 		}
 	}
 
-	public QueryResult<Node> getNodes(final String statement, final Map<String, Object> map) {
+	public QueryResult<Node> getNodes(final String statement, final Map<String, Object> map, final long count, final boolean limited) {
 
 		try {
 
 			logQuery(statement, map);
 
-			return QueryUtils.map(new RecordNodeMapper(), new StatementIterable(tx.run(statement, map)));
+			return QueryUtils.map(new RecordNodeMapper(), new StatementIterable(tx.run(statement, map), count, limited));
 
 		} catch (TransientException tex) {
 			closed = true;
@@ -255,13 +255,13 @@ public class SessionTransaction implements org.structr.api.Transaction {
 		}
 	}
 
-	public QueryResult<Relationship> getRelationships(final String statement, final Map<String, Object> map) {
+	public QueryResult<Relationship> getRelationships(final String statement, final Map<String, Object> map, final long count, final boolean limited) {
 
 		try {
 
 			logQuery(statement, map);
 
-			return QueryUtils.map(new RecordRelationshipMapper(), new StatementIterable(tx.run(statement, map)));
+			return QueryUtils.map(new RecordRelationshipMapper(), new StatementIterable(tx.run(statement, map), count, limited));
 
 		} catch (TransientException tex) {
 			closed = true;
@@ -271,13 +271,13 @@ public class SessionTransaction implements org.structr.api.Transaction {
 		}
 	}
 
-	public QueryResult<Long> getIds(final String statement, final Map<String, Object> map) {
+	public QueryResult<Long> getIds(final String statement, final Map<String, Object> map, final long count, final boolean limited) {
 
 		try {
 
 			logQuery(statement, map);
 
-			return QueryUtils.map(new RecordLongMapper(), new StatementIterable(tx.run(statement, map)));
+			return QueryUtils.map(new RecordLongMapper(), new StatementIterable(tx.run(statement, map), count, limited));
 
 		} catch (TransientException tex) {
 			closed = true;
@@ -302,6 +302,16 @@ public class SessionTransaction implements org.structr.api.Transaction {
 				@Override
 				public void close() {
 					result.consume();
+				}
+
+				@Override
+				public long resultCount() {
+					return 0;
+				}
+
+				@Override
+				public boolean isLimited() {
+					return false;
 				}
 
 				@Override
@@ -385,14 +395,28 @@ public class SessionTransaction implements org.structr.api.Transaction {
 	private class StatementIterable implements QueryResult<Record> {
 
 		private StatementResult result = null;
+		private boolean limited        = false;
+		private long count             = 0;
 
-		public StatementIterable(final StatementResult result) {
-			this.result = result;
+		public StatementIterable(final StatementResult result, final long count, final boolean limited) {
+			this.result  = result;
+			this.count   = count;
+			this.limited = limited;
 		}
 
 		@Override
 		public void close() {
 			result.consume();
+		}
+
+		@Override
+		public long resultCount() {
+			return count;
+		}
+
+		@Override
+		public boolean isLimited() {
+			return limited;
 		}
 
 		@Override
@@ -424,6 +448,5 @@ public class SessionTransaction implements org.structr.api.Transaction {
 				}
 			};
 		}
-
 	}
 }

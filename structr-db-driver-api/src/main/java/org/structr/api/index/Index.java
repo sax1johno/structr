@@ -31,5 +31,5 @@ public interface Index<T> {
 	void remove(final T t);
 	void remove(final T t, final String key);
 
-	QueryResult<T> query(final QueryPredicate predicate);
+	QueryResult<T> query(final QueryPredicate predicate, final int limit, final int offset);
 }

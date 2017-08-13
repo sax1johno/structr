@@ -18,10 +18,9 @@
  */
 package org.structr.bolt.index;
 
-import java.util.Iterator;
 import org.structr.api.QueryResult;
 import org.structr.api.graph.Relationship;
-import org.structr.api.util.Iterables;
+import org.structr.api.util.QueryUtils;
 import org.structr.bolt.BoltDatabaseService;
 import org.structr.bolt.SessionTransaction;
 import org.structr.bolt.mapper.RelationshipRelationshipMapper;
@@ -57,7 +56,7 @@ public class CypherRelationshipIndex extends AbstractCypherIndex<Relationship> {
 	}
 
 	@Override
-	public String getQuerySuffix() {
+	public String getQuerySuffix(final boolean doCount) {
 		return " RETURN DISTINCT n";
 	}
 
@@ -66,18 +65,7 @@ public class CypherRelationshipIndex extends AbstractCypherIndex<Relationship> {
 
 		final SessionTransaction tx                 = db.getCurrentTransaction();
 		final RelationshipRelationshipMapper mapper = new RelationshipRelationshipMapper(db);
-		final Iterable<Relationship> mapped         = Iterables.map(mapper, tx.getRelationships(context.getStatement(), context.getParameters()));
 
-		return new QueryResult<Relationship>() {
-
-			@Override
-			public void close() {
-			}
-
-			@Override
-			public Iterator<Relationship> iterator() {
-				return mapped.iterator();
-			}
-		};
+		return QueryUtils.map(mapper, tx.getRelationships(context.getStatement(false, true), context.getParameters(), -1, false));
 	}
 }

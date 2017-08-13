@@ -18,6 +18,7 @@
  */
 package org.structr.bolt.index;
 
+import java.util.Map;
 import org.structr.api.QueryResult;
 import org.structr.api.graph.Node;
 import org.structr.api.util.QueryUtils;
@@ -45,40 +46,34 @@ public class CypherNodeIndex extends AbstractCypherIndex<Node> {
 	}
 
 	@Override
-	public String getQuerySuffix() {
+	public String getQuerySuffix(final boolean doCount) {
+
+		if (doCount) {
+			return " RETURN COUNT(n)";
+		}
+
 		return " RETURN DISTINCT n";
 	}
 
 	@Override
 	public QueryResult<Node> getResult(final CypherQuery query) {
 
-		final SessionTransaction tx = db.getCurrentTransaction();
-		final NodeNodeMapper mapper = new NodeNodeMapper(db);
+		final int queryHashCode        = query.getHashCode();
+		final SessionTransaction tx    = db.getCurrentTransaction();
+		final NodeNodeMapper mapper    = new NodeNodeMapper(db);
+		final Map<String, Object> data = query.getParameters();
 
-		return QueryUtils.map(mapper, tx.getNodes(query.getStatement(), query.getParameters()));
-	}
+		Long resultCount = resultCountCache.get(queryHashCode);
+		if (resultCount == null) {
 
-	/*
-	@Override
-	public QueryResult<Node> getResult(final CypherQuery query) {
-
-		final int queryHashCode  = query.getHashCode();
-		CachedQueryResult result = queryCache.get(queryHashCode);
-
-		if (result == null) {
-
-			final SessionTransaction tx = db.getCurrentTransaction();
-			final NodeNodeMapper mapper = new NodeNodeMapper(db);
-			final Iterable<Node> mapped = Iterables.map(mapper, tx.getNodes(query.getStatement(), query.getParameters()));
-
-			result = new CachedQueryResult(mapped);
-			if (!result.isEmpty()) {
-
-				queryCache.put(queryHashCode, result);
-			}
+			resultCount = tx.getLong(query.getStatement(true, false), data);
+			resultCountCache.put(queryHashCode, resultCount);
 		}
 
-		return result;
+		// only sort if result count is small enough
+		final boolean doSort  = resultCount < 100000;
+		final boolean limited = query.isLimitQuery();
+
+		return QueryUtils.map(mapper, tx.getNodes(query.getStatement(false, doSort), data, resultCount, limited));
 	}
-	*/
 }

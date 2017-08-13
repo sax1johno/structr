@@ -246,7 +246,7 @@ public class BoltDatabaseService implements DatabaseService, GraphProperties {
 		final SessionTransaction tx = getCurrentTransaction();
 		final NodeNodeMapper mapper = new NodeNodeMapper(this);
 
-		return Iterables.map(mapper, tx.getNodes("MATCH (n) RETURN n", Collections.emptyMap()));
+		return Iterables.map(mapper, tx.getNodes("MATCH (n) RETURN n", Collections.emptyMap(), -1, false));
 	}
 
 	@Override
@@ -259,7 +259,7 @@ public class BoltDatabaseService implements DatabaseService, GraphProperties {
 		final SessionTransaction tx = getCurrentTransaction();
 		final NodeNodeMapper mapper = new NodeNodeMapper(this);
 
-		return Iterables.map(mapper, tx.getNodes("MATCH (n:" + type + ") RETURN n", Collections.emptyMap()));
+		return Iterables.map(mapper, tx.getNodes("MATCH (n:" + type + ") RETURN n", Collections.emptyMap(), -1, false));
 	}
 
 	@Override
@@ -275,7 +275,7 @@ public class BoltDatabaseService implements DatabaseService, GraphProperties {
 
 		map.put("type", type);
 
-		return Iterables.map(mapper, tx.getNodes("MATCH (n) WHERE n.type = {type} RETURN n", map));
+		return Iterables.map(mapper, tx.getNodes("MATCH (n) WHERE n.type = {type} RETURN n", map, -1, false));
 	}
 
 	@Override
@@ -284,7 +284,7 @@ public class BoltDatabaseService implements DatabaseService, GraphProperties {
 		final RelationshipRelationshipMapper mapper = new RelationshipRelationshipMapper(this);
 		final SessionTransaction tx                 = getCurrentTransaction();
 
-		return Iterables.map(mapper, tx.getRelationships("MATCH ()-[r]->() RETURN r", Collections.emptyMap()));
+		return Iterables.map(mapper, tx.getRelationships("MATCH ()-[r]->() RETURN r", Collections.emptyMap(), -1, false));
 	}
 
 	@Override
@@ -297,7 +297,7 @@ public class BoltDatabaseService implements DatabaseService, GraphProperties {
 		final RelationshipRelationshipMapper mapper = new RelationshipRelationshipMapper(this);
 		final SessionTransaction tx                 = getCurrentTransaction();
 
-		return Iterables.map(mapper, tx.getRelationships("MATCH ()-[r:" + type + "]->() RETURN r", Collections.emptyMap()));
+		return Iterables.map(mapper, tx.getRelationships("MATCH ()-[r:" + type + "]->() RETURN r", Collections.emptyMap(), -1, false));
 	}
 
 	@Override

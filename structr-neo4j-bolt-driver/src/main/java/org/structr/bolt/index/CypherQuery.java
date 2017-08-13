@@ -40,15 +40,19 @@ public class CypherQuery {
 	private boolean sortDescending               = false;
 	private SortType sortType                    = null;
 	private String sortKey                       = null;
+	private int offset                           = 0;
+	private int limit                            = 0;
 	private int count                            = 0;
 
-	public CypherQuery(final AbstractCypherIndex<?> index) {
-		this.index = index;
+	public CypherQuery(final AbstractCypherIndex<?> index, final int limit, final int offset) {
+		this.index  = index;
+		this.limit  = limit;
+		this.offset = offset;
 	}
 
 	@Override
 	public String toString() {
-		return getStatement();
+		return getStatement(false, true);
 	}
 
 	public int getHashCode() {
@@ -56,7 +60,7 @@ public class CypherQuery {
 		int hashCode = 23;
 
 		hashCode += 27 * typeLabels.hashCode();
-		hashCode += 37 * getStatement().hashCode();
+		hashCode += 37 * getStatement(false, true).hashCode();
 		hashCode += 47 * deepHashCode(parameters);
 		hashCode += 57 * sortKey.hashCode();
 
@@ -67,7 +71,11 @@ public class CypherQuery {
 		return hashCode;
 	}
 
-	public String getStatement() {
+	public boolean isLimitQuery() {
+		return limit >= 0 && offset >= 0;
+	}
+
+	public String getStatement(final boolean doCount, final boolean doSort) {
 
 		final StringBuilder buf = new StringBuilder();
 		final int typeCount     = typeLabels.size();
@@ -82,7 +90,7 @@ public class CypherQuery {
 					buf.append(buffer);
 				}
 
-				buf.append(index.getQuerySuffix());
+				buf.append(index.getQuerySuffix(doCount));
 				break;
 
 			case 1:
@@ -94,7 +102,7 @@ public class CypherQuery {
 					buf.append(buffer);
 				}
 
-				buf.append(index.getQuerySuffix());
+				buf.append(index.getQuerySuffix(doCount));
 				break;
 
 			default:
@@ -109,7 +117,7 @@ public class CypherQuery {
 						buf.append(buffer);
 					}
 
-					buf.append(index.getQuerySuffix());
+					buf.append(index.getQuerySuffix(doCount));
 
 					if (it.hasNext()) {
 						buf.append(" UNION ");
@@ -118,32 +126,44 @@ public class CypherQuery {
 				break;
 		}
 
-		if (sortKey != null) {
+		if (!doCount) {
 
-			buf.append(" ORDER BY COALESCE(n.`");
-			buf.append(sortKey);
-			buf.append("`, ");
+			if (doSort && sortKey != null) {
 
-			// COALESCE needs a correctly typed minimum value,
-			// so we need to supply a value based on the sort
-			// type.
+				buf.append(" ORDER BY COALESCE(n.`");
+				buf.append(sortKey);
+				buf.append("`, ");
 
-			switch (sortType) {
+				// COALESCE needs a correctly typed minimum value,
+				// so we need to supply a value based on the sort
+				// type.
 
-				case Default:
-					// default is "String"
-					buf.append("''");
-					break;
+				switch (sortType) {
 
-				default:
-					// other types are numeric
-					buf.append("-1");
+					case Default:
+						// default is "String"
+						buf.append("''");
+						break;
+
+					default:
+						// other types are numeric
+						buf.append("-1");
+				}
+
+				buf.append(")");
+
+				if (sortDescending) {
+					buf.append(" DESC");
+				}
 			}
 
-			buf.append(")");
+			// pagination
+			if (isLimitQuery()) {
 
-			if (sortDescending) {
-				buf.append(" DESC");
+				buf.append(" SKIP ");
+				buf.append(offset);
+				buf.append(" LIMIT ");
+				buf.append(limit);
 			}
 		}
 

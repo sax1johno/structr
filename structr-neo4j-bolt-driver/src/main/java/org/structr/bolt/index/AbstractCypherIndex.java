@@ -19,11 +19,9 @@
 package org.structr.bolt.index;
 
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -44,7 +42,6 @@ import org.structr.api.search.TypeConverter;
 import org.structr.api.search.TypeQuery;
 import org.structr.api.search.UuidQuery;
 import org.structr.api.util.FixedSizeCache;
-import org.structr.api.util.Iterables;
 import org.structr.bolt.*;
 import org.structr.bolt.index.converter.BooleanTypeConverter;
 import org.structr.bolt.index.converter.DateTypeConverter;
@@ -98,18 +95,18 @@ public abstract class AbstractCypherIndex<T extends PropertyContainer> implement
 		CONVERTERS.put(Double.class,  new DoubleTypeConverter());
 	}
 
-	protected final FixedSizeCache<Integer, CachedQueryResult> queryCache;
+	protected final FixedSizeCache<Integer, Long> resultCountCache;
 	protected final BoltDatabaseService db;
 
 	public AbstractCypherIndex(final BoltDatabaseService db, final int queryCacheSize) {
 
-		this.queryCache = new FixedSizeCache<>(queryCacheSize);
+		this.resultCountCache = new FixedSizeCache<>(queryCacheSize);
 		this.db         = db;
 	}
 
 	public abstract QueryResult<T> getResult(final CypherQuery query);
 	public abstract String getQueryPrefix(final String mainType, final String sourceTypeLabel, final String targetTypeLabel);
-	public abstract String getQuerySuffix();
+	public abstract String getQuerySuffix(final boolean doCount);
 
 	@Override
 	public void add(final PropertyContainer t, final String key, final Object value, final Class typeHint) {
@@ -140,9 +137,9 @@ public abstract class AbstractCypherIndex<T extends PropertyContainer> implement
 	}
 
 	@Override
-	public QueryResult<T> query(final QueryPredicate predicate) {
+	public QueryResult<T> query(final QueryPredicate predicate, final int limit, final int offset) {
 
-		final CypherQuery query = new CypherQuery(this);
+		final CypherQuery query = new CypherQuery(this, limit, offset);
 
 		createQuery(this, predicate, query, true);
 
@@ -156,11 +153,7 @@ public abstract class AbstractCypherIndex<T extends PropertyContainer> implement
 	}
 
 	public void invalidateCache() {
-
-		if (!queryCache.isEmpty()) {
-
-			queryCache.clear();
-		}
+		resultCountCache.clear();
 	}
 
 	// ----- interface QueryFactory -----
@@ -182,37 +175,5 @@ public abstract class AbstractCypherIndex<T extends PropertyContainer> implement
 		}
 
 		return false;
-	}
-
-	// ----- nested classes -----
-	protected class CachedQueryResult implements QueryResult<T> {
-
-		private Collection<T> result = null;
-
-		public CachedQueryResult(final Iterable<T> source) {
-
-			if (source instanceof Collection) {
-
-				this.result = (Collection)source;
-
-			} else {
-
-				this.result = Iterables.toList(source);
-
-			}
-		}
-
-		@Override
-		public void close() {
-		}
-
-		@Override
-		public Iterator<T> iterator() {
-			return result.iterator();
-		}
-
-		public boolean isEmpty() {
-			return result.isEmpty();
-		}
 	}
 }

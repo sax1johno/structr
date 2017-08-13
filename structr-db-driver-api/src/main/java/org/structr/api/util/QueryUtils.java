@@ -93,10 +93,6 @@ public class QueryUtils {
 		return new MapIterable<>(from, function);
 	}
 
-	public static <FROM, TO> Iterator<TO> map(Function<? super FROM, ? extends TO> function, Iterator<FROM> from) {
-		return new MapIterable.MapIterator<>(from, function);
-	}
-
 	public static <T> List<T> toList(QueryResult<T> iterable) {
 		return addAll(new ArrayList<T>(), iterable);
 	}
@@ -133,6 +129,16 @@ public class QueryUtils {
 		@Override
 		public void close() {
 			from.close();
+		}
+
+		@Override
+		public long resultCount() {
+			return from.resultCount();
+		}
+
+		@Override
+		public boolean isLimited() {
+			return from.isLimited();
 		}
 
 		@Override
@@ -184,6 +190,16 @@ public class QueryUtils {
 		@Override
 		public void close() {
 			iterable.close();
+		}
+
+		@Override
+		public long resultCount() {
+			return iterable.resultCount();
+		}
+
+		@Override
+		public boolean isLimited() {
+			return iterable.isLimited();
 		}
 
 		@Override

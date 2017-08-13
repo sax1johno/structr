@@ -203,32 +203,42 @@ public abstract class Factory<S, T extends GraphObject> implements Adapter<S, T>
 
 	}
 
-	protected Result page(final QueryResult<S> input, final int offset, final int pageSize) throws FrameworkException {
+	protected Result page(final QueryResult<S> input, final int offset, final int limit) throws FrameworkException {
 
-		final SecurityContext securityContext = factoryProfile.getSecurityContext();
-		final boolean dontCheckCount          = securityContext.ignoreResultCount();
-		final List<T> nodes                   = new ArrayList<>();
-		int overallCount                      = 0;
-		int position                          = 0;
-		int count                             = 0;
+		final long resultCount = input.resultCount();
+		final int overallCount = Long.valueOf(resultCount).intValue();
+		final List<T> nodes    = new ArrayList<>(Math.min(limit, overallCount) + 1);
+		int position           = 0;
+		int count              = 0;
 
 		try (final QueryResult<S> tmp = input) {
 
-			for (final S item : tmp) {
+			if (tmp.isLimited()) {
 
-				T n = instantiate(item);
-				if (n != null) {
+				final Iterator<S> iterator = tmp.iterator();
+				while (iterator.hasNext()) {
 
-					overallCount++;
-					position++;
+					nodes.add(instantiate(iterator.next()));
+				}
 
-					if (position > offset && position <= offset + pageSize) {
+			} else {
 
-						nodes.add(n);
+				final Iterator<S> iterator = tmp.iterator();
+				while (iterator.hasNext()) {
 
-						// stop if we got enough nodes
-						if (++count == pageSize && dontCheckCount) {
-							break;
+					T n = instantiate(iterator.next());
+					if (n != null) {
+
+						position++;
+
+						if (position > offset && position <= offset + limit) {
+
+							nodes.add(n);
+
+							// stop if we got enough nodes
+							if (++count == limit) {
+								break;
+							}
 						}
 					}
 				}

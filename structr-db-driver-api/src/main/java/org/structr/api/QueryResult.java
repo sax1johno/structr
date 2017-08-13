@@ -25,4 +25,7 @@ public interface QueryResult<T> extends Iterable<T>, AutoCloseable {
 
 	@Override
 	void close();
+
+	long resultCount();
+	boolean isLimited();
 }

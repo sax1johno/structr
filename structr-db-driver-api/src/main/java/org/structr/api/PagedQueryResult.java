@@ -22,6 +22,7 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 public class PagedQueryResult<T> implements QueryResult<T> {
+
 	private final QueryResult<T> result;
 	private final int page;
 	private final int pageSize;
@@ -38,18 +39,30 @@ public class PagedQueryResult<T> implements QueryResult<T> {
 	}
 
 	@Override
+	public long resultCount() {
+		return result.resultCount();
+	}
+
+	@Override
+	public boolean isLimited() {
+		return result.isLimited();
+	}
+
+	@Override
 	public Iterator<T> iterator() {
 		return new PagingIterator(result.iterator(), page, pageSize);
 	}
 
 	// Custom iterator for Query Results
 	private class PagingIterator<T> implements Iterator<T> {
+
 		private final Iterator<T> iterator;
 		private final int page;
 		private final int pageSize;
 		private int currentIndex;
 
 		public PagingIterator(final Iterator<T> iterator, final int page, final int pageSize) {
+
 			this.currentIndex = 0;
 			this.iterator = iterator;
 			this.page = page;
