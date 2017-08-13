@@ -30,7 +30,7 @@ import com.google.gson.JsonSerializer;
 import java.lang.reflect.Type;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
-import java.util.List;
+import java.util.Iterator;
 import java.util.Locale;
 import org.structr.api.QueryResult;
 import org.structr.core.GraphObject;
@@ -58,17 +58,18 @@ public class ResultGSONAdapter implements JsonSerializer<QueryResult>, JsonDeser
 
 		JsonObject result = new JsonObject();
 
-		// result fields in alphabetical order
-		List<? extends GraphObject> results = src.getResults();
-		Integer page                        = src.getPage();
-		Integer pageCount                   = src.getPageCount();
-		Integer pageSize                    = src.getPageSize();
-		String queryTime                    = src.getQueryTime();
-		Integer resultCount                 = src.getRawResultCount();
-		String searchString                 = src.getSearchString();
-		String sortKey                      = src.getSortKey();
-		String sortOrder                    = src.getSortOrder();
-		GraphObject metaData                = src.getMetaData();
+		final Integer size               = (Integer)src.getMetaData("size");
+		final Integer page               = (Integer)src.getMetaData("page");
+		final Integer pageCount          = (Integer)src.getMetaData("pageCount");
+		final Integer pageSize           = (Integer)src.getMetaData("pageSize");
+		final String queryTime           = (String)src.getMetaData("queryTime");
+		final String searchString        = (String)src.getMetaData("searchString");
+		final String sortKey             = (String)src.getMetaData("sortKey");
+		final String sortOrder           = (String)src.getMetaData("sortOrder");
+		final GraphObject metaData       = (GraphObject)src.getMetaData("metaData");
+		final Boolean isCollection       = (Boolean)src.getMetaData("isCollection");
+		final Boolean isPrimitiveArray   = (Boolean)src.getMetaData("isPrimitiveArray");
+		final Boolean hasNonGraphResult  = (Boolean)src.getMetaData("hasNonGraphResult");
 
 		if(page != null) {
 			result.add("page", new JsonPrimitive(page));
@@ -86,78 +87,78 @@ public class ResultGSONAdapter implements JsonSerializer<QueryResult>, JsonDeser
 			result.add("query_time", new JsonPrimitive(queryTime));
 		}
 
-		if(resultCount != null) {
-			result.add("result_count", new JsonPrimitive(resultCount));
+		if(size != null) {
+			result.add("result_count", new JsonPrimitive(size));
 		}
 
-		if(results != null) {
+		final Iterator iterator = src.iterator();
 
-			if(results.isEmpty()) {
+		if(Boolean.TRUE.equals(hasNonGraphResult)) {
 
-				final Object nonGraphObjectResult = src.getNonGraphObjectResult();
-				if (nonGraphObjectResult != null) {
+			if (iterator.hasNext()) {
 
-					result.add("result", graphObjectGsonAdapter.serializeObject(nonGraphObjectResult, System.currentTimeMillis()));
+				final Object nonGraphObjectResult = iterator.next();
+
+				result.add("result", graphObjectGsonAdapter.serializeObject(nonGraphObjectResult, System.currentTimeMillis()));
 
 
-				} else {
+			} else {
 
-					result.add("result", new JsonArray());
+				result.add("result", new JsonArray());
+			}
+
+		} else if (isPrimitiveArray) {
+
+			JsonArray resultArray = new JsonArray();
+
+			while (iterator.hasNext()) {
+
+				final GraphObject graphObject = (GraphObject)iterator.next();
+				final Object value            = graphObject.getProperty(GraphObject.id);
+
+				if (value != null) {
+
+					resultArray.add(new JsonPrimitive(value.toString()));
 				}
+			}
 
-			} else if (src.isPrimitiveArray()) {
+			result.add("result", resultArray);
 
+
+		} else {
+
+			// keep track of serialization time
+			long startTime = System.currentTimeMillis();
+
+			if(isCollection) {
+
+				// serialize list of results
 				JsonArray resultArray = new JsonArray();
-				for(GraphObject graphObject : results) {
+				while (iterator.hasNext()) {
 
-					final Object value = graphObject.getProperty(GraphObject.id);	// FIXME: UUID key hard-coded, use variable in Result here!
-					if (value != null) {
+					final GraphObject graphObject = (GraphObject)iterator.next();
+					JsonElement element           = graphObjectGsonAdapter.serialize(graphObject, startTime);
 
-						resultArray.add(new JsonPrimitive(value.toString()));
+					if (element != null) {
+
+						resultArray.add(element);
+
+					} else {
+
+						// stop serialization if timeout occurs
+						result.add("status", new JsonPrimitive("Serialization aborted due to timeout"));
+						src.setMetaData("hasPartialContent", true);
+
+						break;
 					}
 				}
 
 				result.add("result", resultArray);
 
-
 			} else {
 
-				// FIXME: do we need this check, or does it cause trouble?
-				if (results.size() > 1 && !src.isCollection()){
-					throw new IllegalStateException(src.getClass().getSimpleName() + " is not a collection resource, but result set has size " + results.size());
-				}
-
-				// keep track of serialization time
-				long startTime = System.currentTimeMillis();
-
-				if(src.isCollection()) {
-
-					// serialize list of results
-					JsonArray resultArray = new JsonArray();
-					for(GraphObject graphObject : results) {
-
-						JsonElement element = graphObjectGsonAdapter.serialize(graphObject, startTime);
-						if (element != null) {
-
-							resultArray.add(element);
-
-						} else {
-
-							// stop serialization if timeout occurs
-							result.add("status", new JsonPrimitive("Serialization aborted due to timeout"));
-							src.setHasPartialContent(true);
-
-							break;
-						}
-					}
-
-					result.add("result", resultArray);
-
-				} else {
-
-					// use GraphObject adapter to serialize single result
-					result.add("result", graphObjectGsonAdapter.serialize(results.get(0), startTime));
-				}
+				// use GraphObject adapter to serialize single result
+				result.add("result", graphObjectGsonAdapter.serialize((GraphObject)iterator.next(), startTime));
 			}
 		}
 

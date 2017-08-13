@@ -124,7 +124,7 @@ public abstract class Factory<S, T extends GraphObject> implements Adapter<S, T>
 
 			} else {
 
-				if (!input.isLimited() && pageSize < Integer.MAX_VALUE) {
+				if (pageSize < Integer.MAX_VALUE) {
 
 					return new PagedQueryResult<>(QueryUtils.filterNullValues(QueryUtils.map(this, input)), page, pageSize);
 
@@ -183,7 +183,7 @@ public abstract class Factory<S, T extends GraphObject> implements Adapter<S, T>
 	// <editor-fold defaultstate="collapsed" desc="private methods">
 	protected List<S> read(final QueryResult<S> iterable) {
 
-		final List<S> nodes  = new ArrayList(iterable.size() + 1);
+		final List<S> nodes  = new ArrayList(100);
 		final Iterator<S> it = iterable.iterator();
 
 		while (it.hasNext()) {

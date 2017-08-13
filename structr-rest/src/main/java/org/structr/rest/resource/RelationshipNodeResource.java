@@ -24,10 +24,11 @@ import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.QueryResult;
+import org.structr.api.util.QueryUtils;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.QueryResult;
 import org.structr.core.entity.AbstractRelationship;
 import org.structr.core.property.PropertyKey;
 import org.structr.rest.RestMethodResult;
@@ -58,11 +59,11 @@ public class RelationshipNodeResource extends WrappingResource {
 	@Override
 	public QueryResult doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
 
-		List<? extends GraphObject> results = wrappedResource.doGet(sortKey, sortDescending, pageSize, page).getResults();
+		List<? extends GraphObject> results = QueryUtils.toList(wrappedResource.doGet(sortKey, sortDescending, pageSize, page));
 		if(results != null && !results.isEmpty()) {
 
 			try {
-				List<GraphObject> resultList = new LinkedList<GraphObject>();
+				List<GraphObject> resultList = new LinkedList<>();
 				for(GraphObject obj : results) {
 
 					if(obj instanceof AbstractRelationship) {
@@ -79,7 +80,8 @@ public class RelationshipNodeResource extends WrappingResource {
 					}
 				}
 
-				return new QueryResult(resultList, null, isCollectionResource(), isPrimitiveArray());
+				return QueryUtils.fromList(resultList);
+				//return new QueryResult(resultList, null, isCollectionResource(), isPrimitiveArray());
 
 			} catch(Throwable t) {
 

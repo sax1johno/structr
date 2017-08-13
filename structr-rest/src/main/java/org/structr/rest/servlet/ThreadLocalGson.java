@@ -20,10 +20,10 @@ package org.structr.rest.servlet;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import org.structr.api.QueryResult;
 import org.structr.api.config.Settings;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.IJsonInput;
-import org.structr.core.QueryResult;
 import org.structr.core.Value;
 import org.structr.core.rest.JsonInputGSONAdapter;
 import org.structr.rest.adapter.FrameworkExceptionGSONAdapter;

@@ -22,10 +22,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
+import org.structr.api.QueryResult;
+import org.structr.api.util.QueryUtils;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.QueryResult;
 import org.structr.core.app.StructrApp;
 import org.structr.core.graph.CypherQueryCommand;
 import org.structr.core.property.PropertyKey;
@@ -71,7 +72,8 @@ public class CypherQueryResource extends Resource {
 				String query                 = queryObject.toString();
 				List<GraphObject> resultList = StructrApp.getInstance(securityContext).command(CypherQueryCommand.class).execute(query, Collections.EMPTY_MAP);
 
-				return new QueryResult(resultList, resultList.size(), true, false);
+				return QueryUtils.fromList(resultList);
+				//return new QueryResult(resultList, resultList.size(), true, false);
 			}
 
 		} catch (org.structr.api.NotFoundException nfe) {
@@ -79,7 +81,7 @@ public class CypherQueryResource extends Resource {
 			throw new NotFoundException("Entity not found for the given query");
 		}
 
-		return new QueryResult(Collections.EMPTY_LIST, 0, false, false);
+		return QueryUtils.emptyResult();
 	}
 
 	@Override

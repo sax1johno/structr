@@ -44,13 +44,12 @@ import org.apache.commons.collections4.ListUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.QueryResult;
 import org.structr.api.RetryException;
-import org.structr.common.PagingHelper;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.JsonInput;
-import org.structr.core.QueryResult;
 import org.structr.core.Services;
 import org.structr.core.Value;
 import org.structr.core.app.App;
@@ -129,8 +128,8 @@ public class CsvServlet extends HttpServlet implements HttpServiceServlet {
 	protected void doGet(final HttpServletRequest request, final HttpServletResponse response) throws UnsupportedEncodingException {
 
 		Authenticator authenticator = null;
-		QueryResult result = null;
-		Resource resource = null;
+		QueryResult result          = null;
+		Resource resource           = null;
 
 		try {
 
@@ -197,23 +196,23 @@ public class CsvServlet extends HttpServlet implements HttpServiceServlet {
 				result = resource.doGet(sortKey, sortDescending, pageSize, page);
 				if (result != null) {
 
-					result.setIsCollection(resource.isCollectionResource());
-					result.setIsPrimitiveArray(resource.isPrimitiveArray());
-
-					PagingHelper.addPagingParameter(result, pageSize, page);
+					result.setMetaData("isCollection", resource.isCollectionResource());
+					result.setMetaData("isPrimitiveArray", resource.isPrimitiveArray());
+					result.setMetaData("page", page);
+					result.setMetaData("pageSize", pageSize);
 
 					// timing..
 					final double queryTimeEnd = System.nanoTime();
 
 					// store property view that will be used to render the results
-					result.setPropertyView(propertyView.get(securityContext));
+					result.setMetaData("propertyView", propertyView.get(securityContext));
 
 					// allow resource to modify result set
 					resource.postProcessResultSet(result);
 
 					DecimalFormat decimalFormat = new DecimalFormat("0.000000000", DecimalFormatSymbols.getInstance(Locale.ENGLISH));
 
-					result.setQueryTime(decimalFormat.format((queryTimeEnd - queryTimeStart) / 1000000000.0));
+					result.setMetaData("queryTime", decimalFormat.format((queryTimeEnd - queryTimeStart) / 1000000000.0));
 
 					Writer writer = response.getWriter();
 
@@ -608,13 +607,12 @@ public class CsvServlet extends HttpServlet implements HttpServiceServlet {
 	 * @param propertyView
 	 * @throws IOException
 	 */
-	public static void writeCsv(final QueryResult result, final Writer out, final String propertyView) throws IOException {
+	public static void writeCsv(final QueryResult<GraphObject> result, final Writer out, final String propertyView) throws IOException {
 
-		final List<GraphObject> list = result.getResults();
 		final StringBuilder row      = new StringBuilder();
 		boolean headerWritten        = false;
 
-		for (final GraphObject obj : list) {
+		for (final GraphObject obj : result) {
 
 			// Write column headers
 			if (!headerWritten) {

@@ -23,13 +23,14 @@ import java.util.List;
 import javax.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.QueryResult;
 import org.structr.api.graph.Direction;
 import org.structr.api.util.Iterables;
+import org.structr.api.util.QueryUtils;
 import org.structr.common.PagingHelper;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.QueryResult;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
@@ -39,7 +40,6 @@ import org.structr.core.property.PropertyKey;
 import org.structr.rest.exception.IllegalPathException;
 
 /**
- *
  *
  */
 public class RelationshipResource extends WrappingResource {
@@ -72,7 +72,7 @@ public class RelationshipResource extends WrappingResource {
 	public QueryResult doGet(final PropertyKey sortKey, final boolean sortDescending, final int pageSize, final int page) throws FrameworkException {
 
 		// fetch all results, paging is applied later
-		final List<? extends GraphObject> results = wrappedResource.doGet(null, false, NodeFactory.DEFAULT_PAGE_SIZE, NodeFactory.DEFAULT_PAGE).getResults();
+		final List<? extends GraphObject> results = QueryUtils.toList(wrappedResource.doGet(null, false, NodeFactory.DEFAULT_PAGE_SIZE, NodeFactory.DEFAULT_PAGE));
 		final App app                             = StructrApp.getInstance();
 
 		if (results != null && !results.isEmpty()) {
@@ -121,9 +121,10 @@ public class RelationshipResource extends WrappingResource {
 					}
 				}
 
-				final int rawResultCount = resultList.size();
+				//final int rawResultCount = resultList.size();
 
-				return new QueryResult(PagingHelper.subList(resultList, pageSize, page), rawResultCount, true, false);
+				return QueryUtils.fromList(PagingHelper.subList(resultList, pageSize, page));
+				//return new QueryResult(PagingHelper.subList(resultList, pageSize, page), rawResultCount, true, false);
 
 			} catch (Throwable t) {
 

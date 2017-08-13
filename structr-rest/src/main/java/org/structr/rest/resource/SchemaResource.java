@@ -27,11 +27,12 @@ import javax.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.QueryResult;
+import org.structr.api.util.QueryUtils;
 import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObjectMap;
-import org.structr.core.QueryResult;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.AbstractRelationship;
@@ -224,7 +225,8 @@ public class SchemaResource extends Resource {
 
 		}
 
-		return new QueryResult(resultList, resultList.size(), false, false);
+		return QueryUtils.fromList(resultList);
+		//return new QueryResult(resultList, resultList.size(), false, false);
 
 	}
 

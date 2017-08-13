@@ -21,25 +21,15 @@ package org.structr.web.resource;
 
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
+import org.structr.api.QueryResult;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.QueryResult;
 import org.structr.core.property.PropertyKey;
 import org.structr.rest.RestMethodResult;
 import org.structr.rest.exception.NotAllowedException;
 import org.structr.rest.resource.Resource;
 
-//~--- classes ----------------------------------------------------------------
-
-/**
- * Resource that handles logs a user out
- *
- *
- */
 public class LogoutResource extends Resource {
-
-
-	//~--- methods --------------------------------------------------------
 
 	@Override
 	public boolean checkAndConfigure(String part, SecurityContext securityContext, HttpServletRequest request) {
@@ -52,7 +42,6 @@ public class LogoutResource extends Resource {
 		}
 
 		return false;
-
 	}
 
 	@Override
@@ -61,7 +50,6 @@ public class LogoutResource extends Resource {
 		securityContext.getAuthenticator().doLogout(securityContext.getRequest());
 
 		return new RestMethodResult(200);
-
 	}
 
 	@Override
@@ -90,10 +78,6 @@ public class LogoutResource extends Resource {
 		return null;
 
 	}
-
-	// ----- private methods -----
-
-	//~--- get methods ----------------------------------------------------
 
 	@Override
 	public Class getEntityClass() {

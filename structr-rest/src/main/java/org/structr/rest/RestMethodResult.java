@@ -31,8 +31,9 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.QueryResult;
+import org.structr.api.util.QueryUtils;
 import org.structr.core.GraphObject;
-import org.structr.core.QueryResult;
 
 /**
  * Encapsulates the result of a REST HTTP method call, i.e. headers, response
@@ -102,7 +103,15 @@ public class RestMethodResult {
 			if (content != null) {
 
 				// serialize result set
-				gson.toJson(new QueryResult(this.content, this.content.size(), this.content.size() > 1 || serializeSingleObjectAsCollection, serializeAsPrimitiveArray), writer);
+				//gson.toJson(new QueryResult(this.content, this.content.size(), this.content.size() > 1 || serializeSingleObjectAsCollection, serializeAsPrimitiveArray), writer);
+
+				final QueryResult result = QueryUtils.fromList(this.content);
+
+				result.setMetaData("size",             this.content.size());
+				result.setMetaData("isCollection",     this.content.size() > 1 || serializeSingleObjectAsCollection);
+				result.setMetaData("isPrimitiveArray", serializeAsPrimitiveArray);
+
+				gson.toJson(result, QueryResult.class, writer);
 			}
 
 			if (content == null) {
@@ -114,7 +123,8 @@ public class RestMethodResult {
 				} else {
 
 					// serialize result set
-					gson.toJson(new QueryResult(nonGraphObjectResult), writer);
+					//gson.toJson(new QueryResult(nonGraphObjectResult), writer);
+					gson.toJson(QueryUtils.single(nonGraphObjectResult), writer);
 				}
 
 			}

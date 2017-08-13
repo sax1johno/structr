@@ -27,7 +27,8 @@ import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.api.Predicate;
-import org.structr.api.util.Iterables;
+import org.structr.api.QueryResult;
+import org.structr.api.util.QueryUtils;
 import org.structr.common.GraphObjectComparator;
 import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
@@ -35,7 +36,6 @@ import org.structr.common.View;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.GraphObjectMap;
-import org.structr.core.QueryResult;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.property.EndNodes;
 import org.structr.core.property.IntProperty;
@@ -78,10 +78,8 @@ public class VirtualType extends AbstractNode implements ResultTransformer {
 		final List<VirtualProperty> props         = sort(getProperty(properties));
 		final Mapper mapper                       = new Mapper(securityContext, props, entityType);
 		final Filter filter                       = new Filter(securityContext, getProperty(filterExpression));
-		final Iterable<GraphObject> iterable      = Iterables.map(mapper, Iterables.filter(filter, result.getResults()));
-		final List<GraphObject> transformedResult = Iterables.toList(iterable);
 
-		return new QueryResult(transformedResult,transformedResult.size(), result.isCollection(), result.isPrimitiveArray());
+		return  QueryUtils.map(mapper, QueryUtils.filter(filter, result));
 	}
 
 	@Override

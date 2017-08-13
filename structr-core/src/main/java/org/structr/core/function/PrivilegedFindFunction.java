@@ -18,6 +18,7 @@
  */
 package org.structr.core.function;
 
+import java.util.List;
 import java.util.Map;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
@@ -91,11 +92,12 @@ public class PrivilegedFindFunction extends Function<Object, Object> {
 
 				query.and(key, sources[1].toString());
 
-				final int resultCount = query.getResult().size();
+				final List<GraphObject> list = query.getAsList();
+				final int resultCount = list.size();
 
 				switch (resultCount) {
 					case 1:
-						return query.getFirst();
+						return list.get(0);
 					case 0:
 						return null;
 					default:

@@ -205,16 +205,8 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 			final Index<S> index = getIndex();
 			if (index != null) {
 
-				int limit  = -1;
-				int offset = -1;
-
-				if (user != null && user.isAdmin() && pageSize != Integer.MAX_VALUE) {
-					offset = (page-1) * pageSize;
-					limit = pageSize;
-				}
-
 				// do query
-				final QueryResult hits = getIndex().query(rootGroup, limit, offset);
+				final QueryResult hits = getIndex().query(rootGroup);
 				intermediateResult     = factory.instantiate(hits);
 			}
 		}

@@ -21,7 +21,6 @@ package org.structr.core.notion;
 import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.structr.api.QueryResult;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.common.error.PropertiesNotFoundToken;
@@ -68,8 +67,8 @@ public class TypeAndValueDeserializationStrategy<S, T extends NodeInterface> imp
 	@Override
 	public T deserialize(final SecurityContext securityContext, Class<T> type, S source, final Object context) throws FrameworkException {
 
-		final App app         = StructrApp.getInstance(securityContext);
-		QueryResult<T> result = QueryResult.EMPTY_RESULT;
+		final App app  = StructrApp.getInstance(securityContext);
+		List<T> result = null;
 
 		// default to UUID
 		if (propertyKey == null) {
@@ -92,17 +91,17 @@ public class TypeAndValueDeserializationStrategy<S, T extends NodeInterface> imp
 				Object value = ((Map<String, Object>)convertedSource).get(propertyKey.jsonName());
 				if (value != null) {
 
-					result = app.nodeQuery(type).and(propertyKey, value.toString()).getResult();
+					result = app.nodeQuery(type).and(propertyKey, value.toString()).getAsList();
 				}
 
 			} else if (convertedSource instanceof GraphObject) {
 
 				final GraphObject obj = (GraphObject)convertedSource;
-				result                = app.nodeQuery(type).and(propertyKey, obj.getProperty(propertyKey)).getResult();
+				result                = app.nodeQuery(type).and(propertyKey, obj.getProperty(propertyKey)).getAsList();
 
 			} else {
 
-				result = app.nodeQuery(type).and(propertyKey, convertedSource).getResult();
+				result = app.nodeQuery(type).and(propertyKey, convertedSource).getAsList();
 			}
 		}
 
@@ -131,9 +130,7 @@ public class TypeAndValueDeserializationStrategy<S, T extends NodeInterface> imp
 
 			case 1 :
 
-				final T obj = result.iterator().next();
-
-				result.close();
+				final T obj = result.get(0);
 
 				//if(!type.getSimpleName().equals(node.getType())) {
 				if (!type.isAssignableFrom(obj.getClass())) {

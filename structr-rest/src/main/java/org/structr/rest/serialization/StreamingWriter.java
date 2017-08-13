@@ -25,7 +25,6 @@ import java.text.DecimalFormatSymbols;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -33,13 +32,13 @@ import java.util.concurrent.TimeUnit;
 import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.QueryResult;
 import org.structr.api.config.Settings;
 import org.structr.common.PropertyView;
 import org.structr.common.QueryRange;
 import org.structr.common.SecurityContext;
 import org.structr.common.View;
 import org.structr.core.GraphObject;
-import org.structr.core.QueryResult;
 import org.structr.core.Value;
 import org.structr.core.app.StructrApp;
 import org.structr.core.converter.PropertyConverter;
@@ -134,17 +133,15 @@ public abstract class StreamingWriter {
 			writer.setIndent("	");
 		}
 
-		// result fields in alphabetical order
-		List<? extends GraphObject> results = result.getResults();
-		Integer page = result.getPage();
-		Integer pageCount = result.getPageCount();
-		Integer pageSize = result.getPageSize();
-		String queryTime = result.getQueryTime();
-		Integer resultCount = result.getRawResultCount();
-		String searchString = result.getSearchString();
-		String sortKey = result.getSortKey();
-		String sortOrder = result.getSortOrder();
-		GraphObject metaData = result.getMetaData();
+		final Integer page             = (Integer)result.getMetaData("page");
+		final Integer pageSize         = (Integer)result.getMetaData("pageSize");
+		final String queryTime         = (String)result.getMetaData("queryTime");
+		final String searchString      = (String)result.getMetaData("searchString");
+		final String sortKey           = (String)result.getMetaData("sortKey");
+		final String sortOrder         = (String)result.getMetaData("sortOrder");
+		final GraphObject metaData     = (GraphObject)result.getMetaData("metaData");
+		final Boolean isPrimitiveArray = (Boolean)result.getMetaData("isPrimitiveArray");
+		final Boolean isCollection     = (Boolean)result.getMetaData("isCollection");
 
 		writer.beginDocument(baseUrl, propertyView.get(securityContext));
 
@@ -155,10 +152,6 @@ public abstract class StreamingWriter {
 			writer.name("page").value(page);
 		}
 
-		if (pageCount != null) {
-			writer.name("page_count").value(pageCount);
-		}
-
 		if (pageSize != null) {
 			writer.name("page_size").value(pageSize);
 		}
@@ -167,110 +160,98 @@ public abstract class StreamingWriter {
 			writer.name("query_time").value(queryTime);
 		}
 
-		if (resultCount != null && renderResultCount) {
-			writer.name("result_count").value(resultCount);
-		}
+		final Iterator iterator = result.iterator();
+		if (!iterator.hasNext()) {
 
-		if (results != null) {
-
-			if (results.isEmpty() && result.isPrimitiveArray()) {
+			if (isPrimitiveArray) {
 
 				writer.name(resultKeyName).nullValue();
 
-			} else if (results.isEmpty() && !result.isPrimitiveArray()) {
-
-				writer.name(resultKeyName).beginArray().endArray();
-
-			} else if (result.isPrimitiveArray()) {
-
-				writer.name(resultKeyName);
-
-				if (results.size() > 1) {
-					writer.beginArray();
-				}
-
-				for (final Object object : results) {
-
-					if (object != null) {
-
-						if (object instanceof GraphObject) {
-
-							// keep track of serialization time
-							final long startTime              = System.currentTimeMillis();
-							final String localPropertyView    = propertyView.get(null);
-							final GraphObject obj             = (GraphObject)object;
-							final Iterator<PropertyKey> keyIt = obj.getPropertyKeys(localPropertyView).iterator();
-
-							while (keyIt.hasNext()) {
-
-								PropertyKey k = keyIt.next();
-								Object value  = obj.getProperty(k);
-
-								root.serializeProperty(writer, k, value, localPropertyView, 0);
-
-							}
-
-							// check for timeout
-							if (System.currentTimeMillis() > startTime + MAX_SERIALIZATION_TIME) {
-
-								logger.error("JSON serialization of {} with {} results took more than {} ms, aborted. Please review output view size or adjust timeout.", new Object[] { securityContext.getCompoundRequestURI(), results.size(), MAX_SERIALIZATION_TIME } );
-
-								// TODO: create some output indicating that streaming was interrupted
-								break;
-							}
-
-						} else {
-
-							writer.value(object.toString());
-						}
-					}
-				}
-
-				if (results.size() > 1) {
-
-					writer.endArray();
-
-				}
-
 			} else {
 
-				// result is an attribute called via REST API
-				if (results.size() > 1 && !result.isCollection()) {
+				writer.name(resultKeyName).beginArray().endArray();
+			}
 
-					throw new IllegalStateException(result.getClass().getSimpleName() + " is not a collection resource, but result set has size " + results.size());
+		} else if (isPrimitiveArray) {
 
-				}
+			writer.name(resultKeyName);
+			writer.beginArray();
 
-				// keep track of serialization time
-				long startTime            = System.currentTimeMillis();
-				String localPropertyView  = propertyView.get(null);
+			while (iterator.hasNext()) {
 
-				if (result.isCollection()) {
+				final Object object = iterator.next();
+				if (object != null && object instanceof GraphObject) {
 
-					writer.name(resultKeyName).beginArray();
+					// keep track of serialization time
+					final long startTime              = System.currentTimeMillis();
+					final String localPropertyView    = propertyView.get(null);
+					final GraphObject obj             = (GraphObject)object;
+					final Iterator<PropertyKey> keyIt = obj.getPropertyKeys(localPropertyView).iterator();
 
-					// serialize list of results
-					for (GraphObject graphObject : results) {
+					while (keyIt.hasNext()) {
 
-						root.serialize(writer, graphObject, localPropertyView, 0);
+						PropertyKey k = keyIt.next();
+						Object value  = obj.getProperty(k);
 
-						// check for timeout
-						if (System.currentTimeMillis() > startTime + MAX_SERIALIZATION_TIME) {
-
-							logger.error("JSON serialization of {} with {} results took more than {} ms, aborted. Please review output view size or adjust timeout.", new Object[] { securityContext.getRequest().getRequestURI().concat( (securityContext.getRequest().getQueryString() == null) ? "" : "?".concat(securityContext.getRequest().getQueryString()) ), results.size(), MAX_SERIALIZATION_TIME } );
-
-							// TODO: create some output indicating that streaming was interrupted
-							break;
-						}
+						root.serializeProperty(writer, k, value, localPropertyView, 0);
 					}
 
-					writer.endArray();
+					// check for timeout
+					if (System.currentTimeMillis() > startTime + MAX_SERIALIZATION_TIME) {
+
+						logger.error("JSON serialization of {} took more than {} ms, aborted. Please review output view size or adjust timeout.",
+							securityContext.getCompoundRequestURI(),
+							MAX_SERIALIZATION_TIME
+						);
+
+						// TODO: create some output indicating that streaming was interrupted
+						break;
+					}
 
 				} else {
 
-					writer.name(resultKeyName);
-					root.serialize(writer, results.get(0), localPropertyView, 0);
+					writer.value(object.toString());
 				}
+			}
+
+			writer.endArray();
+
+		} else {
+
+			// keep track of serialization time
+			long startTime            = System.currentTimeMillis();
+			String localPropertyView  = propertyView.get(null);
+
+			if (isCollection) {
+
+				writer.name(resultKeyName).beginArray();
+
+				// serialize list of results
+				while (iterator.hasNext()) {
+
+					final Object graphObject = iterator.next();
+
+					root.serialize(writer, (GraphObject)graphObject, localPropertyView, 0);
+
+					// check for timeout
+					if (System.currentTimeMillis() > startTime + MAX_SERIALIZATION_TIME) {
+
+						logger.error("JSON serialization of {} took more than {} ms, aborted. Please review output view size or adjust timeout.",
+							securityContext.getRequest().getRequestURI().concat( (securityContext.getRequest().getQueryString() == null) ? "" : "?".concat(securityContext.getRequest().getQueryString()) ),
+							MAX_SERIALIZATION_TIME
+						);
+
+						// TODO: create some output indicating that streaming was interrupted
+						break;
+					}
+				}
+
+				writer.endArray();
+
+			} else {
+
+				writer.name(resultKeyName);
+				root.serialize(writer, (GraphObject)iterator.next(), localPropertyView, 0);
 			}
 		}
 

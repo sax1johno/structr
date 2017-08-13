@@ -18,17 +18,17 @@
  */
 package org.structr.rest.resource;
 
-import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import javax.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.QueryResult;
+import org.structr.api.util.QueryUtils;
 import org.structr.common.PagingHelper;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.QueryResult;
 import org.structr.core.ViewTransformation;
 import org.structr.core.graph.NodeFactory;
 import org.structr.core.property.PropertyKey;
@@ -65,8 +65,8 @@ public class TransformationResource extends WrappingResource {
 
 				try {
 
-					transformation.apply(securityContext, result.getResults());
-					result.setRawResultCount(result.size());
+					transformation.apply(securityContext, result);
+					//result.setRawResultCount(result.size());
 
 				} catch(Throwable t) {
 					logger.warn("", t);
@@ -77,19 +77,18 @@ public class TransformationResource extends WrappingResource {
 
 			} else {
 
-				List<? extends GraphObject> listToTransform = new LinkedList<GraphObject>();
+				List<? extends GraphObject> listToTransform = new LinkedList<>();
 				transformation.apply(securityContext, listToTransform);
 
-				QueryResult result = new QueryResult(listToTransform, listToTransform.size(), wrappedResource.isCollectionResource(), wrappedResource.isPrimitiveArray());
+				//QueryResult result = new QueryResult(listToTransform, listToTransform.size(), wrappedResource.isCollectionResource(), wrappedResource.isPrimitiveArray());
 
 				// apply paging later
-				return PagingHelper.subResult(result, pageSize, page);
+				return PagingHelper.subResult(QueryUtils.fromList(listToTransform), pageSize, page);
 
 			}
 		}
 
-		List emptyList = Collections.emptyList();
-		return new QueryResult(emptyList, null, isCollectionResource(), isPrimitiveArray());
+		return QueryUtils.emptyResult();
 	}
 
 	@Override

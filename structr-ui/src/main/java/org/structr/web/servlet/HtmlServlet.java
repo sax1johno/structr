@@ -65,7 +65,6 @@ import org.structr.common.SecurityContext;
 import org.structr.common.ThreadLocalMatcher;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.QueryResult;
 import org.structr.core.Services;
 import org.structr.core.app.App;
 import org.structr.core.app.Query;
@@ -936,10 +935,10 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 			}
 
 
-			final QueryResult results = query.getResult();
+			final List results = query.getAsList();
 
 			logger.debug("{} results", results.size());
-			request.setAttribute(POSSIBLE_ENTRY_POINTS_KEY, results.getResults());
+			request.setAttribute(POSSIBLE_ENTRY_POINTS_KEY, results);
 
 			return (results.size() > 0 ? (AbstractNode) results.get(0) : null);
 		}
@@ -1108,19 +1107,16 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 
 		if (CONFIRM_REGISTRATION_PAGE.equals(path)) {
 
-			final App app = StructrApp.getInstance();
+			final App app  = StructrApp.getInstance();
+			Principal user = null;
 
-			QueryResult<Principal> results;
 			try (final Tx tx = app.tx()) {
 
-				results = app.nodeQuery(Principal.class).and(User.confirmationKey, key).getResult();
-
+				user = app.nodeQuery(Principal.class).and(User.confirmationKey, key).getFirst();
 				tx.success();
 			}
 
-			if (!results.isEmpty()) {
-
-				final Principal user = results.get(0);
+			if (user != null) {
 
 				try (final Tx tx = app.tx()) {
 
@@ -1179,19 +1175,17 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 
 		if (RESET_PASSWORD_PAGE.equals(path)) {
 
-			final App app = StructrApp.getInstance();
+			final App app  = StructrApp.getInstance();
+			Principal user = null;
 
-			QueryResult<Principal> results;
 			try (final Tx tx = app.tx()) {
 
-				results = app.nodeQuery(Principal.class).and(User.confirmationKey, key).getResult();
+				user = app.nodeQuery(Principal.class).and(User.confirmationKey, key).getFirst();
 
 				tx.success();
 			}
 
-			if (!results.isEmpty()) {
-
-				final Principal user = results.get(0);
+			if (user != null) {
 
 				try (final Tx tx = app.tx()) {
 
@@ -1236,12 +1230,12 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 			query.and().orType(Page.class).orTypes(File.class);
 
 			// Searching for pages needs super user context anyway
-			QueryResult results = query.getResult();
+			List results = query.getAsList();
 
 			logger.debug("{} results", results.size());
-			request.setAttribute(POSSIBLE_ENTRY_POINTS_KEY, results.getResults());
+			request.setAttribute(POSSIBLE_ENTRY_POINTS_KEY, results);
 
-			return (List<Linkable>) results.getResults();
+			return (List<Linkable>) results;
 		}
 
 		return Collections.EMPTY_LIST;
@@ -1262,17 +1256,17 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 			final Query pageQuery = StructrApp.getInstance(securityContext).nodeQuery();
 
 			pageQuery.and(Page.path, path).andType(Page.class);
-			final QueryResult pages = pageQuery.getResult();
+			final List pages = pageQuery.getAsList();
 
 			final Query fileQuery = StructrApp.getInstance(securityContext).nodeQuery();
 			fileQuery.and(AbstractFile.path, path).andTypes(File.class);
 
-			final QueryResult files = fileQuery.getResult();
+			final List files = fileQuery.getAsList();
 
 			logger.debug("Found {} pages and {} files/folders", new Object[] { pages.size(), files.size() });
 
-			final List<Linkable> linkables = (List<Linkable>) pages.getResults();
-			linkables.addAll(files.getResults());
+			final List<Linkable> linkables = (List<Linkable>) pages;
+			linkables.addAll(files);
 
 			request.setAttribute(POSSIBLE_ENTRY_POINTS_KEY, linkables);
 

@@ -18,7 +18,6 @@
  */
 package org.structr.bolt.index;
 
-import java.util.Map;
 import org.structr.api.QueryResult;
 import org.structr.api.graph.Node;
 import org.structr.api.util.QueryUtils;
@@ -46,34 +45,16 @@ public class CypherNodeIndex extends AbstractCypherIndex<Node> {
 	}
 
 	@Override
-	public String getQuerySuffix(final boolean doCount) {
-
-		if (doCount) {
-			return " RETURN COUNT(n)";
-		}
-
+	public String getQuerySuffix() {
 		return " RETURN DISTINCT n";
 	}
 
 	@Override
-	public QueryResult<Node> getResult(final CypherQuery query) {
+	public QueryResult<Node> getResult(final AdvancedCypherQuery query) {
 
-		final int queryHashCode        = query.getHashCode();
 		final SessionTransaction tx    = db.getCurrentTransaction();
 		final NodeNodeMapper mapper    = new NodeNodeMapper(db);
-		final Map<String, Object> data = query.getParameters();
 
-		Integer resultCount = resultCountCache.get(queryHashCode);
-		if (resultCount == null) {
-
-			resultCount = tx.getInteger(query.getStatement(true, false), data);
-			resultCountCache.put(queryHashCode, resultCount);
-		}
-
-		// only sort if result count is small enough
-		final boolean doSort  = resultCount < 100000;
-		final boolean limited = query.isLimitQuery();
-
-		return QueryUtils.map(mapper, tx.getNodes(query.getStatement(false, doSort), data, resultCount, limited));
+		return QueryUtils.map(mapper, new NodeResultStream(tx, query));
 	}
 }

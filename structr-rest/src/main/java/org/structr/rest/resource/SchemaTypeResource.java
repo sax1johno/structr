@@ -21,10 +21,11 @@ package org.structr.rest.resource;
 import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
+import org.structr.api.QueryResult;
+import org.structr.api.util.QueryUtils;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObjectMap;
-import org.structr.core.QueryResult;
 import org.structr.core.property.PropertyKey;
 import org.structr.rest.RestMethodResult;
 import org.structr.rest.exception.IllegalMethodException;
@@ -120,7 +121,8 @@ public class SchemaTypeResource extends Resource {
 
 		List<GraphObjectMap> resultList = SchemaHelper.getSchemaTypeInfo(securityContext, rawType, type, propertyView);
 
-		return new QueryResult(resultList, resultList.size(), false, false);
+		return QueryUtils.fromList(resultList);
+		//return new QueryResult(resultList, resultList.size(), false, false);
 
 	}
 

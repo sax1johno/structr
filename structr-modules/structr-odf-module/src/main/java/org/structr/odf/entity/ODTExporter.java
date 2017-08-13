@@ -22,14 +22,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.odftoolkit.simple.TextDocument;
+import org.structr.api.QueryResult;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.Export;
 import org.structr.core.GraphObject;
 import org.structr.core.GraphObjectMap;
-import org.structr.core.QueryResult;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
@@ -53,17 +54,19 @@ public class ODTExporter extends ODFExporter {
 	@Export
 	public void exportAttributes(String uuid) throws FrameworkException {
 
-		FileBase output = getProperty(resultDocument);
+		FileBase output            = getProperty(resultDocument);
 		VirtualType transformation = getProperty(transformationProvider);
 
 		try {
 
-			final App app = StructrApp.getInstance();
-			final QueryResult result = app.nodeQuery(AbstractNode.class).and(GraphObject.id, uuid).getResult();
-			final QueryResult transformedResult = transformation.transformOutput(securityContext, AbstractNode.class, result);
+			final App app                            = StructrApp.getInstance();
+			final QueryResult result                 = app.nodeQuery(AbstractNode.class).and(GraphObject.id, uuid).getResult();
+			final QueryResult transformedResult      = transformation.transformOutput(securityContext, AbstractNode.class, result);
 
-			Map<String, Object> nodeProperties = new HashMap<>();
-			GraphObjectMap node = (GraphObjectMap) transformedResult.get(0);
+			final Map<String, Object> nodeProperties = new HashMap<>();
+			final Iterator iterator                  = transformedResult.iterator();
+			final GraphObjectMap node                = (GraphObjectMap)iterator.next();
+
 			node.getPropertyKeys(null).forEach(
 				p -> nodeProperties.put(p.dbName(), node.getProperty(p))
 			);

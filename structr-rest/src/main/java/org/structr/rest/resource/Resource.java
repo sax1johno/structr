@@ -28,13 +28,14 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.QueryResult;
+import org.structr.api.util.QueryUtils;
 import org.structr.common.CaseHelper;
 import org.structr.common.GraphObjectComparator;
 import org.structr.common.Permission;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.QueryResult;
 import org.structr.core.Services;
 import org.structr.core.Value;
 import org.structr.core.app.App;
@@ -101,13 +102,13 @@ public abstract class Resource {
 
 	public RestMethodResult doDelete() throws FrameworkException {
 
-		final App app                 = StructrApp.getInstance(securityContext);
-		Iterable<GraphObject> results = null;
+		final App app                    = StructrApp.getInstance(securityContext);
+		QueryResult<GraphObject> results = null;
 
 		// catch 204, DELETE must return 200 if resource is empty
 		try (final Tx tx = app.tx(false, false, false)) {
 
-			results = doGet(null, false, NodeFactory.DEFAULT_PAGE_SIZE, NodeFactory.DEFAULT_PAGE).getResults();
+			results = doGet(null, false, NodeFactory.DEFAULT_PAGE_SIZE, NodeFactory.DEFAULT_PAGE);
 
 			tx.success();
 
@@ -126,7 +127,7 @@ public abstract class Resource {
 	public RestMethodResult doPut(final Map<String, Object> propertySet) throws FrameworkException {
 
 		final QueryResult<GraphObject> result = doGet(null, false, NodeFactory.DEFAULT_PAGE_SIZE, NodeFactory.DEFAULT_PAGE);
-		final List<GraphObject> results  = result.getResults();
+		final List<GraphObject> results       = QueryUtils.toList(result);
 
 		if (results != null && !results.isEmpty()) {
 

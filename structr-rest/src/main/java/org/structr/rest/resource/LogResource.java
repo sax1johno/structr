@@ -48,14 +48,15 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.QueryResult;
 import org.structr.api.config.Settings;
+import org.structr.api.util.QueryUtils;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.EmptyPropertyToken;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.GraphObjectMap;
-import org.structr.core.QueryResult;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.graph.Tx;
@@ -204,7 +205,8 @@ public class LogResource extends Resource {
 				overviewMap.put(firstEntryProperty, new Date(logState.beginTimestamp()));
 				overviewMap.put(lastEntryProperty, new Date(logState.endTimestamp()));
 
-				return new QueryResult(overviewMap, false);
+				return QueryUtils.single(overviewMap);
+				//return new QueryResult(overviewMap, false);
 
 			} else if (logState.doHistogram()) {
 
@@ -221,7 +223,8 @@ public class LogResource extends Resource {
 				// sort result
 				logState.sortEntries();
 
-				return new QueryResult(wrap(logState.entries()), logState.size(), true, false);
+				return QueryUtils.fromList(wrap(logState.entries()));
+				//return new QueryResult(wrap(logState.entries()), logState.size(), true, false);
 			}
 		}
 
@@ -576,7 +579,8 @@ public class LogResource extends Resource {
 			result.put(new GenericProperty(Long.toString(current)), sum);
 		}
 
-		return new QueryResult(result, false);
+		return QueryUtils.single(result);
+		//return new QueryResult(result, false);
 	}
 
 	private QueryResult histogram(final LogState state) throws FrameworkException {
@@ -628,7 +632,8 @@ public class LogResource extends Resource {
 			result.put(new GenericProperty(Long.toString(current)), sum);
 		}
 
-		return new QueryResult(result, false);
+		return QueryUtils.single(result);
+		//return new QueryResult(result, false);
 	}
 
 	private long alignDateOnFormat(final String dateFormat, final long timestamp) {

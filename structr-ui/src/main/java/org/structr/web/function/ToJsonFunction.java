@@ -21,10 +21,10 @@ package org.structr.web.function;
 import java.io.StringWriter;
 import java.util.List;
 import java.util.Map;
+import org.structr.api.util.QueryUtils;
 import org.structr.common.SecurityContext;
 import org.structr.core.GraphObject;
 import org.structr.core.GraphObjectMap;
-import org.structr.core.QueryResult;
 import org.structr.core.StaticValue;
 import org.structr.core.Value;
 import org.structr.rest.serialization.StreamingJsonWriter;
@@ -75,15 +75,15 @@ public class ToJsonFunction extends UiFunction {
 
 					final List list = (List)sources[0];
 
-					jsonStreamer.stream(securityContext, writer, new QueryResult(list, list.size(), true, false), null);
+					jsonStreamer.stream(securityContext, writer, QueryUtils.fromList(list), null);
 
 				} else if (sources[0] instanceof Map) {
 
 					final GraphObjectMap map  = new GraphObjectMap();
 
-					this.recursivelyConvertMapToGraphObjectMap(map, (Map)sources[0], outputDepth);
+					UiFunction.recursivelyConvertMapToGraphObjectMap(map, (Map)sources[0], outputDepth);
 
-					jsonStreamer.stream(securityContext, writer, new QueryResult(map, false), null);
+					jsonStreamer.stream(securityContext, writer, QueryUtils.single(map), null);
 
 				}
 

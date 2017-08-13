@@ -24,10 +24,11 @@ import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.QueryResult;
+import org.structr.api.util.QueryUtils;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.QueryResult;
 import org.structr.core.entity.Principal;
 import org.structr.core.property.PropertyKey;
 import org.structr.rest.RestMethodResult;
@@ -84,7 +85,8 @@ public class MeResource extends TypedIdResource {
 			List<GraphObject> resultList = new LinkedList<>();
 			resultList.add(user);
 
-			return new QueryResult(resultList, null,  isCollectionResource(), isPrimitiveArray());
+			return QueryUtils.fromList(resultList);
+			//return new QueryResult(resultList, null,  isCollectionResource(), isPrimitiveArray());
 
 		} else {
 

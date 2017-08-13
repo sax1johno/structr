@@ -21,6 +21,7 @@ package org.structr.bolt;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import org.neo4j.driver.v1.Record;
@@ -273,13 +274,13 @@ public class SessionTransaction implements org.structr.api.Transaction {
 		}
 	}
 
-	public QueryResult<Node> getNodes(final String statement, final Map<String, Object> map, final int count, final boolean limited) {
+	public QueryResult<Node> getNodes(final String statement, final Map<String, Object> map) {
 
 		try {
 
 			logQuery(statement, map);
 
-			return QueryUtils.map(new RecordNodeMapper(), new StatementIterable(tx.run(statement, map), count, limited));
+			return QueryUtils.map(new RecordNodeMapper(), new StatementIterable(tx.run(statement, map)));
 
 		} catch (TransientException tex) {
 			closed = true;
@@ -289,13 +290,13 @@ public class SessionTransaction implements org.structr.api.Transaction {
 		}
 	}
 
-	public QueryResult<Relationship> getRelationships(final String statement, final Map<String, Object> map, final int count, final boolean limited) {
+	public QueryResult<Relationship> getRelationships(final String statement, final Map<String, Object> map) {
 
 		try {
 
 			logQuery(statement, map);
 
-			return QueryUtils.map(new RecordRelationshipMapper(), new StatementIterable(tx.run(statement, map), count, limited));
+			return QueryUtils.map(new RecordRelationshipMapper(), new StatementIterable(tx.run(statement, map)));
 
 		} catch (TransientException tex) {
 			closed = true;
@@ -305,13 +306,13 @@ public class SessionTransaction implements org.structr.api.Transaction {
 		}
 	}
 
-	public QueryResult<Long> getIds(final String statement, final Map<String, Object> map, final int count, final boolean limited) {
+	public QueryResult<Long> getIds(final String statement, final Map<String, Object> map) {
 
 		try {
 
 			logQuery(statement, map);
 
-			return QueryUtils.map(new RecordLongMapper(), new StatementIterable(tx.run(statement, map), count, limited));
+			return QueryUtils.map(new RecordLongMapper(), new StatementIterable(tx.run(statement, map)));
 
 		} catch (TransientException tex) {
 			closed = true;
@@ -405,29 +406,16 @@ public class SessionTransaction implements org.structr.api.Transaction {
 
 	private class StatementIterable implements QueryResult<Record> {
 
-		private StatementResult result = null;
-		private boolean limited        = false;
-		private int count               = 0;
+		private final Map<String, Object> metadata = new LinkedHashMap<>();
+		private StatementResult result             = null;
 
-		public StatementIterable(final StatementResult result, final int count, final boolean limited) {
+		public StatementIterable(final StatementResult result) {
 			this.result  = result;
-			this.count   = count;
-			this.limited = limited;
 		}
 
 		@Override
 		public void close() {
 			result.consume();
-		}
-
-		@Override
-		public int size() {
-			return count;
-		}
-
-		@Override
-		public boolean isLimited() {
-			return limited;
 		}
 
 		@Override
@@ -444,7 +432,6 @@ public class SessionTransaction implements org.structr.api.Transaction {
 				public Record next() {
 
 					try {
-
 						return result.next();
 
 					} catch (TransientException tex) {
@@ -458,6 +445,16 @@ public class SessionTransaction implements org.structr.api.Transaction {
 					throw new UnsupportedOperationException("Removal not supported.");
 				}
 			};
+		}
+
+		@Override
+		public void setMetaData(final String key, final Object value) {
+			metadata.put(key, value);
+		}
+
+		@Override
+		public Object getMetaData(final String key) {
+			return metadata.get(key);
 		}
 	}
 }

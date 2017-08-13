@@ -39,18 +39,18 @@ public class PagedQueryResult<T> implements QueryResult<T> {
 	}
 
 	@Override
-	public int size() {
-		return result.size();
-	}
-
-	@Override
-	public boolean isLimited() {
-		return result.isLimited();
-	}
-
-	@Override
 	public Iterator<T> iterator() {
 		return new PagingIterator(result.iterator(), page, pageSize);
+	}
+
+	@Override
+	public void setMetaData(final String key, final Object value) {
+		result.setMetaData(key, value);
+	}
+
+	@Override
+	public Object getMetaData(final String key) {
+		return result.getMetaData(key);
 	}
 
 	// Custom iterator for Query Results
@@ -64,14 +64,16 @@ public class PagedQueryResult<T> implements QueryResult<T> {
 		public PagingIterator(final Iterator<T> iterator, final int page, final int pageSize) {
 
 			this.currentIndex = 0;
-			this.iterator = iterator;
-			this.page = page;
-			this.pageSize = pageSize;
+			this.iterator     = iterator;
+			this.page         = page;
+			this.pageSize     = pageSize;
+
 			//On initialization forward iterator to page offset.
 			iterateToOffset();
 		}
 
 		private void iterateToOffset() {
+
 			while(currentIndex < getOffset() && iterator.hasNext()) {
 				iterator.next();
 				currentIndex++;
@@ -79,21 +81,23 @@ public class PagedQueryResult<T> implements QueryResult<T> {
 		}
 
 		private int getOffset() {
-			if(page == 0) {
+
+			if(page == 0 || page == Integer.MAX_VALUE) {
 				return 0;
-			} else if(page  > 0) {
-				return pageSize == Integer.MAX_VALUE ? 0 : (page - 1) * pageSize;
 			}
-			return 0;
+
+			return (page - 1) * pageSize;
 		}
 
 		private int getLimitOffset() {
+
 			//For positive paging, reverse paging needs an alternative implementation
-			return getOffset()+pageSize;
+			return getOffset() + pageSize;
 		}
 
 		@Override
 		public boolean hasNext() {
+
 			//Iterator was exhausted before starting offset was reached.
 			if(currentIndex < getOffset() && !iterator.hasNext()) {
 				return false;
@@ -106,15 +110,17 @@ public class PagedQueryResult<T> implements QueryResult<T> {
 
 		@Override
 		public T next() {
+
 			if(hasNext()) {
+
 				T next = iterator.next();
 				currentIndex++;
 				return next;
+
 			} else {
+
 				throw new NoSuchElementException("No element available for next() call!");
 			}
 		}
-
 	}
-
 }

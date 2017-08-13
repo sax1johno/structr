@@ -32,11 +32,11 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.QueryResult;
 import org.structr.api.config.Settings;
 import org.structr.common.MailHelper;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.QueryResult;
 import org.structr.core.app.App;
 import org.structr.core.app.Query;
 import org.structr.core.app.StructrApp;
@@ -109,7 +109,7 @@ public class RegistrationResource extends Resource {
 
 		if (propertySet.containsKey(User.eMail.jsonName())) {
 
-			final Principal user;
+			Principal user = null;
 
 			final String emailString  = (String) propertySet.get(User.eMail.jsonName());
 
@@ -120,16 +120,13 @@ public class RegistrationResource extends Resource {
 			final String localeString = (String) propertySet.get(MailTemplate.locale.jsonName());
 			final String confKey      = UUID.randomUUID().toString();
 
-			final QueryResult result = StructrApp.getInstance().nodeQuery(User.class).and(User.eMail, emailString).getResult();
-			if (!result.isEmpty()) {
-
-				user = (Principal) result.get(0);
+			user = StructrApp.getInstance().nodeQuery(User.class).and(User.eMail, emailString).getFirst();
+			if (user != null) {
 
 				// For existing users, update confirmation key
 				user.setProperties(securityContext, new PropertyMap(User.confirmationKey, confKey));
 
 				existingUser = true;
-
 
 			} else {
 

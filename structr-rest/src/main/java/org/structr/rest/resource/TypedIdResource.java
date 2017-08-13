@@ -20,10 +20,11 @@ package org.structr.rest.resource;
 
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
+import org.structr.api.QueryResult;
+import org.structr.api.util.QueryUtils;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.QueryResult;
 import org.structr.core.graph.search.SearchCommand;
 import org.structr.core.property.PropertyKey;
 import org.structr.rest.RestMethodResult;
@@ -60,7 +61,8 @@ public class TypedIdResource extends FilterableResource {
 
 	@Override
 	public QueryResult doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
-		return new QueryResult(getEntity(), isPrimitiveArray());
+		return QueryUtils.single(getEntity());
+		//return new QueryResult(getEntity(), isPrimitiveArray());
 	}
 
 	@Override

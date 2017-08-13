@@ -30,11 +30,11 @@ import java.util.StringJoiner;
 import org.odftoolkit.odfdom.doc.OdfSpreadsheetDocument;
 import org.odftoolkit.odfdom.doc.table.OdfTable;
 import org.odftoolkit.odfdom.doc.table.OdfTableCell;
+import org.structr.api.QueryResult;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.Export;
 import org.structr.core.GraphObject;
 import org.structr.core.GraphObjectMap;
-import org.structr.core.QueryResult;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
@@ -139,8 +139,10 @@ public class ODSExporter extends ODFExporter {
 			final QueryResult result = app.nodeQuery(AbstractNode.class).and(GraphObject.id, uuid).getResult();
 			final QueryResult transformedResult = transformation.transformOutput(securityContext, AbstractNode.class, result);
 
-			Map<String, Object> nodeProperties = new HashMap<>();
-			GraphObjectMap node = (GraphObjectMap) transformedResult.get(0);
+			final Map<String, Object> nodeProperties = new HashMap<>();
+			final Iterator iterator                  = transformedResult.iterator();
+			final GraphObjectMap node                = (GraphObjectMap)iterator.next();
+			
 			node.getPropertyKeys(null).forEach(
 				p -> nodeProperties.put(p.dbName(), node.getProperty(p))
 			);

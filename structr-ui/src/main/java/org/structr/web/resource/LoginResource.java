@@ -24,9 +24,9 @@ import javax.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.QueryResult;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.QueryResult;
 import org.structr.core.entity.Principal;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
@@ -34,8 +34,6 @@ import org.structr.rest.RestMethodResult;
 import org.structr.rest.exception.NotAllowedException;
 import org.structr.rest.resource.Resource;
 import org.structr.web.entity.User;
-
-//~--- classes ----------------------------------------------------------------
 
 /**
  * Resource that handles user logins
@@ -45,8 +43,6 @@ import org.structr.web.entity.User;
 public class LoginResource extends Resource {
 
 	private static final Logger logger       = LoggerFactory.getLogger(LoginResource.class.getName());
-
-	//~--- methods --------------------------------------------------------
 
 	@Override
 	public boolean checkAndConfigure(String part, SecurityContext securityContext, HttpServletRequest request) {

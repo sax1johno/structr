@@ -26,11 +26,11 @@ import org.mozilla.javascript.Context;
 import org.mozilla.javascript.ScriptRuntime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.QueryResult;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.common.error.UnlicensedException;
 import org.structr.core.GraphObject;
-import org.structr.core.QueryResult;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.SchemaMethod;
@@ -45,7 +45,7 @@ import org.structr.schema.action.Actions;
 /**
  *
  */
-public class SchemaMethodResource extends SortableResource {
+public class SchemaMethodResource extends FilterableResource {
 
 	private static final Logger logger   = LoggerFactory.getLogger(SchemaMethodResource.class);
 	private TypeResource typeResource   = null;

@@ -44,8 +44,9 @@ public class RestVerbsTest extends StructrRestTest {
 
 		createNodes(100);
 
-		expectOk(200).body("result_count", Matchers.equalTo(100)).when().get("/TestOne");
-		expectOk(200).body("result_count", Matchers.equalTo(  1)).when().get("/TestOne?name=node055");
+		expectOk(200).body("result", Matchers.hasSize(100)).when().get("/TestOne");
+		expectOk(200).body("result", Matchers.hasSize( 10)).when().get("/TestOne?pageSize=10");
+		expectOk(200).body("result", Matchers.hasSize(  1)).when().get("/TestOne?name=node055");
 
 	}
 
@@ -82,7 +83,7 @@ public class RestVerbsTest extends StructrRestTest {
 		*/
 
 		expectOk(201)
-			.body("result_count", Matchers.equalTo(1))
+			.body("result",       Matchers.hasSize(1))
 			.body("result",       Matchers.instanceOf(Collection.class))
 			.body("result[0]",    Matchers.instanceOf(String.class))
 			.when().post("/TestOne");
@@ -96,15 +97,15 @@ public class RestVerbsTest extends StructrRestTest {
 
 		// delete exactly one element by name
 		expectOk(200).when().delete("/TestOne?name=node055");
-		expectOk(200).body("result_count", Matchers.equalTo(99)).when().get("/TestOne");
+		expectOk(200).body("result", Matchers.hasSize(99)).when().get("/TestOne");
 
 		// delete 11 elements
 		expectOk(200).when().delete("/TestOne?name=02&loose=1");
-		expectOk(200).body("result_count", Matchers.equalTo(88)).when().get("/TestOne");
+		expectOk(200).body("result", Matchers.hasSize(88)).when().get("/TestOne");
 
 		// delete 18 elements
 		expectOk(200).when().delete("/TestOne?name=7&loose=1");
-		expectNotOk(200).body("result_count", Matchers.equalTo(70)).when().get("/TestOne");
+		expectOk(200).body("result", Matchers.hasSize(70)).when().get("/TestOne");
 	}
 
 	// ----- private methods -----

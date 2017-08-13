@@ -24,10 +24,10 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.util.QueryUtils;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.QueryResult;
 import org.structr.core.app.Query;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
@@ -117,7 +117,7 @@ public class SearchCommand extends AbstractCommand {
 				try {
 					securityContext.setRequest(getWebSocket().getRequest());
 
-					webSocketData.setResult(restDataSource.getData(new RenderContext(securityContext), restQuery));
+					webSocketData.setResult(QueryUtils.toList(restDataSource.getData(new RenderContext(securityContext), restQuery)));
 					getWebSocket().send(webSocketData, true);
 
 					return;
@@ -144,11 +144,8 @@ public class SearchCommand extends AbstractCommand {
 
 		try {
 
-			// do search
-			final QueryResult result = query.getResult();
-
 			// set full result list
-			webSocketData.setResult(result.getResults());
+			webSocketData.setResult(query.getAsList());
 
 			// send only over local connection
 			getWebSocket().send(webSocketData, true);

@@ -209,9 +209,12 @@ public class AccessControlTest extends StructrTest {
 			SecurityContext user2Context = SecurityContext.getInstance(user2, AccessMode.Backend);
 
 			try (final Tx tx = app.tx()) {
-				QueryResult result = StructrApp.getInstance(user2Context).nodeQuery(type).getResult();
+
+				List result = StructrApp.getInstance(user2Context).nodeQuery(type).getAsList();
 
 				assertEquals(2, result.size());
+
+				tx.success();
 			}
 
 		} catch (FrameworkException ex) {
@@ -252,7 +255,7 @@ public class AccessControlTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				QueryResult result = StructrApp.getInstance(user2Context).nodeQuery(type).getResult();
+				List result = StructrApp.getInstance(user2Context).nodeQuery(type).getAsList();
 
 				assertEquals(2, result.size());
 
@@ -349,7 +352,7 @@ public class AccessControlTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				QueryResult result = StructrApp.getInstance(publicContext).nodeQuery(type).sort(AbstractNode.createdDate).getResult();
+				List result = StructrApp.getInstance(publicContext).nodeQuery(type).sort(AbstractNode.createdDate).getAsList();
 
 				assertEquals(3, result.size());
 				assertEquals(3, (int) result.size());
@@ -358,6 +361,8 @@ public class AccessControlTest extends StructrTest {
 //				assertEquals(nodes.get(3).getUuid(), result.get(0).getUuid());
 //				assertEquals(nodes.get(5).getUuid(), result.get(1).getUuid());
 //				assertEquals(nodes.get(7).getUuid(), result.get(2).getUuid());
+
+				tx.success();
 			}
 
 		} catch (FrameworkException ex) {
@@ -408,7 +413,7 @@ public class AccessControlTest extends StructrTest {
 				final List<NodeInterface> list          = QueryUtils.toList(result);
 
 				assertEquals(2, list.size());
-				assertEquals(4, result.size());
+				//assertEquals(4, result.size());
 
 				assertEquals(nodes.get(3).getUuid(), list.get(0).getUuid());
 				assertEquals(nodes.get(5).getUuid(), list.get(1).getUuid());

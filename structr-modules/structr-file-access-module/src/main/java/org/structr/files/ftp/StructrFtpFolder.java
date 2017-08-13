@@ -27,9 +27,9 @@ import java.util.List;
 import org.apache.ftpserver.ftplet.FtpFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.QueryResult;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.QueryResult;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.graph.Tx;
@@ -47,7 +47,7 @@ public class StructrFtpFolder extends AbstractStructrFtpFile implements FtpFile 
 	private static final Logger logger = LoggerFactory.getLogger(StructrFtpFolder.class.getName());
 
 	public StructrFtpFolder(final SecurityContext securityContext, final Folder folder) {
-		super(securityContext, folder);		
+		super(securityContext, folder);
 	}
 
 	@Override
@@ -73,18 +73,18 @@ public class StructrFtpFolder extends AbstractStructrFtpFile implements FtpFile 
 
 	@Override
 	public long getLastModified() {
-		
+
 		try (Tx tx = StructrApp.getInstance(securityContext).tx()) {
-		
+
 			final Date date = structrFile.getProperty(Folder.lastModifiedDate);
-			
+
 			tx.success();
-			
+
 			return date.getTime();
-		
+
 		} catch (Exception ex) {
 		}
-		
+
 		return 0L;
 	}
 
@@ -108,9 +108,7 @@ public class StructrFtpFolder extends AbstractStructrFtpFile implements FtpFile 
 			if ("/".equals(requestedPath)) {
 				try {
 					QueryResult<Folder> folders = app.nodeQuery(Folder.class).getResult();
-					logger.debug("{} folders found", folders.size());
-
-					for (Folder f : folders.getResults()) {
+					for (Folder f : folders) {
 
 						if (f.getProperty(AbstractFile.hasParent)) {
 							continue;
@@ -124,9 +122,7 @@ public class StructrFtpFolder extends AbstractStructrFtpFile implements FtpFile 
 					}
 
 					QueryResult<FileBase> files = app.nodeQuery(FileBase.class).getResult();
-					logger.debug("{} files found", files.size());
-
-					for (FileBase f : files.getResults()) {
+					for (FileBase f : files) {
 
 						if (f.getProperty(AbstractFile.hasParent)) {
 							continue;
@@ -142,9 +138,7 @@ public class StructrFtpFolder extends AbstractStructrFtpFile implements FtpFile 
 					}
 
 					QueryResult<Page> pages = app.nodeQuery(Page.class).getResult();
-					logger.debug("{} pages found", pages.size());
-
-					for (Page p : pages.getResults()) {
+					for (Page p : pages) {
 
 						logger.debug("Structr page found: {}", p);
 
@@ -212,7 +206,7 @@ public class StructrFtpFolder extends AbstractStructrFtpFile implements FtpFile 
 
 	@Override
 	public Object getPhysicalFile() {
-		throw new UnsupportedOperationException("Not supported yet."); 
+		throw new UnsupportedOperationException("Not supported yet.");
 	}
 
 }

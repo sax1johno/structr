@@ -27,6 +27,7 @@ import org.apache.commons.collections.map.LRUMap;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.QueryResult;
 import org.structr.api.util.Iterables;
 import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
@@ -34,7 +35,6 @@ import org.structr.common.ValidationHelper;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.QueryResult;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.AbstractRelationship;
@@ -349,7 +349,7 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 		final String _tag        = getProperty(DOMElement.tag);
 
 		// non-final variables
-		QueryResult localResult                 = renderContext.getResult();
+		QueryResult localResult            = renderContext.getResult();
 		boolean anyChildNodeCreatesNewLine = false;
 
 		renderStructrAppLib(out, securityContext, renderContext, depth);

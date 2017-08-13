@@ -27,7 +27,12 @@ public interface QueryResult<T> extends Iterable<T>, AutoCloseable {
 	@Override
 	void close();
 
-	int size();
+	void setMetaData(final String key, final Object value);
+	Object getMetaData(final String key);
 
-	boolean isLimited();
+	default boolean isSet(final String key) {
+
+		final Object value = getMetaData(key);
+		return value != null && Boolean.TRUE.equals(value);
+	}
 }

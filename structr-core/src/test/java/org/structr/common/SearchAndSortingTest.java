@@ -33,8 +33,6 @@ import static org.junit.Assert.fail;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.structr.api.QueryResult;
-import org.structr.api.util.QueryUtils;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.app.App;
@@ -96,7 +94,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				QueryResult<TestOne> result = app.nodeQuery(type).getResult();
+				List<TestOne> result = app.nodeQuery(type).getAsList();
 
 				assertEquals(4, result.size());
 
@@ -104,7 +102,7 @@ public class SearchAndSortingTest extends StructrTest {
 					System.out.println(node);
 				}
 
-				result = app.nodeQuery(type).andName("TestOne-12").getResult();
+				result = app.nodeQuery(type).andName("TestOne-12").getAsList();
 
 				assertEquals(1, result.size());
 
@@ -154,7 +152,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				QueryResult result = app.nodeQuery(type).and(TestOne.name, "TestOne-13").getResult();
+				List result = app.nodeQuery(type).and(TestOne.name, "TestOne-13").getAsList();
 
 				assertEquals(1, result.size());
 
@@ -205,7 +203,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				QueryResult result = app.nodeQuery(type).and(TestOne.name, "testone", false).getResult();
+				List result = app.nodeQuery(type).and(TestOne.name, "testone", false).getAsList();
 
 				assertEquals(4, result.size());
 
@@ -256,7 +254,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				QueryResult result = app.nodeQuery(type).and(TestOne.name, "TestOne", false).getResult();
+				List result = app.nodeQuery(type).and(TestOne.name, "TestOne", false).getAsList();
 
 				assertEquals(4, result.size());
 
@@ -307,7 +305,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				QueryResult result = app.nodeQuery(type).and(TestOne.stringWithDefault, "default value", false).getResult();
+				List result = app.nodeQuery(type).and(TestOne.stringWithDefault, "default value", false).getAsList();
 
 				assertEquals(4, result.size());
 
@@ -400,13 +398,13 @@ public class SearchAndSortingTest extends StructrTest {
 
 				long t0 = System.currentTimeMillis();
 
-				QueryResult<? extends GraphObject> result = app.nodeQuery(NodeInterface.class).getResult();
+				List<? extends GraphObject> result = app.nodeQuery(NodeInterface.class).getAsList();
 
 				long t1 = System.currentTimeMillis();
 				logger.info("Query with inexact type took {} ms", t1-t0);
 				assertEquals(1006, result.size());
 
-				result = app.nodeQuery(NodeInterface.class).getResult();
+				result = app.nodeQuery(NodeInterface.class).getAsList();
 
 				long t2 = System.currentTimeMillis();
 				logger.info("Query with exact type took {} ms", t2-t1);
@@ -615,7 +613,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				QueryResult<NodeInterface> result = app.nodeQuery(type).getResult();
+				List<NodeInterface> result = app.nodeQuery(type).getAsList();
 
 				assertEquals(number, result.size());
 
@@ -624,20 +622,22 @@ public class SearchAndSortingTest extends StructrTest {
 				int pageSize        = 10;
 				int page            = 1;
 
-				result = app.nodeQuery(type).sort(sortKey).order(sortDesc).page(page).pageSize(pageSize).getResult();
+				result = app.nodeQuery(type).sort(sortKey).order(sortDesc).page(page).pageSize(pageSize).getAsList();
 
+				/*
 				logger.info("Raw result size: {}, expected: {}", new Object[] { result.size(), number });
 				assertTrue(result.size() == number);
 
-				final List<NodeInterface> list = QueryUtils.toList(result);
+				final List<NodeInterface> result = QueryUtils.toList(result);
+				*/
 
-				logger.info("Result size: {}, expected: {}", new Object[] { list.size(), Math.min(number, pageSize) });
-				assertTrue(list.size() == Math.min(number, pageSize));
+				logger.info("Result size: {}, expected: {}", new Object[] { result.size(), Math.min(number, pageSize) });
+				assertTrue(result.size() == Math.min(number, pageSize));
 
 				for (int j = 0; j < Math.min(result.size(), pageSize); j++) {
 
 					int expectedNumber = number + offset - 1 - j;
-					String gotName     = list.get(j).getProperty(AbstractNode.name);
+					String gotName     = result.get(j).getProperty(AbstractNode.name);
 
 					System.out.println(expectedNumber + ", got: " + gotName);
 					assertEquals(Integer.toString(expectedNumber), gotName);
@@ -692,7 +692,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				QueryResult<NodeInterface> result = app.nodeQuery(type).getResult();
+				List<NodeInterface> result = app.nodeQuery(type).getAsList();
 
 				assertEquals(number, result.size());
 
@@ -701,20 +701,22 @@ public class SearchAndSortingTest extends StructrTest {
 				int pageSize        = 10;
 				int page            = 1;
 
-				result = app.nodeQuery(type).sort(sortKey).order(sortDesc).page(page).pageSize(pageSize).getResult();
+				result = app.nodeQuery(type).sort(sortKey).order(sortDesc).page(page).pageSize(pageSize).getAsList();
 
+				/*
 				logger.info("Raw result size: {}, expected: {}", new Object[] { result.size(), number });
 				assertTrue(result.size() == number);
 
-				final List<NodeInterface> list = QueryUtils.toList(result);
+				final List<NodeInterface> result = QueryUtils.toList(result);
+				*/
 
-				logger.info("Result size: {}, expected: {}", new Object[] { list.size(), pageSize });
-				assertTrue(list.size() == Math.min(number, pageSize));
+				logger.info("Result size: {}, expected: {}", new Object[] { result.size(), pageSize });
+				assertTrue(result.size() == Math.min(number, pageSize));
 
 				for (int j = 0; j < Math.min(result.size(), pageSize); j++) {
 
 					String expectedName = "TestOne-" + (offset + j);
-					String gotName     = list.get(j).getProperty(AbstractNode.name);
+					String gotName     = result.get(j).getProperty(AbstractNode.name);
 
 					System.out.println(expectedName + ", got: " + gotName);
 					assertEquals(expectedName, gotName);
@@ -766,7 +768,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				QueryResult<NodeInterface> result = app.nodeQuery(type).getResult();
+				List<NodeInterface> result = app.nodeQuery(type).getAsList();
 
 				assertEquals(number, result.size());
 
@@ -775,20 +777,22 @@ public class SearchAndSortingTest extends StructrTest {
 				int pageSize        = 10;
 				int page            = 1;
 
-				result = app.nodeQuery(type).sort(sortKey).order(sortDesc).page(page).pageSize(pageSize).getResult();
+				result = app.nodeQuery(type).sort(sortKey).order(sortDesc).page(page).pageSize(pageSize).getAsList();
 
+				/*
 				logger.info("Raw result size: {}, expected: {}", new Object[] { result.size(), number });
 				assertTrue(result.size() == number);
 
-				final List<NodeInterface> list = QueryUtils.toList(result);
+				final List<NodeInterface> result = QueryUtils.toList(result);
+				*/
 
-				logger.info("Result size: {}, expected: {}", new Object[] { list.size(), pageSize });
-				assertTrue(list.size() == Math.min(number, pageSize));
+				logger.info("Result size: {}, expected: {}", new Object[] { result.size(), pageSize });
+				assertTrue(result.size() == Math.min(number, pageSize));
 
 				for (int j = 0; j < pageSize; j++) {
 
 					int expectedNumber = number + offset - 1 - j;
-					String gotName     = list.get(j).getProperty(AbstractNode.name);
+					String gotName     = result.get(j).getProperty(AbstractNode.name);
 
 					System.out.println(expectedNumber + ", got: " + gotName);
 					assertEquals(Integer.toString(expectedNumber), gotName);
@@ -836,7 +840,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				QueryResult<NodeInterface> result = app.nodeQuery(type).getResult();
+				List<NodeInterface> result = app.nodeQuery(type).getAsList();
 
 				assertEquals(number, result.size());
 
@@ -845,20 +849,22 @@ public class SearchAndSortingTest extends StructrTest {
 				int pageSize        = 5;
 				int page            = 1;
 
-				result = app.nodeQuery(type).sort(sortKey).order(sortDesc).page(page).pageSize(pageSize).getResult();
+				result = app.nodeQuery(type).sort(sortKey).order(sortDesc).page(page).pageSize(pageSize).getAsList();
 
+				/*
 				logger.info("Raw result size: {}, expected: {}", new Object[] { result.size(), number });
 				assertTrue(result.size() == number);
 
-				final List<NodeInterface> list = QueryUtils.toList(result);
+				final List<NodeInterface> result = QueryUtils.toList(result);
+				*/
 
-				logger.info("Result size: {}, expected: {}", new Object[] { list.size(), pageSize });
-				assertTrue(list.size() == Math.min(number, pageSize));
+				logger.info("Result size: {}, expected: {}", new Object[] { result.size(), pageSize });
+				assertTrue(result.size() == Math.min(number, pageSize));
 
 				for (int j = 0; j < pageSize; j++) {
 
 					int expectedNumber = offset + j;
-					int gotNumber      = (Integer) list.get(j).getProperty(key);
+					int gotNumber      = (Integer) result.get(j).getProperty(key);
 
 					System.out.println("expected: " + expectedNumber + ", got: " + gotNumber);
 					assertEquals(expectedNumber, gotNumber);
@@ -920,7 +926,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				QueryResult<NodeInterface> result = app.nodeQuery(type).getResult();
+				List<NodeInterface> result = app.nodeQuery(type).getAsList();
 
 				assertEquals(number, result.size());
 
@@ -929,20 +935,22 @@ public class SearchAndSortingTest extends StructrTest {
 				int pageSize        = 10;
 				int page            = 1;
 
-				result = app.nodeQuery(type).sort(sortKey).order(sortDesc).page(page).pageSize(pageSize).getResult();
+				result = app.nodeQuery(type).sort(sortKey).order(sortDesc).page(page).pageSize(pageSize).getAsList();
 
+				/*
 				logger.info("Raw result size: {}, expected: {}", new Object[] { result.size(), number });
 				assertTrue(result.size() == number);
 
-				final List<NodeInterface> list = QueryUtils.toList(result);
+				final List<NodeInterface> result = QueryUtils.toList(result);
+				*/
 
-				logger.info("Result size: {}, expected: {}", new Object[] { list.size(), pageSize });
-				assertTrue(list.size() == Math.min(number, pageSize));
+				logger.info("Result size: {}, expected: {}", new Object[] { result.size(), pageSize });
+				assertTrue(result.size() == Math.min(number, pageSize));
 
-				for (int j = 0; j < Math.min(list.size(), pageSize); j++) {
+				for (int j = 0; j < Math.min(result.size(), pageSize); j++) {
 
 					String expectedName = "TestOne-" + (30 - (j+1)*2);
-					String gotName     = list.get(j).getProperty(AbstractNode.name);
+					String gotName     = result.get(j).getProperty(AbstractNode.name);
 
 					System.out.println(j + ": " +  expectedName + ", got: " + gotName);
 					assertEquals(expectedName, gotName);
@@ -1542,7 +1550,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				final QueryResult<NodeInterface> initialResult = app.nodeQuery(type).getResult();
+				final List<NodeInterface> initialResult = app.nodeQuery(type).getAsList();
 
 				assertTrue(initialResult.size() == number);
 
@@ -1551,11 +1559,12 @@ public class SearchAndSortingTest extends StructrTest {
 				int pageSize        = 10;
 				int page            = 1;
 
-				final QueryResult<NodeInterface> result = app.nodeQuery(type).includeDeletedAndHidden().sort(sortKey).order(sortDesc).page(page).pageSize(pageSize).getResult();
-				final List<NodeInterface> list          = QueryUtils.toList(result);
+				final List<NodeInterface> list = app.nodeQuery(type).includeDeletedAndHidden().sort(sortKey).order(sortDesc).page(page).pageSize(pageSize).getAsList();
 
+				/*
 				logger.info("Raw result size: {}, expected: {}", new Object[] { result.size(), number });
 				assertTrue(result.size() == number);
+				*/
 
 				logger.info("Result size: {}, expected: {}", new Object[] { list.size(), pageSize });
 				assertTrue(list.size() == pageSize);
@@ -1609,7 +1618,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				QueryResult result = app.nodeQuery(type).getResult();
+				List result = app.nodeQuery(type).getAsList();
 
 				assertEquals(number, result.size());
 
@@ -1897,9 +1906,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 				final PropertyKey sortKey = AbstractNode.name;
 				final boolean sortDesc    = false;
-				final int pageSize        = 10;
-				final int page            = 22;
-				final QueryResult result  = tester1App.nodeQuery(type).sort(sortKey).order(sortDesc).pageSize(pageSize).page(page).getResult();
+				final List result         = tester1App.nodeQuery(type).sort(sortKey).order(sortDesc).getAsList();
 
 				assertEquals("Invalid paging result count with non-superuser security context", tester1NodeCount, (int)result.size());
 
@@ -1910,9 +1917,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 				final PropertyKey sortKey = AbstractNode.name;
 				final boolean sortDesc    = false;
-				final int pageSize        = 10;
-				final int page            = 22;
-				final QueryResult result       = tester2App.nodeQuery(type).sort(sortKey).order(sortDesc).pageSize(pageSize).page(page).getResult();
+				final List result         = tester2App.nodeQuery(type).sort(sortKey).order(sortDesc).getAsList();
 
 				assertEquals("Invalid paging result count with non-superuser security context", tester2NodeCount, (int)result.size());
 
@@ -1986,7 +1991,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 				final PropertyKey sortKey = AbstractNode.name;
 				final boolean sortDesc    = false;
-				final QueryResult result  = testerApp.nodeQuery(type).sort(sortKey).order(sortDesc).getResult();
+				final List result         = testerApp.nodeQuery(type).sort(sortKey).order(sortDesc).getAsList();
 				int i                     = 0;
 
 				for (final Object o : result) {
@@ -2066,7 +2071,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 		try (final Tx tx = app.tx()) {
 
-			final QueryResult<TestOne> result = app.nodeQuery(TestOne.class).includeDeletedAndHidden(false).getResult();
+			final List<TestOne> result = app.nodeQuery(TestOne.class).includeDeletedAndHidden(false).getAsList();
 
 			assertEquals("Result count should not include deleted or hidden nodes", 7, (int)result.size());
 			assertEquals("Actual result size should be equal to result count", 7, (int)result.size());
@@ -2090,22 +2095,21 @@ public class SearchAndSortingTest extends StructrTest {
 			query.includeDeletedAndHidden();
 		}
 
-		final QueryResult<NodeInterface> result = query.getResult();
+		final List<NodeInterface> list = query.getAsList();
 
+		/*
 		logger.info("===================================================\nRaw result size: {}, expected: {} (page size: {}, page: {})",
-			result.size(), number, pageSize, page
+			list.size(), number, pageSize, page
 		);
 
-		assertTrue(result.size() == ((pageSize == 0 || page == 0) ? 0 : number));
+		assertTrue(list.size() == ((pageSize == 0 || page == 0) ? 0 : number));
+		*/
 
 		long expectedResultCount = (pageSize == 0 || page == 0)
 					   ? 0
 					   : Math.min(number, pageSize);
 
 		int startIndex = (Math.max(page, 1) - 1) * pageSize;
-
-		final List<NodeInterface> list = QueryUtils.toList(result);
-
 
 		logger.info("Result size: {}, expected: {}, start index: {}", new Object[] { list.size(), expectedResultCount, startIndex });
 		assertTrue(list.size() == expectedResultCount);

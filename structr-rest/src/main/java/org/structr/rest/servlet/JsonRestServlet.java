@@ -39,16 +39,15 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.QueryResult;
 import org.structr.api.RetryException;
 import org.structr.api.config.Settings;
-import org.structr.common.PagingHelper;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.IJsonInput;
 import org.structr.core.JsonInput;
 import org.structr.core.JsonSingleInput;
-import org.structr.core.QueryResult;
 import org.structr.core.Services;
 import org.structr.core.Value;
 import org.structr.core.app.App;
@@ -833,26 +832,27 @@ public class JsonRestServlet extends HttpServlet implements HttpServiceServlet {
 
 			if (returnContent) {
 
-				if (!(resource instanceof StaticRelationshipResource) && !result.isPrimitiveArray() && !result.isEmpty()) {
+				if (!(resource instanceof StaticRelationshipResource) && !result.isSet("isPrimitiveArray")) {
 
-					result.setIsCollection(resource.isCollectionResource());
-					result.setIsPrimitiveArray(resource.isPrimitiveArray());
+					result.setMetaData("isCollection",     resource.isCollectionResource());
+					result.setMetaData("isPrimitiveArray", resource.isPrimitiveArray());
 
 				}
 
-				PagingHelper.addPagingParameter(result, pageSize, page);
+				result.setMetaData("page", page);
+				result.setMetaData("pageSize", pageSize);
 
 				// timing..
 				double queryTimeEnd = System.nanoTime();
 
 				// store property view that will be used to render the results
-				result.setPropertyView(propertyView.get(securityContext));
+				result.setMetaData("propertyView", propertyView.get(securityContext));
 
 				// allow resource to modify result set
 				resource.postProcessResultSet(result);
 
 				DecimalFormat decimalFormat = new DecimalFormat("0.000000000", DecimalFormatSymbols.getInstance(Locale.ENGLISH));
-				result.setQueryTime(decimalFormat.format((queryTimeEnd - queryTimeStart) / 1000000000.0));
+				result.setMetaData("queryTime", decimalFormat.format((queryTimeEnd - queryTimeStart) / 1000000000.0));
 
 				String accept = request.getHeader("Accept");
 

@@ -20,6 +20,8 @@ package org.structr.websocket.command;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.QueryResult;
+import org.structr.api.util.QueryUtils;
 import org.structr.common.PropertyView;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.StructrApp;
@@ -51,16 +53,16 @@ public class GetSchemaInfoCommand extends AbstractCommand {
 		try {
 
 			final String type = (String) webSocketData.getNodeData().get("type");
-
 			if (type != null) {
-				
-				final Class typeClass = StructrApp.getConfiguration().getNodeEntityClass(type);
-				
-				webSocketData.setResult(SchemaTypeResource.getSchemaTypeResult(getWebSocket().getSecurityContext(), typeClass, PropertyView.Ui).getResults());
-				
+
+				final Class typeClass    = StructrApp.getConfiguration().getNodeEntityClass(type);
+				final QueryResult result = SchemaTypeResource.getSchemaTypeResult(getWebSocket().getSecurityContext(), typeClass, PropertyView.Ui);
+
+				webSocketData.setResult(QueryUtils.toList(result));
+
 			} else {
 
-				webSocketData.setResult(SchemaResource.getSchemaOverviewResult().getResults());
+				webSocketData.setResult(QueryUtils.toList(SchemaResource.getSchemaOverviewResult()));
 			}
 
 			// send only over local connection (no broadcast)

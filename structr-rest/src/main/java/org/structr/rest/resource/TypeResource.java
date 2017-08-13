@@ -18,13 +18,13 @@
  */
 package org.structr.rest.resource;
 
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.QueryResult;
+import org.structr.api.util.QueryUtils;
 import org.structr.common.GraphObjectComparator;
 import org.structr.common.PagingHelper;
 import org.structr.common.ResultTransformer;
@@ -33,7 +33,6 @@ import org.structr.common.error.EmptyPropertyToken;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.QueryResult;
 import org.structr.core.app.App;
 import org.structr.core.app.Query;
 import org.structr.core.app.StructrApp;
@@ -64,7 +63,7 @@ import org.structr.schema.SchemaHelper;
  *
  *
  */
-public class TypeResource extends SortableResource {
+public class TypeResource extends FilterableResource {
 
 	private static final Logger logger = LoggerFactory.getLogger(TypeResource.class.getName());
 
@@ -186,8 +185,7 @@ public class TypeResource extends SortableResource {
 			logger.warn("type was null");
 		}
 
-		List emptyList = Collections.emptyList();
-		return new QueryResult(emptyList, null, isCollectionResource(), isPrimitiveArray());
+		return QueryUtils.emptyResult();
 	}
 
 	@Override

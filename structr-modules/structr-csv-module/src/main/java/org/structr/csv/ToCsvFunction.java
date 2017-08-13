@@ -25,13 +25,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.QueryResult;
 import org.structr.core.app.StructrApp;
 import org.structr.core.function.LocalizeFunction;
 import org.structr.core.property.DateProperty;
@@ -147,26 +147,7 @@ public class ToCsvFunction extends UiFunction {
 	}
 
 	public static void writeCsv(
-			final QueryResult result,
-			final Writer out,
-			final String propertyView,
-			final List<String> properties,
-			final char quoteChar,
-			final char delimiterChar,
-			final String recordSeparator,
-			final boolean includeHeader,
-			final boolean localizeHeader,
-			final String headerLocalizationDomain,
-			final Locale locale
-	) throws IOException {
-
-		final List<GraphObject> list = result.getResults();
-
-		writeCsv(list, out, propertyView, properties, quoteChar, delimiterChar, recordSeparator, includeHeader, localizeHeader, headerLocalizationDomain, locale);
-	}
-
-	public static void writeCsv(
-			final List list,
+			final Iterable list,
 			final Writer out,
 			final String propertyView,
 			final List<String> properties,
@@ -180,8 +161,9 @@ public class ToCsvFunction extends UiFunction {
 	) throws IOException {
 
 		final StringBuilder row = new StringBuilder();
+		final Iterator iterator = list.iterator();
 
-		if (includeHeader) {
+		if (includeHeader && iterator.hasNext()) {
 
 			row.setLength(0);
 
@@ -189,7 +171,7 @@ public class ToCsvFunction extends UiFunction {
 
 			if (propertyView != null) {
 
-				final Object obj = list.get(0);
+				final Object obj = list.iterator().next();
 
 				if (obj instanceof GraphObject) {
 					for (PropertyKey key : ((GraphObject)obj).getPropertyKeys(propertyView)) {
@@ -228,7 +210,9 @@ public class ToCsvFunction extends UiFunction {
 
 		}
 
-		for (final Object obj : list) {
+		while (iterator.hasNext()) {
+
+			final Object obj = iterator.next();
 
 			row.setLength(0);
 

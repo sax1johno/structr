@@ -20,9 +20,9 @@ package org.structr.rest.resource;
 
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
+import org.structr.api.QueryResult;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.QueryResult;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.property.PropertyKey;
@@ -33,7 +33,7 @@ import org.structr.rest.exception.IllegalMethodException;
  *
  *
  */
-public class EntityResolverResource extends SortableResource {
+public class EntityResolverResource extends FilterableResource {
 
 	@Override
 	public boolean checkAndConfigure(String part, SecurityContext securityContext, HttpServletRequest request) {

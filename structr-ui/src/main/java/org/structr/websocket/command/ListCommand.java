@@ -18,13 +18,13 @@
  */
 package org.structr.websocket.command;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.QueryResult;
 import org.structr.core.app.Query;
 import org.structr.core.app.StructrApp;
 import org.structr.core.property.PropertyKey;
@@ -103,13 +103,13 @@ public class ListCommand extends AbstractCommand {
 		try {
 
 			// do search
-			final QueryResult result = query.getResult();
+			final List result = query.getAsList();
 
 			// save raw result count
-			int resultCountBeforePaging = result.getRawResultCount(); // filteredResults.size();
+			int resultCountBeforePaging = result.size();
 
 			// set full result list
-			webSocketData.setResult(result.getResults());
+			webSocketData.setResult(result);
 			webSocketData.setRawResultCount(resultCountBeforePaging);
 
 			// send only over local connection

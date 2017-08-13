@@ -18,7 +18,6 @@
  */
 package org.structr.rest.resource;
 
-import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -31,14 +30,15 @@ import javax.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.api.Predicate;
+import org.structr.api.QueryResult;
 import org.structr.api.graph.Node;
 import org.structr.api.util.Iterables;
+import org.structr.api.util.QueryUtils;
 import org.structr.common.PagingHelper;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.GraphObjectMap;
-import org.structr.core.QueryResult;
 import org.structr.core.app.App;
 import org.structr.core.app.Query;
 import org.structr.core.app.StructrApp;
@@ -69,7 +69,7 @@ import org.structr.rest.exception.NotFoundException;
  *
  *
  */
-public class StaticRelationshipResource extends SortableResource {
+public class StaticRelationshipResource extends FilterableResource {
 
 	private static final Logger logger = LoggerFactory.getLogger(StaticRelationshipResource.class.getName());
 
@@ -102,12 +102,12 @@ public class StaticRelationshipResource extends SortableResource {
 
 					if (!typeResource.isNode) {
 
-						final NodeInterface source = (NodeInterface) sourceEntity;
-						final Node sourceNode = source.getNode();
+						final NodeInterface source   = (NodeInterface) sourceEntity;
+						final Node sourceNode        = source.getNode();
 						final Class relationshipType = typeResource.entityClass;
-						final Relation relation = AbstractNode.getRelationshipForType(relationshipType);
-						final Class destNodeType = relation.getOtherType(typedIdResource.getEntityClass());
-						final Set partialResult = new LinkedHashSet<>(typeResource.doGet(sortKey, sortDescending, NodeFactory.DEFAULT_PAGE_SIZE, NodeFactory.DEFAULT_PAGE).getResults());
+						final Relation relation      = AbstractNode.getRelationshipForType(relationshipType);
+						final Class destNodeType     = relation.getOtherType(typedIdResource.getEntityClass());
+						final Set partialResult      = new LinkedHashSet<>(QueryUtils.toList(typeResource.doGet(sortKey, sortDescending, NodeFactory.DEFAULT_PAGE_SIZE, NodeFactory.DEFAULT_PAGE)));
 
 						// filter list according to end node type
 						final Set<GraphObject> set = Iterables.toSet(Iterables.filter(new OtherNodeTypeRelationFilter(securityContext, sourceNode, destNodeType), source.getRelationships(relationshipType)));
@@ -121,7 +121,9 @@ public class StaticRelationshipResource extends SortableResource {
 						applyDefaultSorting(finalResult, sortKey, sortDescending);
 
 						// return result
-						return new QueryResult(PagingHelper.subList(finalResult, pageSize, page), finalResult.size(), isCollectionResource(), isPrimitiveArray());
+						return QueryUtils.fromList(PagingHelper.subList(finalResult, pageSize, page));
+
+						//return new QueryResult(PagingHelper.subList(finalResult, pageSize, page), finalResult.size(), isCollectionResource(), isPrimitiveArray());
 
 					} else {
 
@@ -175,9 +177,11 @@ public class StaticRelationshipResource extends SortableResource {
 
 							GraphObjectMap gObject = new GraphObjectMap();
 							gObject.setProperty(new ArrayProperty(this.typeResource.rawType, Object.class), propertyResults.toArray());
-							QueryResult r = new QueryResult(gObject, true);
-							r.setRawResultCount(rawResultCount);
-							return r;
+
+							//QueryResult r = new QueryResult(gObject, true);
+							//r.setRawResultCount(rawResultCount);
+
+							return QueryUtils.single(gObject);
 
 						}
 
@@ -190,13 +194,15 @@ public class StaticRelationshipResource extends SortableResource {
 						applyDefaultSorting(finalResult, sortKey, sortDescending);
 
 						// return result
-						QueryResult r = new QueryResult(PagingHelper.subList(finalResult, pageSize, page), finalResult.size(), isCollectionResource(), isPrimitiveArray());
-						r.setRawResultCount(rawResultCount);
-						return r;
+						//QueryResult r = new QueryResult(PagingHelper.subList(finalResult, pageSize, page), finalResult.size(), isCollectionResource(), isPrimitiveArray());
+						//r.setRawResultCount(rawResultCount);
+
+						return QueryUtils.fromList(PagingHelper.subList(finalResult, pageSize, page));
 
 					} else if (value instanceof GraphObject) {
 
-						return new QueryResult((GraphObject) value, isPrimitiveArray());
+						return QueryUtils.single((GraphObject)value);
+						//return new QueryResult((GraphObject) value, isPrimitiveArray());
 
 					} else if (value != null) {
 
@@ -228,9 +234,11 @@ public class StaticRelationshipResource extends SortableResource {
 						}
 
 						gObject.setProperty(key, value);
-						QueryResult r = new QueryResult(gObject, true);
-						r.setRawResultCount(resultCount);
-						return r;
+
+						//QueryResult r = new QueryResult(gObject, true);
+						//r.setRawResultCount(resultCount);
+
+						return QueryUtils.single(gObject);
 
 					} else {
 
@@ -243,21 +251,23 @@ public class StaticRelationshipResource extends SortableResource {
 				// check propertyKey to return the right variant of empty result
 				if (!(propertyKey instanceof StartNode || propertyKey instanceof EndNode)) {
 
-					return new QueryResult(Collections.EMPTY_LIST, 1, false, true);
+					return QueryUtils.emptyResult();
+					//return new QueryResult(Collections.EMPTY_LIST, 1, false, true);
 
 				}
 
 			}
 		}
 
-		return new QueryResult(Collections.EMPTY_LIST, 0, false, true);
+		return QueryUtils.emptyResult();
+		//return new QueryResult(Collections.EMPTY_LIST, 0, false, true);
 	}
 
 	@Override
 	public RestMethodResult doPut(final Map<String, Object> propertySet) throws FrameworkException {
 
-		final List<? extends GraphObject> results = typedIdResource.doGet(null, false, NodeFactory.DEFAULT_PAGE_SIZE, NodeFactory.DEFAULT_PAGE).getResults();
-		final App app = StructrApp.getInstance(securityContext);
+		final List<? extends GraphObject> results = QueryUtils.toList(typedIdResource.doGet(null, false, NodeFactory.DEFAULT_PAGE_SIZE, NodeFactory.DEFAULT_PAGE));
+		final App app                             = StructrApp.getInstance(securityContext);
 
 		if (results != null) {
 

@@ -29,7 +29,7 @@ import org.structr.api.search.SortType;
 /**
  *
  */
-public class CypherQuery {
+public class AdvancedCypherQuery implements PageableQuery {
 
 	private final Map<String, Object> parameters = new HashMap<>();
 	private final List<String> typeLabels        = new LinkedList<>();
@@ -40,19 +40,18 @@ public class CypherQuery {
 	private boolean sortDescending               = false;
 	private SortType sortType                    = null;
 	private String sortKey                       = null;
-	private int offset                           = 0;
-	private int limit                            = 0;
+	private int page                             = 0;
+	private int pageSize                         = 0;
 	private int count                            = 0;
 
-	public CypherQuery(final AbstractCypherIndex<?> index, final int limit, final int offset) {
-		this.index  = index;
-		this.limit  = limit;
-		this.offset = offset;
+	public AdvancedCypherQuery(final AbstractCypherIndex<?> index) {
+		this.index    = index;
+		this.pageSize = 10000;
 	}
 
 	@Override
 	public String toString() {
-		return getStatement(false, true);
+		return getStatement(false);
 	}
 
 	public int getHashCode() {
@@ -60,7 +59,7 @@ public class CypherQuery {
 		int hashCode = 23;
 
 		hashCode += 27 * typeLabels.hashCode();
-		hashCode += 37 * getStatement(false, true).hashCode();
+		hashCode += 37 * getStatement(false).hashCode();
 		hashCode += 47 * deepHashCode(parameters);
 		hashCode += 57 * sortKey.hashCode();
 
@@ -71,11 +70,13 @@ public class CypherQuery {
 		return hashCode;
 	}
 
-	public boolean isLimitQuery() {
-		return limit >= 0 && offset >= 0;
+	@Override
+	public void nextPage() {
+		page++;
 	}
 
-	public String getStatement(final boolean doCount, final boolean doSort) {
+	@Override
+	public String getStatement(final boolean doSort) {
 
 		final StringBuilder buf = new StringBuilder();
 		final int typeCount     = typeLabels.size();
@@ -90,7 +91,7 @@ public class CypherQuery {
 					buf.append(buffer);
 				}
 
-				buf.append(index.getQuerySuffix(doCount));
+				buf.append(index.getQuerySuffix());
 				break;
 
 			case 1:
@@ -102,7 +103,7 @@ public class CypherQuery {
 					buf.append(buffer);
 				}
 
-				buf.append(index.getQuerySuffix(doCount));
+				buf.append(index.getQuerySuffix());
 				break;
 
 			default:
@@ -117,7 +118,7 @@ public class CypherQuery {
 						buf.append(buffer);
 					}
 
-					buf.append(index.getQuerySuffix(doCount));
+					buf.append(index.getQuerySuffix());
 
 					if (it.hasNext()) {
 						buf.append(" UNION ");
@@ -126,50 +127,44 @@ public class CypherQuery {
 				break;
 		}
 
-		if (!doCount) {
+		if (doSort && sortKey != null) {
 
-			if (doSort && sortKey != null) {
+			buf.append(" ORDER BY COALESCE(n.`");
+			buf.append(sortKey);
+			buf.append("`, ");
 
-				buf.append(" ORDER BY COALESCE(n.`");
-				buf.append(sortKey);
-				buf.append("`, ");
+			// COALESCE needs a correctly typed minimum value,
+			// so we need to supply a value based on the sort
+			// type.
 
-				// COALESCE needs a correctly typed minimum value,
-				// so we need to supply a value based on the sort
-				// type.
+			switch (sortType) {
 
-				switch (sortType) {
+				case Default:
+					// default is "String"
+					buf.append("''");
+					break;
 
-					case Default:
-						// default is "String"
-						buf.append("''");
-						break;
-
-					default:
-						// other types are numeric
-						buf.append("-1");
-				}
-
-				buf.append(")");
-
-				if (sortDescending) {
-					buf.append(" DESC");
-				}
+				default:
+					// other types are numeric
+					buf.append("-1");
 			}
 
-			// pagination
-			if (isLimitQuery()) {
+			buf.append(")");
 
-				buf.append(" SKIP ");
-				buf.append(offset);
-				buf.append(" LIMIT ");
-				buf.append(limit);
+			if (sortDescending) {
+				buf.append(" DESC");
 			}
 		}
+
+		buf.append(" SKIP ");
+		buf.append(page * pageSize);
+		buf.append(" LIMIT ");
+		buf.append(pageSize);
 
 		return buf.toString();
 	}
 
+	@Override
 	public Map<String, Object> getParameters() {
 		return parameters;
 	}

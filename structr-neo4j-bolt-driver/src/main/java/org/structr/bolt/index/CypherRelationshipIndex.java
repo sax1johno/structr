@@ -56,16 +56,16 @@ public class CypherRelationshipIndex extends AbstractCypherIndex<Relationship> {
 	}
 
 	@Override
-	public String getQuerySuffix(final boolean doCount) {
+	public String getQuerySuffix() {
 		return " RETURN DISTINCT n";
 	}
 
 	@Override
-	public QueryResult<Relationship> getResult(final CypherQuery context) {
+	public QueryResult<Relationship> getResult(final AdvancedCypherQuery query) {
 
 		final SessionTransaction tx                 = db.getCurrentTransaction();
 		final RelationshipRelationshipMapper mapper = new RelationshipRelationshipMapper(db);
 
-		return QueryUtils.map(mapper, tx.getRelationships(context.getStatement(false, true), context.getParameters(), -1, false));
+		return QueryUtils.map(mapper, new RelationshipResultStream(tx, query));
 	}
 }

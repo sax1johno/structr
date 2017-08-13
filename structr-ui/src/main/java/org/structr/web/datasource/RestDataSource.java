@@ -18,11 +18,9 @@
  */
 package org.structr.web.datasource;
 
-import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import javax.servlet.http.HttpServletRequest;
@@ -31,12 +29,12 @@ import org.apache.commons.collections.iterators.IteratorEnumeration;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.structr.common.PagingHelper;
+import org.structr.api.QueryResult;
+import org.structr.api.util.QueryUtils;
 import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.QueryResult;
 import org.structr.core.Value;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
@@ -65,29 +63,33 @@ public class RestDataSource implements GraphDataSource<Iterable<GraphObject>> {
 	private static final Logger logger = LoggerFactory.getLogger(RestDataSource.class.getName());
 
 	@Override
-	public Iterable<GraphObject> getData(final RenderContext renderContext, AbstractNode referenceNode) throws FrameworkException {
+	public QueryResult<GraphObject> getData(final RenderContext renderContext, AbstractNode referenceNode) throws FrameworkException {
 
 		final String restQuery = ((DOMNode) referenceNode).getPropertyWithVariableReplacement(renderContext, DOMNode.restQuery);
 		if (restQuery == null || restQuery.isEmpty()) {
-			return Collections.EMPTY_LIST;
+
+			return QueryUtils.emptyResult();
 		}
 
 		return getData(renderContext, restQuery);
 	}
 
 	// FIXME: this method is needed by the websocket search command because there is no reference node for the above method
-	public List<GraphObject> getData(final RenderContext renderContext, final String restQuery) throws FrameworkException {
+	public QueryResult<GraphObject> getData(final RenderContext renderContext, final String restQuery) throws FrameworkException {
 
 		final Map<Pattern, Class<? extends Resource>> resourceMap = new LinkedHashMap<>();
 		final SecurityContext securityContext                     = renderContext.getSecurityContext();
 
 		ResourceProvider resourceProvider = renderContext.getResourceProvider();
 		if (resourceProvider == null) {
+
 			try {
 				resourceProvider = UiResourceProvider.class.newInstance();
+
 			} catch (Throwable t) {
+
 				logger.error("Couldn't establish a resource provider", t);
-				return Collections.EMPTY_LIST;
+				return QueryUtils.emptyResult();
 			}
 		}
 
@@ -174,7 +176,7 @@ public class RestDataSource implements GraphDataSource<Iterable<GraphObject>> {
 
 		if (resource == null) {
 
-			return Collections.EMPTY_LIST;
+			return QueryUtils.emptyResult();
 
 		}
 
@@ -221,18 +223,14 @@ public class RestDataSource implements GraphDataSource<Iterable<GraphObject>> {
 		}
 
 
-		result.setIsCollection(resource.isCollectionResource());
-		result.setIsPrimitiveArray(resource.isPrimitiveArray());
-
-		//Integer rawResultCount = (Integer) Services.getAttribute(NodeFactory.RAW_RESULT_COUNT + Thread.currentThread().getId());
-		PagingHelper.addPagingParameter(result, pageSize, page);
-
-		List<GraphObject> res = result.getResults();
+		result.setMetaData("isCollection", resource.isCollectionResource());
+		result.setMetaData("isPrimitiveArray", resource.isPrimitiveArray());
+		result.setMetaData("page", page);
+		result.setMetaData("pageSize", pageSize);
 
 		renderContext.setResult(result);
 
-		return res != null ? res : Collections.EMPTY_LIST;
-
+		return result;
 	}
 
 	/**

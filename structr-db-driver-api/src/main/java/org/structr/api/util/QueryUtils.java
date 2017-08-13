@@ -22,7 +22,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.function.Function;
@@ -72,12 +74,16 @@ public class QueryUtils {
 		return new MapIterable<>(from, function);
 	}
 
+	public static <FROM> QueryResult<FROM> filter(final Predicate<FROM> predicate, final QueryResult<FROM> from) {
+		return new FilterIterable<>(from, predicate);
+	}
+
 	public static <FROM> QueryResult<FROM> filterNullValues(final QueryResult<FROM> from) {
 		return new FilterIterable<>(from, (value) -> value != null);
 	}
 
 	public static <T> List<T> toList(QueryResult<T> iterable) {
-		return addAll(new ArrayList<T>(iterable.size() + 1), iterable);
+		return addAll(new ArrayList<T>(100), iterable);
 	}
 
 	public static <T> Set<T> toSet(QueryResult<T> iterable) {
@@ -89,7 +95,32 @@ public class QueryUtils {
 	}
 
 	public static <T> QueryResult<T> fromList(final List<T> list) {
-		return new ListBasedResult<>(list);
+		return fromList(list, list.size(), true, false);
+	}
+
+	public static <T> QueryResult<T> fromList(final List<T> list, final int resultCount, final boolean isCollection, final boolean isPrimitiveArray) {
+
+		final QueryResult<T> listBasedResult = new ListBasedResult<>(list);
+
+		listBasedResult.setMetaData("size",             resultCount);
+		listBasedResult.setMetaData("isCollection",     isCollection);
+		listBasedResult.setMetaData("isPrimitiveArray", isPrimitiveArray);
+
+		return listBasedResult;
+	}
+
+	public static <T> QueryResult<T> single(final T single) {
+
+		final List<T> list = new ArrayList<>();
+		list.add(single);
+
+		final QueryResult<T> listBasedResult = new ListBasedResult<>(list);
+
+		listBasedResult.setMetaData("size",             1);
+		listBasedResult.setMetaData("isCollection",     false);
+		listBasedResult.setMetaData("isPrimitiveArray", false);
+
+		return listBasedResult;
 	}
 
 	public static <T> QueryResult<T> emptyList() {
@@ -113,18 +144,18 @@ public class QueryUtils {
 		}
 
 		@Override
-		public int size() {
-			return from.size();
-		}
-
-		@Override
-		public boolean isLimited() {
-			return from.isLimited();
-		}
-
-		@Override
 		public Iterator<TO> iterator() {
 			return new MapIterator<>(from.iterator(), function);
+		}
+
+		@Override
+		public void setMetaData(String key, Object value) {
+			from.setMetaData(key, value);
+		}
+
+		@Override
+		public Object getMetaData(String key) {
+			return from.getMetaData(key);
 		}
 
 		static class MapIterator<FROM, TO> implements Iterator<TO> {
@@ -179,13 +210,13 @@ public class QueryUtils {
 		}
 
 		@Override
-		public int size() {
-			return iterable.size();
+		public void setMetaData(String key, Object value) {
+			iterable.setMetaData(key, value);
 		}
 
 		@Override
-		public boolean isLimited() {
-			return iterable.isLimited();
+		public Object getMetaData(String key) {
+			return iterable.getMetaData(key);
 		}
 
 		static class FilterIterator<T> implements Iterator<T> {
@@ -261,18 +292,10 @@ public class QueryUtils {
 
 	private static class EmptyResult<T> implements QueryResult<T> {
 
+		private final Map<String, Object> metadata = new LinkedHashMap<>();
+
 		@Override
 		public void close() {
-		}
-
-		@Override
-		public int size() {
-			return 0;
-		}
-
-		@Override
-		public boolean isLimited() {
-			return false;
 		}
 
 		@Override
@@ -291,11 +314,22 @@ public class QueryUtils {
 				}
 			};
 		}
+
+		@Override
+		public void setMetaData(final String key, final Object value) {
+			metadata.put(key, value);
+		}
+
+		@Override
+		public Object getMetaData(final String key) {
+			return metadata.get(key);
+		}
 	}
 
 	private static class ListBasedResult<T> implements QueryResult<T> {
 
-		private List<T> list = null;
+		private final Map<String, Object> metadata = new LinkedHashMap<>();
+		private List<T> list                       = null;
 
 		public ListBasedResult(final List<T> src) {
 			this.list = src;
@@ -303,16 +337,6 @@ public class QueryUtils {
 
 		@Override
 		public void close() {
-		}
-
-		@Override
-		public int size() {
-			return list.size();
-		}
-
-		@Override
-		public boolean isLimited() {
-			return false;
 		}
 
 		@Override
@@ -326,6 +350,16 @@ public class QueryUtils {
 
 		public List<T> getList() {
 			return list;
+		}
+
+		@Override
+		public void setMetaData(final String key, final Object value) {
+			metadata.put(key, value);
+		}
+
+		@Override
+		public Object getMetaData(final String key) {
+			return metadata.get(key);
 		}
 	}
 }

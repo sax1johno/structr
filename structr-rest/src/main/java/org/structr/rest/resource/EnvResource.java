@@ -22,12 +22,13 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
+import org.structr.api.QueryResult;
 import org.structr.api.service.LicenseManager;
+import org.structr.api.util.QueryUtils;
 import org.structr.common.SecurityContext;
 import org.structr.common.VersionHelper;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObjectMap;
-import org.structr.core.QueryResult;
 import org.structr.core.Services;
 import org.structr.core.property.GenericProperty;
 import org.structr.core.property.PropertyKey;
@@ -83,7 +84,8 @@ public class EnvResource extends Resource {
 
 		resultList.add(info);
 
-		return new QueryResult(resultList, resultList.size(), false, false);
+		return QueryUtils.fromList(resultList);
+		//return new QueryResult(resultList, resultList.size(), false, false);
 	}
 
 	@Override

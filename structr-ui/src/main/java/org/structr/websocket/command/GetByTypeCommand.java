@@ -18,13 +18,13 @@
  */
 package org.structr.websocket.command;
 
+import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.PagingHelper;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.QueryResult;
 import org.structr.core.app.Query;
 import org.structr.core.app.StructrApp;
 import org.structr.core.property.PropertyKey;
@@ -38,20 +38,20 @@ import org.structr.websocket.message.WebSocketMessage;
 
 /**
  * Websocket command to a list of nodes by type.
- * 
+ *
  * Supports paging and ignores thumbnails.
  *
  *
  *
  */
 public class GetByTypeCommand extends AbstractCommand {
-	
+
 	private static final Logger logger = LoggerFactory.getLogger(GetByTypeCommand.class.getName());
-	
+
 	static {
-		
+
 		StructrWebSocket.addCommand(GetByTypeCommand.class);
-		
+
 	}
 
 	@Override
@@ -71,14 +71,14 @@ public class GetByTypeCommand extends AbstractCommand {
 		if (properties != null) {
 			securityContext.setCustomView(StringUtils.split(properties, ","));
 		}
-		
+
 		final String sortOrder   = webSocketData.getSortOrder();
 		final String sortKey     = webSocketData.getSortKey();
 		final int pageSize       = webSocketData.getPageSize();
 		final int page           = webSocketData.getPage();
 		PropertyKey sortProperty = StructrApp.getConfiguration().getPropertyKeyForJSONName(type, sortKey);
 
-		
+
 		final Query query = StructrApp.getInstance(securityContext).nodeQuery(type).includeDeletedAndHidden(includeDeletedAndHidden).sort(sortProperty).order("desc".equals(sortOrder));
 
 		// for image lists, suppress thumbnails
@@ -90,13 +90,13 @@ public class GetByTypeCommand extends AbstractCommand {
 		try {
 
 			// do search
-			QueryResult result = query.getResult();
+			List result = query.getAsList();
 
 			// save raw result count
 			int resultCountBeforePaging = result.size();
 
 			// set full result list
-			webSocketData.setResult(PagingHelper.subList(result.getResults(), pageSize, page));
+			webSocketData.setResult(PagingHelper.subList(result, pageSize, page));
 			webSocketData.setRawResultCount(resultCountBeforePaging);
 
 			// send only over local connection

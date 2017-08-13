@@ -24,11 +24,11 @@ import java.util.Stack;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
+import org.structr.api.QueryResult;
 import org.structr.api.config.Settings;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.QueryResult;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.Principal;
 import org.structr.core.graph.NodeInterface;
@@ -461,7 +461,7 @@ public class RenderContext extends ActionContext {
 						final QueryResult sizeResult = this.getResult();
 						if (sizeResult != null) {
 
-							return sizeResult.getRawResultCount();
+							return sizeResult.getMetaData("size");
 						}
 						break;
 
@@ -470,7 +470,7 @@ public class RenderContext extends ActionContext {
 						final QueryResult pageSizeResult = this.getResult();
 						if (pageSizeResult != null) {
 
-							return pageSizeResult.getPageSize();
+							return pageSizeResult.getMetaData("pageSize");
 
 						}
 						break;
@@ -480,7 +480,7 @@ public class RenderContext extends ActionContext {
 						final QueryResult pageCountResult = this.getResult();
 						if (pageCountResult != null) {
 
-							Integer pageCount = result.getPageCount();
+							Integer pageCount = (Integer)result.getMetaData("pageCount");
 							if (pageCount != null) {
 
 								return pageCount;
@@ -498,7 +498,7 @@ public class RenderContext extends ActionContext {
 						final QueryResult pageNoResult = this.getResult();
 						if (pageNoResult != null) {
 
-							return pageNoResult.getPage();
+							return pageNoResult.getMetaData("page");
 						}
 						break;
 

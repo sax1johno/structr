@@ -36,8 +36,6 @@ public class PagingHelper {
 
 	private static final Logger logger = LoggerFactory.getLogger(PagingHelper.class.getName());
 
-	//~--- methods --------------------------------------------------------
-
 	/**
 	 * Return a single page of the list with the given paging parameters.
 	 *

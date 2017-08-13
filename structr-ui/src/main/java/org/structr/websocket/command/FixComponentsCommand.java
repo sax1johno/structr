@@ -21,9 +21,9 @@ package org.structr.websocket.command;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.QueryResult;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.QueryResult;
 import org.structr.core.app.StructrApp;
 import org.structr.core.graph.CreateRelationshipCommand;
 import org.structr.core.property.PropertyMap;
@@ -51,8 +51,6 @@ public class FixComponentsCommand extends AbstractCommand {
 
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
-
-		final SecurityContext securityContext = getWebSocket().getSecurityContext();
 
 		try {
 			fixLostComponents();
@@ -84,12 +82,12 @@ public class FixComponentsCommand extends AbstractCommand {
 	 */
 	private void fixLostComponents() throws FrameworkException {
 
-		Page hiddenDoc                            = CreateComponentCommand.getOrCreateHiddenDocument();
-		SecurityContext securityContext           = SecurityContext.getSuperUserInstance();
-		QueryResult<DOMNode> result                    = StructrApp.getInstance(securityContext).nodeQuery(DOMNode.class).getResult();
+		final Page hiddenDoc                      = CreateComponentCommand.getOrCreateHiddenDocument();
+		final SecurityContext securityContext     = SecurityContext.getSuperUserInstance();
+		final QueryResult<DOMNode> result         = StructrApp.getInstance(securityContext).nodeQuery(DOMNode.class).getResult();
 		final CreateRelationshipCommand createRel = StructrApp.getInstance(securityContext).command(CreateRelationshipCommand.class);
 
-		for (DOMNode node : result.getResults()) {
+		for (DOMNode node : result) {
 
 			if (node.hasChildNodes()
 				&& (node.hasIncomingRelationships(Sync.class) || node.hasRelationship(Sync.class))

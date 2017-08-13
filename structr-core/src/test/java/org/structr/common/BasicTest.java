@@ -33,7 +33,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.api.NotFoundException;
 import org.structr.api.NotInTransactionException;
-import org.structr.api.QueryResult;
 import org.structr.api.graph.RelationshipType;
 import org.structr.api.util.Iterables;
 import org.structr.common.error.FrameworkException;
@@ -161,7 +160,7 @@ public class BasicTest extends StructrTest {
 
 			try (final Tx tx = app.tx()) {
 
-				QueryResult result = app.nodeQuery().uuid(uuid).getResult();
+				List result = app.nodeQuery().uuid(uuid).getAsList();
 
 				assertEquals("Node should have been deleted", 0, result.size());
 
