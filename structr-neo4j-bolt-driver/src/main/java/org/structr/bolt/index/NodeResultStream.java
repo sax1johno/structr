@@ -30,13 +30,15 @@ import org.structr.bolt.SessionTransaction;
 public class NodeResultStream implements QueryResult<Node> {
 
 	private final Map<String, Object> metadata = new LinkedHashMap<>();
+	private QueryResult<Node> result           = null;
 	private PageableQuery query                = null;
 	private Iterator<Node> current             = null;
 	private SessionTransaction tx              = null;
 
 	public NodeResultStream(final SessionTransaction tx, final PageableQuery query) {
-		this.query = query;
-		this.tx    = tx;
+
+		this.query  = query;
+		this.tx     = tx;
 	}
 
 	@Override
@@ -58,27 +60,41 @@ public class NodeResultStream implements QueryResult<Node> {
 
 		return new Iterator<Node>() {
 
+			private int remaining = 0;
+
 			@Override
 			public boolean hasNext() {
 
 				if (current == null || !current.hasNext()) {
 
-					final String statement            = query.getStatement(false);
-					final Map<String, Object> params  = query.getParameters();
-					final QueryResult<Node> result    = tx.getNodes(statement, params);
-
+					// close previous result
 					if (result != null) {
+						result.close();
+					}
 
-						current = result.iterator();
+					// fetch more?
+					if (remaining == 0) {
 
-						// advance page
-						query.nextPage();
+						// reset count
+						remaining = query.pageSize();
 
-						// does the next result have elements?
-						if (!current.hasNext()) {
+						final String statement            = query.getStatement();
+						final Map<String, Object> params  = query.getParameters();
 
-							// no more elements
-							return false;
+						result = tx.getNodes(statement, params);
+						if (result != null) {
+
+							current = result.iterator();
+
+							// advance page
+							query.nextPage();
+
+							// does the next result have elements?
+							if (!current.hasNext()) {
+
+								// no more elements
+								return false;
+							}
 						}
 					}
 				}
@@ -88,6 +104,7 @@ public class NodeResultStream implements QueryResult<Node> {
 
 			@Override
 			public Node next() {
+				remaining--;
 				return current.next();
 			}
 		};

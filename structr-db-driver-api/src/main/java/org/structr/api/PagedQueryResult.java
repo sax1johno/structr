@@ -100,12 +100,15 @@ public class PagedQueryResult<T> implements QueryResult<T> {
 
 			//Iterator was exhausted before starting offset was reached.
 			if(currentIndex < getOffset() && !iterator.hasNext()) {
+
 				return false;
-			} else if(currentIndex >= getOffset() && currentIndex < getLimitOffset()) {
+
+			} else if(iterator.hasNext() && currentIndex >= getOffset() && currentIndex < getLimitOffset()) {
+
 				return true;
-			} else {
-				return false;
 			}
+
+			return false;
 		}
 
 		@Override

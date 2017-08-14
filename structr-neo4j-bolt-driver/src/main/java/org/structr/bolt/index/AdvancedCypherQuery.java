@@ -51,7 +51,7 @@ public class AdvancedCypherQuery implements PageableQuery {
 
 	@Override
 	public String toString() {
-		return getStatement(false);
+		return getStatement();
 	}
 
 	public int getHashCode() {
@@ -59,9 +59,12 @@ public class AdvancedCypherQuery implements PageableQuery {
 		int hashCode = 23;
 
 		hashCode += 27 * typeLabels.hashCode();
-		hashCode += 37 * getStatement(false).hashCode();
+		hashCode += 37 * getStatement().hashCode();
 		hashCode += 47 * deepHashCode(parameters);
-		hashCode += 57 * sortKey.hashCode();
+
+		if (sortKey != null) {
+			hashCode += 57 * sortKey.hashCode();
+		}
 
 		if (sortDescending) {
 			hashCode += 1;
@@ -76,12 +79,18 @@ public class AdvancedCypherQuery implements PageableQuery {
 	}
 
 	@Override
-	public String getStatement(final boolean doSort) {
+	public int pageSize() {
+		return this.pageSize;
+	}
+
+	@Override
+	public String getStatement() {
 
 		final StringBuilder buf = new StringBuilder();
 		final int typeCount     = typeLabels.size();
 
 		switch (typeCount) {
+
 			case 0:
 
 				buf.append(index.getQueryPrefix(null, sourceTypeLabel, targetTypeLabel));
@@ -127,7 +136,7 @@ public class AdvancedCypherQuery implements PageableQuery {
 				break;
 		}
 
-		if (doSort && sortKey != null) {
+		if (sortKey != null) {
 
 			buf.append(" ORDER BY COALESCE(n.`");
 			buf.append(sortKey);

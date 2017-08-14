@@ -22,8 +22,9 @@ import java.util.Map;
 
 public interface PageableQuery {
 
+	int pageSize();
 	void nextPage();
-	String getStatement(final boolean doSort);
+	String getStatement();
 	Map<String, Object> getParameters();
 
 }

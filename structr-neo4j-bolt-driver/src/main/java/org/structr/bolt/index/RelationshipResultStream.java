@@ -30,6 +30,7 @@ import org.structr.bolt.SessionTransaction;
 public class RelationshipResultStream implements QueryResult<Relationship> {
 
 	private final Map<String, Object> metadata = new LinkedHashMap<>();
+	private QueryResult<Relationship> result   = null;
 	private Iterator<Relationship> current     = null;
 	private SessionTransaction tx              = null;
 	private PageableQuery query                = null;
@@ -63,10 +64,15 @@ public class RelationshipResultStream implements QueryResult<Relationship> {
 
 				if (current == null || !current.hasNext()) {
 
-					final String statement                 = query.getStatement(false);
-					final Map<String, Object> params       = query.getParameters();
-					final QueryResult<Relationship> result = tx.getRelationships(statement, params);
+					// close previous result
+					if (result != null) {
+						result.close();
+					}
 
+					final String statement                 = query.getStatement();
+					final Map<String, Object> params       = query.getParameters();
+
+					result = tx.getRelationships(statement, params);
 					if (result != null) {
 
 						current = result.iterator();

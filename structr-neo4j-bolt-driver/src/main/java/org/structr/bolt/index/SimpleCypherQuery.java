@@ -43,7 +43,12 @@ public class SimpleCypherQuery implements PageableQuery {
 	}
 
 	@Override
-	public String getStatement(final boolean doSort) {
+	public int pageSize() {
+		return this.pageSize;
+	}
+
+	@Override
+	public String getStatement() {
 
 		final StringBuilder buf = new StringBuilder(base);
 
