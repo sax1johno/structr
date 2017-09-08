@@ -24,6 +24,8 @@ package org.structr.core.property;
 import java.lang.reflect.ParameterizedType;
 import org.structr.api.search.SortType;
 import org.structr.common.SecurityContext;
+import org.structr.common.error.FrameworkException;
+import org.structr.common.error.UnknownPropertyKey;
 import org.structr.core.GraphObject;
 import org.structr.core.converter.PropertyConverter;
 
@@ -52,6 +54,13 @@ public class GenericProperty<T> extends AbstractPrimitiveProperty<T> {
 
 	//~--- methods --------------------------------------------------------
 
+	@Override
+	public Object setProperty(SecurityContext securityContext, GraphObject obj, T value) throws FrameworkException {
+		
+		// Don't set property of unknown type
+		throw new FrameworkException(422, "Property " + jsonName() + " is unknown in schema", new UnknownPropertyKey(obj.getClass().getSimpleName(), this));
+	}
+	
 	@Override
 	public String typeName() {
 		return valueType().getSimpleName();

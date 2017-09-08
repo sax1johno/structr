@@ -37,6 +37,7 @@ import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
+import org.structr.core.entity.SchemaMethod;
 import org.structr.core.entity.SchemaNode;
 import org.structr.core.entity.SchemaProperty;
 import org.structr.core.entity.TestEight;
@@ -48,7 +49,7 @@ import org.structr.core.graph.NodeAttribute;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.Tx;
 import org.structr.core.property.IntProperty;
-import org.structr.core.property.StringProperty;
+import org.structr.core.property.PropertyKey;
 import org.structr.core.script.Scripting;
 import org.structr.schema.action.ActionContext;
 
@@ -276,8 +277,17 @@ public class SystemTest extends StructrTest {
 
 		try (final Tx tx = app.tx()) {
 
-			createTestType.setProperty(new StringProperty("testCount"), "Integer");
-			createTestType.setProperty(new StringProperty("___onCreate"), "set(this, 'testCount', size(find('CreateTest')))");
+			app.create(SchemaProperty.class,
+				new NodeAttribute(SchemaProperty.schemaNode, createTestType),
+				new NodeAttribute(SchemaProperty.name, "testCount"),
+				new NodeAttribute(SchemaProperty.propertyType, "Integer"));
+			
+			app.create(SchemaMethod.class,
+				new NodeAttribute(SchemaMethod.schemaNode, createTestType),
+				new NodeAttribute(SchemaMethod.name, "onCreate"),
+				new NodeAttribute(SchemaMethod.source, "set(this, 'testCount', size(find('CreateTest')))"));
+			
+			//createTestType.setProperty(new StringProperty("___onCreate"), );
 
 			tx.success();
 
@@ -306,7 +316,8 @@ public class SystemTest extends StructrTest {
 		// fourth step: check property value
 		try (final Tx tx = app.tx()) {
 
-			final Integer testCount = node.getProperty(new IntProperty("testCount"));
+			IntProperty testCountProperty = (IntProperty) StructrApp.getConfiguration().getPropertyKeyForJSONName(testType, "testCount");
+			final Integer testCount = node.getProperty(testCountProperty);
 
 			assertEquals("Invalid node count, check parallel instantiation!", (int)nodeCount+1, (int)testCount);
 
