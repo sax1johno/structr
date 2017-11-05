@@ -37,7 +37,6 @@ import org.structr.core.Transformation;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.AbstractRelationship;
-import org.structr.core.entity.Principal;
 import org.structr.core.entity.Security;
 import org.structr.core.entity.relationship.PrincipalOwnsNode;
 import org.structr.core.property.AbstractPrimitiveProperty;
@@ -45,6 +44,7 @@ import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.core.property.TypeProperty;
 import org.structr.schema.SchemaHelper;
+import org.structr.core.entity.Principal;
 
 //~--- classes ----------------------------------------------------------------
 
@@ -217,7 +217,9 @@ public class CreateNodeCommand<T extends NodeInterface> extends NodeServiceComma
 
 		if (user != null && user.shouldSkipSecurityRelationships() == false) {
 
-			buf.append("MATCH (u:Principal) WHERE id(u) = {userId}");
+			buf.append("MATCH (u:");
+			buf.append(Principal.class.getSimpleName());
+			buf.append(") WHERE id(u) = {userId}");
 			buf.append(" CREATE (u)-[o:OWNS {ownsProperties}]->(n");
 
 			for (final String label : labels) {

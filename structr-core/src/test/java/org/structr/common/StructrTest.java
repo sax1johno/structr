@@ -50,12 +50,13 @@ import org.structr.core.app.StructrApp;
 import org.structr.api.config.Settings;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.GenericNode;
-import org.structr.core.entity.Principal;
 import org.structr.core.entity.Relation;
+import org.structr.core.entity.SchemaNode;
 import org.structr.core.graph.NodeAttribute;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.Tx;
 import org.structr.core.property.PropertyMap;
+import org.structr.core.entity.Principal;
 
 /**
  *
@@ -136,6 +137,8 @@ public class StructrTest {
 		Settings.SuperUserName.setValue("superadmin");
 		Settings.SuperUserPassword.setValue("sehrgeheim");
 
+		Settings.LogSchemaOutput.setValue(true);
+
 		final Services services = Services.getInstance();
 
 		// wait for service layer to be initialized
@@ -210,6 +213,40 @@ public class StructrTest {
 
 		return classes;
 
+	}
+
+	protected Principal createUser(final String name) {
+
+		try (final Tx tx = app.tx()) {
+
+			final SchemaNode node = app.create(SchemaNode.class,
+				new NodeAttribute<>(AbstractNode.name, "User"),
+				new NodeAttribute<>(SchemaNode.implementsInterfaces, Principal.class.getSimpleName())
+			);
+
+			tx.success();
+
+		} catch (Throwable t){
+			t.printStackTrace();
+		}
+
+
+		try (final Tx tx = app.tx()) {
+
+			final Class userType  = StructrApp.getConfiguration().getNodeEntityClass("User");
+			final Principal node  = (Principal)app.create(userType,
+				new NodeAttribute<>(AbstractNode.name, "User")
+			);
+
+			tx.success();
+
+			return node;
+
+		} catch (Throwable t){
+			t.printStackTrace();
+		}
+
+		return null;
 	}
 
 	protected <T extends AbstractNode> List<T> createTestNodes(final Class<T> type, final int number, final long delay) throws FrameworkException {

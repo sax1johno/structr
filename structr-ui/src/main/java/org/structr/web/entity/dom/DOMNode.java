@@ -23,22 +23,19 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.structr.api.Predicate;
 import org.structr.api.util.Iterables;
 import org.structr.common.CaseHelper;
 import org.structr.common.Filter;
 import org.structr.common.Permission;
+import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
@@ -52,7 +49,6 @@ import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.LinkedTreeNode;
 import org.structr.core.entity.Principal;
 import org.structr.core.entity.Security;
-import org.structr.core.graph.ModificationQueue;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.notion.PropertyNotion;
 import org.structr.core.property.BooleanProperty;
@@ -99,42 +95,25 @@ import org.w3c.dom.UserDataHandler;
 
 /**
  * Combines AbstractNode and org.w3c.dom.Node.
- *
- *
  */
-public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, DOMNode> implements Node, Renderable, DOMAdoptable, DOMImportable {
-
-	private static final Logger logger = LoggerFactory.getLogger(DOMNode.class.getName());
+public interface DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, DOMNode>, Node, Renderable, DOMAdoptable, DOMImportable {
 
 	// ----- error messages for DOMExceptions -----
-	protected static final String NO_MODIFICATION_ALLOWED_MESSAGE         = "Permission denied.";
-	protected static final String INVALID_ACCESS_ERR_MESSAGE              = "Permission denied.";
-	protected static final String INDEX_SIZE_ERR_MESSAGE                  = "Index out of range.";
-	protected static final String CANNOT_SPLIT_TEXT_WITHOUT_PARENT        = "Cannot split text element without parent and/or owner document.";
-	protected static final String WRONG_DOCUMENT_ERR_MESSAGE              = "Node does not belong to this document.";
-	protected static final String HIERARCHY_REQUEST_ERR_MESSAGE_SAME_NODE = "A node cannot accept itself as a child.";
-	protected static final String HIERARCHY_REQUEST_ERR_MESSAGE_ANCESTOR  = "A node cannot accept its own ancestor as child.";
-	protected static final String HIERARCHY_REQUEST_ERR_MESSAGE_DOCUMENT  = "A document may only have one html element.";
-	protected static final String HIERARCHY_REQUEST_ERR_MESSAGE_ELEMENT   = "A document may only accept an html element as its document element.";
-	protected static final String NOT_SUPPORTED_ERR_MESSAGE               = "Node type not supported.";
-	protected static final String NOT_FOUND_ERR_MESSAGE                   = "Node is not a child.";
-	protected static final String NOT_SUPPORTED_ERR_MESSAGE_IMPORT_DOC    = "Document nodes cannot be imported into another document.";
-	protected static final String NOT_SUPPORTED_ERR_MESSAGE_ADOPT_DOC     = "Document nodes cannot be adopted by another document.";
-	protected static final String NOT_SUPPORTED_ERR_MESSAGE_RENAME        = "Renaming of nodes is not supported by this implementation.";
+	public static final String NO_MODIFICATION_ALLOWED_MESSAGE         = "Permission denied.";
+	public static final String INVALID_ACCESS_ERR_MESSAGE              = "Permission denied.";
+	public static final String INDEX_SIZE_ERR_MESSAGE                  = "Index out of range.";
+	public static final String CANNOT_SPLIT_TEXT_WITHOUT_PARENT        = "Cannot split text element without parent and/or owner document.";
+	public static final String WRONG_DOCUMENT_ERR_MESSAGE              = "Node does not belong to this document.";
+	public static final String HIERARCHY_REQUEST_ERR_MESSAGE_SAME_NODE = "A node cannot accept itself as a child.";
+	public static final String HIERARCHY_REQUEST_ERR_MESSAGE_ANCESTOR  = "A node cannot accept its own ancestor as child.";
+	public static final String HIERARCHY_REQUEST_ERR_MESSAGE_DOCUMENT  = "A document may only have one html element.";
+	public static final String HIERARCHY_REQUEST_ERR_MESSAGE_ELEMENT   = "A document may only accept an html element as its document element.";
+	public static final String NOT_SUPPORTED_ERR_MESSAGE               = "Node type not supported.";
+	public static final String NOT_FOUND_ERR_MESSAGE                   = "Node is not a child.";
+	public static final String NOT_SUPPORTED_ERR_MESSAGE_IMPORT_DOC    = "Document nodes cannot be imported into another document.";
+	public static final String NOT_SUPPORTED_ERR_MESSAGE_ADOPT_DOC     = "Document nodes cannot be adopted by another document.";
+	public static final String NOT_SUPPORTED_ERR_MESSAGE_RENAME        = "Renaming of nodes is not supported by this implementation.";
 
-	private static final List<GraphDataSource<Iterable<GraphObject>>> listSources = new LinkedList<>();
-	private Page cachedOwnerDocument;
-
-	static {
-
-		// register data sources
-		listSources.add(new IdRequestParameterGraphDataSource("nodeId"));
-		listSources.add(new RestDataSource());
-		listSources.add(new NodeGraphDataSource());
-		listSources.add(new FunctionDataSource());
-		listSources.add(new CypherGraphDataSource());
-		listSources.add(new XPathGraphDataSource());
-	}
 	public static final Property<String> dataKey                      = new StringProperty("dataKey").indexed();
 	public static final Property<String> cypherQuery                  = new StringProperty("cypherQuery");
 	public static final Property<String> xpathQuery                   = new StringProperty("xpathQuery");
@@ -174,26 +153,147 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 		dataKey, restQuery, cypherQuery, xpathQuery, functionQuery, hideOnIndex, hideOnDetail, showForLocales, hideForLocales, showConditions, hideConditions
 	};
 
-	private static final Set<PropertyKey> cloneBlacklist = new LinkedHashSet<>(Arrays.asList(new Property[] {
+	public static final Set<PropertyKey> cloneBlacklist = new LinkedHashSet<>(Arrays.asList(new Property[] {
 		GraphObject.id, GraphObject.type, DOMNode.ownerDocument, DOMNode.pageId, DOMNode.parent, DOMNode.parentId, DOMElement.syncedNodes,
 		DOMNode.children, DOMNode.childrenIds, LinkSource.linkable, LinkSource.linkableId, Page.path
 	}));
 
-	// a simple cache for custom properties
-	private Set<PropertyKey> customProperties = null;
+	public static final List<GraphDataSource> LIST_SOURCES = new LinkedList<>(Arrays.asList(new GraphDataSource[] {
 
-	public abstract boolean isSynced();
-	public abstract boolean contentEquals(final DOMNode otherNode);
-	public abstract String getContextName();
-	public abstract void updateFromNode(final DOMNode otherNode) throws FrameworkException;
+		// register data sources
+		new IdRequestParameterGraphDataSource("nodeId"),
+		new RestDataSource(),
+		new NodeGraphDataSource(),
+		new FunctionDataSource(),
+		new CypherGraphDataSource(),
+		new XPathGraphDataSource()
 
-	public String getIdHash() {
+	}));
 
-		return getUuid();
+
+	boolean isSynced();
+	boolean contentEquals(final DOMNode otherNode);
+	String getContextName();
+	void updateFromNode(final DOMNode otherNode) throws FrameworkException;
+
+	// ---- static methods -----
+	public static String indent(final int depth, final RenderContext renderContext) {
+
+		if (!renderContext.shouldIndentHtml()) {
+			return "";
+		}
+
+		StringBuilder indent = new StringBuilder("\n");
+
+		for (int d = 0; d < depth; d++) {
+
+			indent.append("	");
+
+		}
+
+		return indent.toString();
+	}
+
+	public static String escapeForHtml(final String raw) {
+		return StringUtils.replaceEach(raw, new String[]{"&", "<", ">"}, new String[]{"&amp;", "&lt;", "&gt;"});
 
 	}
 
-	public String getIdHashOrProperty() {
+	public static String escapeForHtmlAttributes(final String raw) {
+		//return StringUtils.replaceEach(raw, new String[]{"&", "<", ">", "\"", "'"}, new String[]{"&amp;", "&lt;", "&gt;", "&quot;", "&#39;"});
+		return StringUtils.replaceEach(raw, new String[]{"&", "<", ">", "\""}, new String[]{"&amp;", "&lt;", "&gt;", "&quot;"});
+	}
+
+	public static String unescapeForHtmlAttributes(final String raw) {
+		//return StringUtils.replaceEach(raw, new String[]{"&", "<", ">", "\"", "'"}, new String[]{"&amp;", "&lt;", "&gt;", "&quot;", "&#39;"});
+		return StringUtils.replaceEach(raw, new String[]{"&amp;", "&lt;", "&gt;", "&quot;"}, new String[]{"&", "<", ">", "\""});
+	}
+
+	public static GraphObjectMap extractHeaders(final Header[] headers) {
+
+		final GraphObjectMap map = new GraphObjectMap();
+
+		for (final Header header : headers) {
+
+			map.put(new StringProperty(header.getName()), header.getValue());
+		}
+
+		return map;
+	}
+
+	public static Set<DOMNode> getAllChildNodes(final DOMNode node) {
+
+		Set<DOMNode> allChildNodes = new HashSet();
+
+		getAllChildNodes(node, allChildNodes);
+
+		return allChildNodes;
+	}
+
+	public static void getAllChildNodes(final DOMNode node, final Set<DOMNode> allChildNodes) {
+
+		Node n = node.getFirstChild();
+
+		while (n != null) {
+
+			if (n instanceof DOMNode) {
+
+				DOMNode domNode = (DOMNode)n;
+
+				if (!allChildNodes.contains(domNode)) {
+
+					allChildNodes.add(domNode);
+					allChildNodes.addAll(getAllChildNodes(domNode));
+
+				} else {
+
+					// break loop!
+					break;
+				}
+			}
+
+			n = n.getNextSibling();
+		}
+	}
+
+	/**
+	 * Recursively clone given node, all its direct children and connect the cloned child nodes to the clone parent node.
+	 *
+	 * @param securityContext
+	 * @param nodeToClone
+	 * @return
+	 */
+	public static DOMNode cloneAndAppendChildren(final SecurityContext securityContext, final DOMNode nodeToClone) {
+
+		final DOMNode newNode = (DOMNode)nodeToClone.cloneNode(false);
+
+		final List<DOMNode> childrenToClone = (List<DOMNode>)nodeToClone.getChildNodes();
+
+		for (final DOMNode childNodeToClone : childrenToClone) {
+
+			final DOMNode newChildNode = (DOMNode)cloneAndAppendChildren(securityContext, childNodeToClone);
+			newNode.appendChild(newChildNode);
+
+		}
+
+		return newNode;
+	}
+
+	public static String objectToString(final Object source) {
+
+		if (source != null) {
+			return source.toString();
+		}
+
+		return null;
+	}
+
+	// ----- actual methods -----
+	default String getIdHash() {
+		return getUuid();
+	}
+
+	default String getIdHashOrProperty() {
 
 		String idHash = getProperty(DOMNode.dataHashProperty);
 		if (idHash == null) {
@@ -205,16 +305,16 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 	}
 
 	@Override
-	public Class<DOMChildren> getChildLinkType() {
+	default Class<DOMChildren> getChildLinkType() {
 		return DOMChildren.class;
 	}
 
 	@Override
-	public Class<DOMSiblings> getSiblingLinkType() {
+	default Class<DOMSiblings> getSiblingLinkType() {
 		return DOMSiblings.class;
 	}
 
-	public boolean isSharedComponent() {
+	default boolean isSharedComponent() {
 
 		final Document _ownerDocument = getOwnerDocumentAsSuperUser();
 		if (_ownerDocument != null) {
@@ -232,13 +332,12 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 		return false;
 	}
 
-
 	// ----- public methods -----
-	public List<DOMChildren> getChildRelationships() {
+	default List<DOMChildren> getChildRelationships() {
 		return treeGetChildRelationships();
 	}
 
-	public String getPositionPath() {
+	default String getPositionPath() {
 
 		String path = "";
 
@@ -257,43 +356,71 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 
 	}
 
-	@Override
-	public boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
+	default Document getOwnerDocumentAsSuperUser() {
 
-		if (super.onCreation(securityContext, errorBuffer)) {
+		Page cachedOwnerDocument = null;
 
-			return checkName(errorBuffer);
+		if (cachedOwnerDocument == null) {
+
+			final PageLink ownership = getOutgoingRelationshipAsSuperUser(PageLink.class);
+			if (ownership != null) {
+
+				Page page = ownership.getTargetNode();
+				cachedOwnerDocument = page;
+			}
 		}
 
-		return false;
+		return cachedOwnerDocument;
 	}
 
-	@Override
-	public boolean onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
+	default Set<PropertyKey> getDataPropertyKeys() {
 
-		if (super.onModification(securityContext, errorBuffer, modificationQueue)) {
+		final Set<PropertyKey> customProperties = new TreeSet<>();
+		final org.structr.api.graph.Node dbNode = getNode();
+		final Iterable<String> props            = dbNode.getPropertyKeys();
 
-			if (customProperties != null) {
+		for (final String key : props) {
 
-				// invalidate data property cache
-				customProperties.clear();
+			if (key.startsWith("data-")) {
+
+				final PropertyKey propertyKey = StructrApp.getConfiguration().getPropertyKeyForJSONName(getClass(), key);
+				if (propertyKey instanceof BooleanProperty && dbNode.hasProperty(key)) {
+
+					final Object defaultValue = propertyKey.defaultValue();
+					final Object nodeValue    = dbNode.getProperty(key);
+
+					// don't export boolean false values (which is the default)
+					if (nodeValue != null && Boolean.FALSE.equals(nodeValue) && (defaultValue == null || nodeValue.equals(defaultValue))) {
+
+						continue;
+					}
+				}
+
+				customProperties.add(propertyKey);
+
+			} else if (key.startsWith(CustomHtmlAttributeProperty.CUSTOM_HTML_ATTRIBUTE_PREFIX)) {
+
+				final CustomHtmlAttributeProperty customProp = new CustomHtmlAttributeProperty(StructrApp.getConfiguration().getPropertyKeyForJSONName(getClass(), key));
+
+				customProperties.add(customProp);
 			}
-
-
-			try {
-
-				increasePageVersion();
-
-			} catch (FrameworkException ex) {
-
-				logger.warn("Updating page version failed", ex);
-
-			}
-
-			return checkName(errorBuffer);
 		}
 
-		return false;
+		return customProperties;
+	}
+
+	default String getPagePath() {
+
+		final StringBuilder buf = new StringBuilder();
+		DOMNode current         = this;
+
+		while (current != null) {
+
+			buf.insert(0, "/" + current.getContextName());
+			current = current.getProperty(DOMNode.parent);
+		}
+
+		return buf.toString();
 	}
 
 	/**
@@ -304,7 +431,9 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 	 * @throws FrameworkException
 	 */
 	@Override
-	public void render(final RenderContext renderContext, final int depth) throws FrameworkException {
+	default void render(final RenderContext renderContext, final int depth) throws FrameworkException {
+
+		final SecurityContext securityContext = getSecurityContext();
 
 		if (!securityContext.isVisible(this)) {
 			return;
@@ -431,9 +560,9 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 	 * @return content
 	 * @throws FrameworkException
 	 */
-	public String getContent(final RenderContext.EditMode editMode) throws FrameworkException {
+	default String getContent(final RenderContext.EditMode editMode) throws FrameworkException {
 
-		final RenderContext ctx = new RenderContext(securityContext, null, null, editMode);
+		final RenderContext ctx         = new RenderContext(getSecurityContext(), null, null, editMode);
 		final StringRenderBuffer buffer = new StringRenderBuffer();
 		ctx.setBuffer(buffer);
 		render(ctx, 0);
@@ -442,7 +571,7 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 		return buffer.getBuffer().toString();
 	}
 
-	public Template getClosestTemplate(final Page page) {
+	default Template getClosestTemplate(final Page page) {
 
 		DOMNode node = this;
 
@@ -489,7 +618,7 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 
 	}
 
-	public Page getClosestPage() {
+	default Page getClosestPage() {
 
 		DOMNode node = this;
 
@@ -507,17 +636,39 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 		return null;
 	}
 
-	public boolean inTrash() {
+	default boolean inTrash() {
 		return (getProperty(DOMNode.parent) == null && getOwnerDocumentAsSuperUser() == null);
 	}
 
+	default Iterable<GraphObject> checkListSources(final SecurityContext securityContext, final RenderContext renderContext) {
+
+		// try registered data sources first
+		for (GraphDataSource source : LIST_SOURCES) {
+
+			try {
+
+				Iterable<GraphObject> graphData = source.getData(renderContext, this);
+				if (graphData != null && !Iterables.isEmpty(graphData)) {
+					return graphData;
+				}
+
+			} catch (FrameworkException fex) {
+
+				logger.warn("", fex);
+
+				logger.warn("Could not retrieve data from graph data source {}: {}", new Object[]{source, fex});
+			}
+		}
+
+		return Collections.EMPTY_LIST;
+	}
 	// ----- private methods -----
 	/**
 	 * Get all ancestors of this node
 	 *
 	 * @return list of ancestors
 	 */
-	private List<Node> getAncestors() {
+	default List<Node> getAncestors() {
 
 		List<Node> ancestors = new ArrayList();
 
@@ -538,7 +689,7 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 	 *
 	 * @param newChild
 	 */
-	protected void handleNewChild(Node newChild) {
+	default void handleNewChild(Node newChild) {
 
 		final Page page = (Page)getOwnerDocument();
 
@@ -556,7 +707,7 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 
 	}
 
-	protected boolean renderDeploymentExportComments(final AsyncBuffer out, final boolean isContentNode) {
+	default boolean renderDeploymentExportComments(final AsyncBuffer out, final boolean isContentNode) {
 
 		final Set<String> instructions = new LinkedHashSet<>();
 
@@ -597,7 +748,7 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 		}
 	}
 
-	protected void renderSharedComponentConfiguration(final AsyncBuffer out, final EditMode editMode) {
+	default void renderSharedComponentConfiguration(final AsyncBuffer out, final EditMode editMode) {
 
 		if (EditMode.DEPLOYMENT.equals(editMode)) {
 
@@ -611,7 +762,7 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 		}
 	}
 
-	private void getContentInstructions(final Set<String> instructions) {
+	default void getContentInstructions(final Set<String> instructions) {
 
 		final String _contentType = getProperty(Content.contentType);
 		if (_contentType != null) {
@@ -632,7 +783,7 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 		}
 	}
 
-	private void getLinkableInstructions(final Set<String> instructions) {
+	default void getLinkableInstructions(final Set<String> instructions) {
 
 		if (this instanceof LinkSource) {
 
@@ -654,7 +805,7 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 		}
 	}
 
-	private void getVisibilityInstructions(final Set<String> instructions) {
+	default void getVisibilityInstructions(final Set<String> instructions) {
 
 		final Page _ownerDocument       = (Page)getOwnerDocument();
 
@@ -747,7 +898,7 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 		}
 	}
 
-	private void getSecurityInstructions(final Set<String> instructions) {
+	default void getSecurityInstructions(final Set<String> instructions) {
 
 		final Principal _owner = getOwnerNode();
 		if (_owner != null) {
@@ -778,10 +929,10 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 		}
 	}
 
-	protected void renderCustomAttributes(final AsyncBuffer out, final SecurityContext securityContext, final RenderContext renderContext) throws FrameworkException {
+	default void renderCustomAttributes(final AsyncBuffer out, final SecurityContext securityContext, final RenderContext renderContext) throws FrameworkException {
 
-		dbNode = this.getNode();
-		EditMode editMode = renderContext.getEditMode(securityContext.getUser(false));
+		final org.structr.api.graph.Node dbNode = getNode();
+		EditMode editMode                       = renderContext.getEditMode(securityContext.getUser(false));
 
 		for (PropertyKey key : getDataPropertyKeys()) {
 
@@ -849,45 +1000,8 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 		}
 	}
 
-	protected Set<PropertyKey> getDataPropertyKeys() {
+	default void setDataRoot(final RenderContext renderContext, final NodeInterface node, final String dataKey) {
 
-		if (customProperties == null) {
-
-			customProperties = new TreeSet<>();
-
-			final Iterable<String> props = dbNode.getPropertyKeys();
-			for (final String key : props) {
-
-				if (key.startsWith("data-")) {
-
-					final PropertyKey propertyKey = StructrApp.getConfiguration().getPropertyKeyForJSONName(getClass(), key);
-					if (propertyKey instanceof BooleanProperty && dbNode.hasProperty(key)) {
-
-						final Object defaultValue = propertyKey.defaultValue();
-						final Object nodeValue    = dbNode.getProperty(key);
-
-						// don't export boolean false values (which is the default)
-						if (nodeValue != null && Boolean.FALSE.equals(nodeValue) && (defaultValue == null || nodeValue.equals(defaultValue))) {
-
-							continue;
-						}
-					}
-
-					customProperties.add(propertyKey);
-
-				} else if (key.startsWith(CustomHtmlAttributeProperty.CUSTOM_HTML_ATTRIBUTE_PREFIX)) {
-
-					final CustomHtmlAttributeProperty customProp = new CustomHtmlAttributeProperty(StructrApp.getConfiguration().getPropertyKeyForJSONName(getClass(), key));
-
-					customProperties.add(customProp);
-				}
-			}
-		}
-
-		return customProperties;
-	}
-
-	protected void setDataRoot(final RenderContext renderContext, final AbstractNode node, final String dataKey) {
 		// an outgoing RENDER_NODE relationship points to the data node where rendering starts
 		for (RenderNode rel : node.getOutgoingRelationships(RenderNode.class)) {
 
@@ -901,7 +1015,7 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 		}
 	}
 
-	public void renderNodeList(final SecurityContext securityContext, final RenderContext renderContext, final int depth, final String dataKey) throws FrameworkException {
+	default void renderNodeList(final SecurityContext securityContext, final RenderContext renderContext, final int depth, final String dataKey) throws FrameworkException {
 
 		final Iterable<GraphObject> listSource = renderContext.getListSource();
 		if (listSource != null) {
@@ -918,29 +1032,6 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 		}
 	}
 
-	protected Iterable<GraphObject> checkListSources(final SecurityContext securityContext, final RenderContext renderContext) {
-
-		// try registered data sources first
-		for (GraphDataSource<Iterable<GraphObject>> source : listSources) {
-
-			try {
-
-				Iterable<GraphObject> graphData = source.getData(renderContext, this);
-				if (graphData != null && !Iterables.isEmpty(graphData)) {
-					return graphData;
-				}
-
-			} catch (FrameworkException fex) {
-
-				logger.warn("", fex);
-
-				logger.warn("Could not retrieve data from graph data source {}: {}", new Object[]{source, fex});
-			}
-		}
-
-		return Collections.EMPTY_LIST;
-	}
-
 	/**
 	 * Increase version of the page.
 	 *
@@ -948,7 +1039,7 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 	 *
 	 * @throws FrameworkException
 	 */
-	protected void increasePageVersion() throws FrameworkException {
+	default void increasePageVersion() throws FrameworkException {
 
 		Page page = null;
 
@@ -995,13 +1086,13 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 
 	}
 
-	protected boolean avoidWhitespace() {
+	default boolean avoidWhitespace() {
 
 		return false;
 
 	}
 
-	protected void checkIsChild(Node otherNode) throws DOMException {
+	default void checkIsChild(Node otherNode) throws DOMException {
 
 		if (otherNode instanceof DOMNode) {
 
@@ -1019,7 +1110,7 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 		throw new DOMException(DOMException.NOT_SUPPORTED_ERR, NOT_SUPPORTED_ERR_MESSAGE);
 	}
 
-	protected void checkHierarchy(Node otherNode) throws DOMException {
+	default void checkHierarchy(Node otherNode) throws DOMException {
 
 		// we can only check DOMNodes
 		if (otherNode instanceof DOMNode) {
@@ -1050,7 +1141,7 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 		throw new DOMException(DOMException.NOT_SUPPORTED_ERR, NOT_SUPPORTED_ERR_MESSAGE);
 	}
 
-	protected void checkSameDocument(Node otherNode) throws DOMException {
+	default void checkSameDocument(Node otherNode) throws DOMException {
 
 		Document doc = getOwnerDocument();
 
@@ -1081,7 +1172,9 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 		}
 	}
 
-	protected void checkWriteAccess() throws DOMException {
+	default void checkWriteAccess() throws DOMException {
+
+		final SecurityContext securityContext = getSecurityContext();
 
 		if (!isGranted(Permission.write, securityContext)) {
 
@@ -1091,7 +1184,9 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 		}
 	}
 
-	protected void checkReadAccess() throws DOMException {
+	default void checkReadAccess() throws DOMException {
+
+		final SecurityContext securityContext = getSecurityContext();
 
 		if (securityContext.isVisible(this) || isGranted(Permission.read, securityContext)) {
 			return;
@@ -1102,30 +1197,15 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 		throw new DOMException(DOMException.INVALID_ACCESS_ERR, INVALID_ACCESS_ERR_MESSAGE);
 	}
 
-	public static String indent(final int depth, final RenderContext renderContext) {
-
-		if (!renderContext.shouldIndentHtml()) {
-			return "";
-		}
-
-		StringBuilder indent = new StringBuilder("\n");
-
-		for (int d = 0; d < depth; d++) {
-
-			indent.append("	");
-
-		}
-
-		return indent.toString();
-	}
-
 	/**
 	 * Decide whether this node should be displayed for the given conditions string.
 	 *
 	 * @param renderContext
 	 * @return true if node should be displayed
 	 */
-	protected boolean displayForConditions(final RenderContext renderContext) {
+	default boolean displayForConditions(final RenderContext renderContext) {
+
+		final SecurityContext securityContext = getSecurityContext();
 
 		// In raw or widget mode, render everything
 		EditMode editMode = renderContext.getEditMode(securityContext.getUser(false));
@@ -1169,7 +1249,9 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 	 * @param renderContext
 	 * @return true if node should be displayed
 	 */
-	protected boolean displayForLocale(final RenderContext renderContext) {
+	default boolean displayForLocale(final RenderContext renderContext) {
+
+		final SecurityContext securityContext = getSecurityContext();
 
 		// In raw or widget mode, render everything
 		EditMode editMode = renderContext.getEditMode(securityContext.getUser(false));
@@ -1201,23 +1283,9 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 
 	}
 
-	public static String escapeForHtml(final String raw) {
-		return StringUtils.replaceEach(raw, new String[]{"&", "<", ">"}, new String[]{"&amp;", "&lt;", "&gt;"});
+	default void collectNodesByPredicate(Node startNode, DOMNodeList results, Predicate<Node> predicate, int depth, boolean stopOnFirstHit) {
 
-	}
-
-	public static String escapeForHtmlAttributes(final String raw) {
-		//return StringUtils.replaceEach(raw, new String[]{"&", "<", ">", "\"", "'"}, new String[]{"&amp;", "&lt;", "&gt;", "&quot;", "&#39;"});
-		return StringUtils.replaceEach(raw, new String[]{"&", "<", ">", "\""}, new String[]{"&amp;", "&lt;", "&gt;", "&quot;"});
-	}
-
-	public static String unescapeForHtmlAttributes(final String raw) {
-		//return StringUtils.replaceEach(raw, new String[]{"&", "<", ">", "\"", "'"}, new String[]{"&amp;", "&lt;", "&gt;", "&quot;", "&#39;"});
-		return StringUtils.replaceEach(raw, new String[]{"&amp;", "&lt;", "&gt;", "&quot;"}, new String[]{"&", "<", ">", "\""});
-	}
-
-	protected void collectNodesByPredicate(Node startNode, DOMNodeList results, Predicate<Node> predicate, int depth, boolean stopOnFirstHit) {
-
+		final SecurityContext securityContext = getSecurityContext();
 
 		if (predicate instanceof Filter) {
 			((Filter)predicate).setSecurityContext(securityContext);
@@ -1248,7 +1316,7 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 
 	// ----- interface org.w3c.dom.Node -----
 	@Override
-	public String getTextContent() throws DOMException {
+	default String getTextContent() throws DOMException {
 
 		final DOMNodeList results = new DOMNodeList();
 		final TextCollector textCollector = new TextCollector();
@@ -1259,50 +1327,50 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 	}
 
 	@Override
-	public void setTextContent(String textContent) throws DOMException {
+	default void setTextContent(String textContent) throws DOMException {
 		// TODO: implement?
 	}
 
 	@Override
-	public Node getParentNode() {
+	default Node getParentNode() {
 		// FIXME: type cast correct here?
 		return (Node)getProperty(parent);
 	}
 
 	@Override
-	public NodeList getChildNodes() {
+	default NodeList getChildNodes() {
 		checkReadAccess();
 		return new DOMNodeList(treeGetChildren());
 	}
 
 	@Override
-	public Node getFirstChild() {
+	default Node getFirstChild() {
 		checkReadAccess();
 		return treeGetFirstChild();
 	}
 
 	@Override
-	public Node getLastChild() {
+	default Node getLastChild() {
 		return treeGetLastChild();
 	}
 
 	@Override
-	public Node getPreviousSibling() {
+	default Node getPreviousSibling() {
 		return listGetPrevious(this);
 	}
 
 	@Override
-	public Node getNextSibling() {
+	default Node getNextSibling() {
 		return listGetNext(this);
 	}
 
 	@Override
-	public Document getOwnerDocument() {
+	default Document getOwnerDocument() {
 		return getProperty(ownerDocument);
 	}
 
 	@Override
-	public Node insertBefore(final Node newChild, final Node refChild) throws DOMException {
+	default Node insertBefore(final Node newChild, final Node refChild) throws DOMException {
 
 		// according to DOM spec, insertBefore with null refChild equals appendChild
 		if (refChild == null) {
@@ -1377,7 +1445,7 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 	}
 
 	@Override
-	public Node replaceChild(final Node newChild, final Node oldChild) throws DOMException {
+	default Node replaceChild(final Node newChild, final Node oldChild) throws DOMException {
 
 		checkWriteAccess();
 
@@ -1449,7 +1517,7 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 	}
 
 	@Override
-	public Node removeChild(final Node node) throws DOMException {
+	default Node removeChild(final Node node) throws DOMException {
 
 		checkWriteAccess();
 		checkSameDocument(node);
@@ -1468,7 +1536,7 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 	}
 
 	@Override
-	public Node appendChild(final Node newChild) throws DOMException {
+	default Node appendChild(final Node newChild) throws DOMException {
 
 		checkWriteAccess();
 		checkSameDocument(newChild);
@@ -1526,12 +1594,14 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 	}
 
 	@Override
-	public boolean hasChildNodes() {
+	default boolean hasChildNodes() {
 		return !getProperty(children).isEmpty();
 	}
 
 	@Override
-	public Node cloneNode(boolean deep) {
+	default Node cloneNode(boolean deep) {
+
+		final SecurityContext securityContext = getSecurityContext();
 
 		if (deep) {
 
@@ -1541,7 +1611,7 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 
 			final PropertyMap properties = new PropertyMap();
 
-			for (Iterator<PropertyKey> it = getPropertyKeys(uiView.name()).iterator(); it.hasNext();) {
+			for (Iterator<PropertyKey> it = getPropertyKeys(PropertyView.Ui).iterator(); it.hasNext();) {
 
 				final PropertyKey key = it.next();
 
@@ -1598,36 +1668,36 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 	}
 
 	@Override
-	public boolean isSupported(String string, String string1) {
+	default boolean isSupported(String string, String string1) {
 		return false;
 	}
 
 	@Override
-	public String getNamespaceURI() {
+	default String getNamespaceURI() {
 		return null; //return "http://www.w3.org/1999/xhtml";
 	}
 
 	@Override
-	public String getPrefix() {
+	default String getPrefix() {
 		return null;
 	}
 
 	@Override
-	public void setPrefix(String prefix) throws DOMException {
+	default void setPrefix(String prefix) throws DOMException {
 	}
 
 	@Override
-	public String getBaseURI() {
+	default String getBaseURI() {
 		return null;
 	}
 
 	@Override
-	public short compareDocumentPosition(Node node) throws DOMException {
+	default short compareDocumentPosition(Node node) throws DOMException {
 		return 0;
 	}
 
 	@Override
-	public boolean isSameNode(Node node) {
+	default boolean isSameNode(Node node) {
 
 		if (node != null && node instanceof DOMNode) {
 
@@ -1643,42 +1713,37 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 	}
 
 	@Override
-	public String lookupPrefix(String string) {
+	default String lookupPrefix(String string) {
 		return null;
 	}
 
 	@Override
-	public boolean isDefaultNamespace(String string) {
+	default boolean isDefaultNamespace(String string) {
 		return true;
 	}
 
 	@Override
-	public String lookupNamespaceURI(String string) {
+	default String lookupNamespaceURI(String string) {
 		return null;
 	}
 
 	@Override
-	public boolean isEqualNode(Node node) {
+	default boolean isEqualNode(Node node) {
 		return equals(node);
 	}
 
 	@Override
-	public Object getFeature(String string, String string1) {
+	default Object setUserData(String string, Object o, UserDataHandler udh) {
 		return null;
 	}
 
 	@Override
-	public Object setUserData(String string, Object o, UserDataHandler udh) {
+	default Object getUserData(String string) {
 		return null;
 	}
 
 	@Override
-	public Object getUserData(String string) {
-		return null;
-	}
-
-	@Override
-	public final void normalize() {
+	default void normalize() {
 
 		Document document = getOwnerDocument();
 		if (document != null) {
@@ -1732,15 +1797,38 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 
 	}
 
+	default void setVisibility(final boolean publicUsers, final boolean authenticatedUsers) throws FrameworkException {
+
+		final PropertyMap map = new PropertyMap();
+
+		map.put(NodeInterface.visibleToPublicUsers, publicUsers);
+		map.put(NodeInterface.visibleToAuthenticatedUsers, authenticatedUsers);
+
+		setProperties(getSecurityContext(), map);
+	}
+
+	default boolean checkName(final ErrorBuffer errorBuffer) {
+
+		final String _name = getProperty(AbstractNode.name);
+		if (_name != null && _name.contains("/")) {
+
+			errorBuffer.add(new SemanticErrorToken(getType(), AbstractNode.name, "may_not_contain_slashes", _name));
+
+			return false;
+		}
+
+		return true;
+	}
+
 	// ----- interface DOMAdoptable -----
 	@Override
-	public Node doAdopt(final Page _page) throws DOMException {
+	default Node doAdopt(final Page _page) throws DOMException {
 
 		if (_page != null) {
 
 			try {
 
-				setProperties(securityContext, new PropertyMap(ownerDocument, _page));
+				setProperties(getSecurityContext(), new PropertyMap(ownerDocument, _page));
 
 			} catch (FrameworkException fex) {
 
@@ -1752,121 +1840,8 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 		return this;
 	}
 
-	public static GraphObjectMap extractHeaders(final Header[] headers) {
-
-		final GraphObjectMap map = new GraphObjectMap();
-
-		for (final Header header : headers) {
-
-			map.put(new StringProperty(header.getName()), header.getValue());
-		}
-
-		return map;
-	}
-
-	// ----- static methods -----
-
-	public static Set<DOMNode> getAllChildNodes(final DOMNode node) {
-
-		Set<DOMNode> allChildNodes = new HashSet();
-
-		getAllChildNodes(node, allChildNodes);
-
-		return allChildNodes;
-	}
-
-	private static void getAllChildNodes(final DOMNode node, final Set<DOMNode> allChildNodes) {
-
-		Node n = node.getFirstChild();
-
-		while (n != null) {
-
-			if (n instanceof DOMNode) {
-
-				DOMNode domNode = (DOMNode)n;
-
-				if (!allChildNodes.contains(domNode)) {
-
-					allChildNodes.add(domNode);
-					allChildNodes.addAll(getAllChildNodes(domNode));
-
-				} else {
-
-					// break loop!
-					break;
-				}
-			}
-
-			n = n.getNextSibling();
-		}
-	}
-
-	/**
-	 * Recursively clone given node, all its direct children and connect the cloned child nodes to the clone parent node.
-	 *
-	 * @param securityContext
-	 * @param nodeToClone
-	 * @return
-	 */
-	public static DOMNode cloneAndAppendChildren(final SecurityContext securityContext, final DOMNode nodeToClone) {
-
-		final DOMNode newNode = (DOMNode)nodeToClone.cloneNode(false);
-
-		final List<DOMNode> childrenToClone = (List<DOMNode>)nodeToClone.getChildNodes();
-
-		for (final DOMNode childNodeToClone : childrenToClone) {
-
-			final DOMNode newChildNode = (DOMNode)cloneAndAppendChildren(securityContext, childNodeToClone);
-			newNode.appendChild(newChildNode);
-
-		}
-
-		return newNode;
-	}
-
-	// ----- interface Syncable -----
-	@Override
-	public List<GraphObject> getSyncData() throws FrameworkException {
-
-		final List<GraphObject> data = super.getSyncData();
-
-		// nodes
-		data.addAll(getProperty(DOMNode.children));
-
-		final DOMNode sibling = getProperty(DOMNode.nextSibling);
-		if (sibling != null) {
-
-			data.add(sibling);
-		}
-
-		// relationships
-		for (final DOMChildren child : getOutgoingRelationships(DOMChildren.class)) {
-			data.add(child);
-		}
-
-		final DOMSiblings siblingRel = getOutgoingRelationship(DOMSiblings.class);
-		if (siblingRel != null) {
-
-			data.add(siblingRel);
-		}
-
-		// for template nodes
-		data.add(getProperty(DOMNode.sharedComponent));
-		data.add(getIncomingRelationship(Sync.class));
-
-		// add parent page
-		data.add(getProperty(ownerDocument));
-		data.add(getOutgoingRelationship(PageLink.class));
-
-		// add parent element
-		data.add(getProperty(DOMNode.parent));
-		data.add(getIncomingRelationship(DOMChildren.class));
-
-		return data;
-	}
-
 	// ----- nested classes -----
-	protected static class TextCollector implements Predicate<Node> {
+	static class TextCollector implements Predicate<Node> {
 
 		private final StringBuilder textBuffer = new StringBuilder(200);
 
@@ -1885,7 +1860,7 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 		}
 	}
 
-	protected static class TagPredicate implements Predicate<Node> {
+	static class TagPredicate implements Predicate<Node> {
 
 		private String tagName = null;
 
@@ -1907,113 +1882,5 @@ public abstract class DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, D
 
 			return false;
 		}
-	}
-
-	public static String objectToString(final Object source) {
-
-		if (source != null) {
-			return source.toString();
-		}
-
-		return null;
-	}
-
-	/**
-	 * Returns the owner document of this DOMNode, following an OUTGOING "PAGE" relationship.
-	 *
-	 * @return the owner node of this node
-	 */
-	public Document getOwnerDocumentAsSuperUser() {
-
-		if (cachedOwnerDocument == null) {
-
-			final PageLink ownership = getOutgoingRelationshipAsSuperUser(PageLink.class);
-			if (ownership != null) {
-
-				Page page = ownership.getTargetNode();
-				cachedOwnerDocument = page;
-			}
-		}
-
-		return cachedOwnerDocument;
-	}
-
-	private Map<String, Integer> cachedMostUsedTagNames = null;
-
-	public synchronized Map<String, Integer> getMostUsedElementNames() {
-
-		if (cachedMostUsedTagNames == null) {
-
-			cachedMostUsedTagNames = new LinkedHashMap<>();
-
-			getMostUsedElementNames(cachedMostUsedTagNames, this, 0);
-		}
-
-		return cachedMostUsedTagNames;
-	}
-
-	private String cachedPagePath = null;
-
-	public String getPagePath() {
-
-		if (cachedPagePath == null) {
-
-			final StringBuilder buf = new StringBuilder();
-			DOMNode current         = this;
-
-			while (current != null) {
-
-				buf.insert(0, "/" + current.getContextName());
-				current = current.getProperty(DOMNode.parent);
-			}
-
-			cachedPagePath = buf.toString();
-		}
-
-		return cachedPagePath;
-	}
-
-	public void setVisibility(final boolean publicUsers, final boolean authenticatedUsers) throws FrameworkException {
-
-		final PropertyMap map = new PropertyMap();
-
-		map.put(NodeInterface.visibleToPublicUsers, publicUsers);
-		map.put(NodeInterface.visibleToAuthenticatedUsers, authenticatedUsers);
-
-		setProperties(securityContext, map);
-	}
-
-	// ----- private methods -----
-	private void getMostUsedElementNames(final Map<String, Integer> mostUsedElements, final DOMNode parent, final int depth) {
-
-		for (final DOMNode node : parent.getProperty(DOMNode.children)) {
-
-			final String tag = node.getProperty(DOMElement.tag);
-
-			if (tag != null && !Page.nonBodyTags.contains(tag)) {
-
-				final Integer value = cachedMostUsedTagNames.get(tag);
-				if (value == null) {
-					cachedMostUsedTagNames.put(tag, 1);
-				} else {
-					cachedMostUsedTagNames.put(tag, value + 1);
-				}
-			}
-
-			getMostUsedElementNames(mostUsedElements, node, depth + 1);
-		}
-	}
-
-	private boolean checkName(final ErrorBuffer errorBuffer) {
-
-		final String _name = getProperty(AbstractNode.name);
-		if (_name != null && _name.contains("/")) {
-
-			errorBuffer.add(new SemanticErrorToken(getType(), AbstractNode.name, "may_not_contain_slashes", _name));
-
-			return false;
-		}
-
-		return true;
 	}
 }

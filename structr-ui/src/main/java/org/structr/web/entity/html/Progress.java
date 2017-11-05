@@ -23,14 +23,5 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Progress extends DOMElement {
-//
-//	static {
-//
-//		StructrApp.getConfiguration().registerPropertySet(Progress.class, PropertyView.All, HtmlElement.UiKey.values());
-//		StructrApp.getConfiguration().registerPropertySet(Progress.class, PropertyView.Public, HtmlElement.UiKey.values());
-//		StructrApp.getConfiguration().registerPropertySet(Progress.class, PropertyView.Html, PropertyView.Html, htmlAttributes);
-//
-//	}
-//
+public interface Progress extends DOMElement {
 }

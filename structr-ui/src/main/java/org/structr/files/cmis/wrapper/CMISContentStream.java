@@ -28,7 +28,6 @@ import java.nio.file.StandardOpenOption;
 import org.apache.chemistry.opencmis.commons.data.ContentStream;
 import org.apache.chemistry.opencmis.commons.exceptions.CmisConstraintException;
 import org.structr.cmis.common.CMISExtensionsData;
-import org.structr.web.entity.FileBase;
 
 /**
  * An implementation of the CMIS ContentStream interface using a MappedByteBuffer.
@@ -44,9 +43,9 @@ public class CMISContentStream extends CMISExtensionsData implements ContentStre
 	private long offset        = 0L;
 
 
-	public CMISContentStream(final FileBase file, final BigInteger offset, final BigInteger length) {
+	public CMISContentStream(final org.structr.web.entity.File file, final BigInteger offset, final BigInteger length) {
 
-		this.contentType = file.getProperty(FileBase.contentType);
+		this.contentType = file.getProperty(org.structr.web.entity.File.contentType);
 		this.name        = file.getName();
 		this.file        = file.getFileOnDisk();
 		this.offset      = offset != null ? offset.longValue() : 0L;

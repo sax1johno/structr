@@ -23,22 +23,12 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Kbd extends DOMElement {
-//
-//	static {
-//
-//		StructrApp.getConfiguration().registerPropertySet(Kbd.class, PropertyView.All, HtmlElement.UiKey.values());
-//		StructrApp.getConfiguration().registerPropertySet(Kbd.class, PropertyView.Public, HtmlElement.UiKey.values());
-//		StructrApp.getConfiguration().registerPropertySet(Kbd.class, PropertyView.Html, PropertyView.Html, htmlAttributes);
-//
-//	}
+public interface Kbd extends DOMElement {
 
-	//~--- methods --------------------------------------------------------
-
+	/*
 	@Override
 	public boolean avoidWhitespace() {
-
 		return true;
-
 	}
+	*/
 }

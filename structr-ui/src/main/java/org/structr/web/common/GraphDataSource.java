@@ -19,15 +19,14 @@
 package org.structr.web.common;
 
 import org.structr.common.error.FrameworkException;
-import org.structr.core.entity.AbstractNode;
+import org.structr.core.GraphObject;
+import org.structr.core.graph.NodeInterface;
 
 /**
  * Defines an interface for graph database content retrieval.
- *
- *
  */
 
-public interface GraphDataSource<T> {
+public interface GraphDataSource {
 
-	public T getData(final RenderContext renderContext, final AbstractNode referenceNode) throws FrameworkException;
+	public Iterable<GraphObject> getData(final RenderContext renderContext, final NodeInterface referenceNode) throws FrameworkException;
 }

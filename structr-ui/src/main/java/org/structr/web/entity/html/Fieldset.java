@@ -23,5 +23,5 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Fieldset extends DOMElement {
+public interface Fieldset extends DOMElement {
 }

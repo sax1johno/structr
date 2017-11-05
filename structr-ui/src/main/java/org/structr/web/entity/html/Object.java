@@ -26,9 +26,8 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Object extends DOMElement {
+public interface Object extends DOMElement {
 
-	//public static final Property<String> _data		= new HtmlProperty("data");
 	public static final Property<String> _type		= new HtmlProperty("type");
 	public static final Property<String> _typemustmatch	= new HtmlProperty("typemustmatch");
 	public static final Property<String> _usemap		= new HtmlProperty("usemap");
@@ -39,6 +38,4 @@ public class Object extends DOMElement {
 	public static final org.structr.common.View htmlView	= new org.structr.common.View(Object.class, PropertyView.Html,
 		_data, _type, _typemustmatch, _usemap, _form, _width, _height
 	);
-	
-
 }

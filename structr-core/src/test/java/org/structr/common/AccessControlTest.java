@@ -38,8 +38,6 @@ import org.structr.core.Result;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.Group;
-import org.structr.core.entity.Principal;
 import org.structr.core.entity.ResourceAccess;
 import org.structr.core.entity.TestOne;
 import org.structr.core.entity.TestUser;
@@ -48,10 +46,11 @@ import org.structr.core.entity.relationship.Ownership;
 import org.structr.core.entity.relationship.PrincipalOwnsNode;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.Tx;
+import org.structr.core.entity.GroupMixin;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
-
-//~--- classes ----------------------------------------------------------------
+import org.structr.core.entity.Principal;
+import org.structr.core.entity.Group;
 
 /**
  * Test access control with different permission levels.
@@ -970,7 +969,7 @@ public class AccessControlTest extends StructrTest {
 
 			final List<TestUser> users = createTestNodes(TestUser.class, 2);
 			final TestUser user1       = (TestUser) users.get(0);
-			final Group group1         = createTestNode(Group.class, "test group");
+			final GroupMixin group1    = createTestNode(GroupMixin.class, "test group");
 			final TestOne t1           = createTestNode(TestOne.class);
 
 			t1.setProperty(AbstractNode.owner, user1);

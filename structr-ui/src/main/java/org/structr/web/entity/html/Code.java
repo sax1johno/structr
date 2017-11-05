@@ -23,23 +23,14 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Code extends DOMElement {
-//
-//	static {
-//
-//		StructrApp.getConfiguration().registerPropertySet(Code.class, PropertyView.All, HtmlElement.UiKey.values());
-//		StructrApp.getConfiguration().registerPropertySet(Code.class, PropertyView.Public, HtmlElement.UiKey.values());
-//		StructrApp.getConfiguration().registerPropertySet(Code.class, PropertyView.Html, PropertyView.Html, htmlAttributes);
-//		StructrApp.getConfiguration().registerEntityRelation(Code.class, Content.class, RelType.CONTAINS, Direction.OUTGOING, Relation.Cardinality.ManyToMany);
-//
-//	}
+public interface Code extends DOMElement {
 
-	//~--- methods --------------------------------------------------------
-
+	/*
 	@Override
 	public boolean avoidWhitespace() {
 
 		return true;
 
 	}
+	*/
 }

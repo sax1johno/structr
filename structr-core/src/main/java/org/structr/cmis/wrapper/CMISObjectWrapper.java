@@ -49,10 +49,10 @@ import org.structr.cmis.info.CMISObjectInfo;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.app.StructrApp;
-import org.structr.core.entity.Principal;
 import org.structr.core.entity.SuperUser;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
+import org.structr.core.entity.Principal;
 
 /**
  *

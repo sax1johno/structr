@@ -33,7 +33,7 @@ import org.structr.schema.action.ActionContext;
 import org.structr.schema.action.Function;
 import org.structr.web.common.RenderContext;
 import org.structr.web.datasource.FunctionDataSource;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.dom.DOMNode;
 
 /**
@@ -124,12 +124,12 @@ public class IncludeFunction extends Function<Object, Object> {
 
 			} else {
 
-				final FileBase file = app.nodeQuery(FileBase.class).andName((String)sources[0]).getFirst();
+				final File file = app.nodeQuery(File.class).andName((String)sources[0]).getFirst();
 
 				if (file != null) {
 
 					final String name = file.getProperty(NodeInterface.name);
-					final String contentType = file.getProperty(FileBase.contentType);
+					final String contentType = file.getProperty(File.contentType);
 					final String charset = StringUtils.substringAfterLast(contentType, "charset=");
 					final String extension = StringUtils.substringAfterLast(name, ".");
 

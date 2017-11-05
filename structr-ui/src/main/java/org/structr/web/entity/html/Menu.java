@@ -23,5 +23,5 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Menu extends DOMElement {
+public interface Menu extends DOMElement {
 }

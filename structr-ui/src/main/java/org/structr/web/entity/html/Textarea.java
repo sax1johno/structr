@@ -18,19 +18,16 @@
  */
 package org.structr.web.entity.html;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.structr.common.PropertyView;
 import org.structr.common.View;
 import org.structr.core.property.Property;
 import org.structr.web.common.HtmlProperty;
 import org.structr.web.entity.dom.DOMElement;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
  *
  */
-public class Textarea extends DOMElement {
+public interface Textarea extends DOMElement {
 
 	public static final Property<String> _name        = new HtmlProperty("name");
 	public static final Property<String> _disabled    = new HtmlProperty("disabled");
@@ -44,11 +41,12 @@ public class Textarea extends DOMElement {
 	public static final Property<String> _rows        = new HtmlProperty("rows");
 	public static final Property<String> _wrap        = new HtmlProperty("wrap");
 	public static final Property<String> _cols        = new HtmlProperty("cols");
-	
+
 	public static final View htmlView = new View(Textarea.class, PropertyView.Html,
 	    _name, _disabled, _form, _readonly, _maxlenght, _autofocus, _required, _placeholder, _dirname, _rows, _wrap, _cols
 	);
-	
+
+	/*
 	@Override
 	public boolean avoidWhitespace() {
 
@@ -62,4 +60,5 @@ public class Textarea extends DOMElement {
 		return (Property[]) ArrayUtils.addAll(super.getHtmlAttributes(), htmlView.properties());
 
 	}
+	*/
 }

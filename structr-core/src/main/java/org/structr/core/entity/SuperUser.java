@@ -18,7 +18,6 @@
  */
 package org.structr.core.entity;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -38,20 +37,14 @@ import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.graph.ModificationQueue;
 import org.structr.core.graph.NodeInterface;
-import org.structr.core.graph.RelationshipInterface;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.schema.NonIndexed;
 import org.structr.schema.action.ActionContext;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
  * The SuperUser entity. Please note that this class is not persitent but will
  * be instantiated when needed.
- *
- *
- *
  */
 public class SuperUser implements Principal, AccessControllable, NonIndexed {
 
@@ -113,9 +106,12 @@ public class SuperUser implements Principal, AccessControllable, NonIndexed {
 
 	@Override
 	public long getId() {
-
 		return -1L;
+	}
 
+	@Override
+	public Long getNodeId() {
+		return getId();
 	}
 
 	public String getRealName() {
@@ -443,11 +439,6 @@ public class SuperUser implements Principal, AccessControllable, NonIndexed {
 	}
 
 	@Override
-	public List<GraphObject> getSyncData() {
-		return new ArrayList<>();
-	}
-
-	@Override
 	public boolean isNode() {
 		return false;
 	}
@@ -455,16 +446,6 @@ public class SuperUser implements Principal, AccessControllable, NonIndexed {
 	@Override
 	public boolean isRelationship() {
 		return false;
-	}
-
-	@Override
-	public NodeInterface getSyncNode() {
-		return null;
-	}
-
-	@Override
-	public RelationshipInterface getSyncRelationship() {
-		return null;
 	}
 
 	@Override
@@ -514,5 +495,30 @@ public class SuperUser implements Principal, AccessControllable, NonIndexed {
 	@Override
 	public Class getEntityType() {
 		return SuperUser.class;
+	}
+
+	@Override
+	public List<Security> getSecurityRelationships() {
+		return Collections.emptyList();
+	}
+
+	@Override
+	public <A extends NodeInterface, B extends NodeInterface, S extends Source, T extends Target> boolean hasRelationship(Class<? extends Relation<A, B, S, T>> type) {
+		throw new UnsupportedOperationException("Not supported.");
+	}
+
+	@Override
+	public <A extends NodeInterface, B extends NodeInterface, S extends Source, T extends Target, R extends Relation<A, B, S, T>> boolean hasIncomingRelationships(Class<R> type) {
+		throw new UnsupportedOperationException("Not supported.");
+	}
+
+	@Override
+	public <A extends NodeInterface, B extends NodeInterface, S extends Source, T extends Target, R extends Relation<A, B, S, T>> boolean hasOutgoingRelationships(Class<R> type) {
+		throw new UnsupportedOperationException("Not supported.");
+	}
+
+	@Override
+	public <A extends NodeInterface, B extends NodeInterface, T extends Target, R extends Relation<A, B, ManyStartpoint<A>, T>> R getOutgoingRelationshipAsSuperUser(Class<R> type) {
+		throw new UnsupportedOperationException("Not supported.");
 	}
 }

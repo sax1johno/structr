@@ -51,10 +51,9 @@ import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.property.PropertyMap;
-import org.structr.dynamic.File;
 import org.structr.util.Base64;
 import static org.structr.web.common.FileHelper.setFileData;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Image;
 import org.structr.web.property.ThumbnailProperty;
 
@@ -416,7 +415,7 @@ public abstract class ImageHelper extends FileHelper {
 		return null;
 	}
 
-	public static BufferedImage getRotatedImage(final FileBase originalImage) {
+	public static BufferedImage getRotatedImage(final File originalImage) {
 
 		try {
 
@@ -554,7 +553,7 @@ public abstract class ImageHelper extends FileHelper {
 	 * @param image the image
 	 * @throws FrameworkException
 	 */
-	public static void updateMetadata(final FileBase image) throws FrameworkException {
+	public static void updateMetadata(final File image) throws FrameworkException {
 
 		updateMetadata(image, image.getInputStream());
 	}
@@ -566,7 +565,7 @@ public abstract class ImageHelper extends FileHelper {
 	 * @param fis file input stream
 	 * @throws FrameworkException
 	 */
-	public static void updateMetadata(final FileBase image, final InputStream fis) throws FrameworkException {
+	public static void updateMetadata(final File image, final InputStream fis) throws FrameworkException {
 
 		try {
 			final BufferedImage source = ImageIO.read(fis);
@@ -708,7 +707,7 @@ public abstract class ImageHelper extends FileHelper {
 		return false;
 	}
 
-	private static Metadata getMetadata(final FileBase originalImage) {
+	private static Metadata getMetadata(final File originalImage) {
 
 		Metadata metadata = new Metadata();
 
@@ -728,7 +727,7 @@ public abstract class ImageHelper extends FileHelper {
 		return metadata;
 	}
 
-	public static int getOrientation(final FileBase originalImage) {
+	public static int getOrientation(final File originalImage) {
 
 		try {
 
@@ -749,7 +748,7 @@ public abstract class ImageHelper extends FileHelper {
 		return 1;
 	}
 
-	public static JSONObject getExifData(final FileBase originalImage) {
+	public static JSONObject getExifData(final File originalImage) {
 
 		final JSONObject exifDataJson = new JSONObject();
 
@@ -807,7 +806,7 @@ public abstract class ImageHelper extends FileHelper {
 		return null;
 	}
 
-	public static String getExifDataString(final FileBase originalImage) {
+	public static String getExifDataString(final File originalImage) {
 		JSONObject data = getExifData(originalImage);
 		return data != null ? data.toString() : null;
 	}

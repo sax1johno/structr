@@ -27,10 +27,10 @@ import org.structr.core.property.StringProperty;
 import org.structr.schema.action.ActionContext;
 import org.structr.schema.action.Function;
 import org.structr.web.common.FileHelper;
-import org.structr.web.entity.FileBase;
-import static org.structr.web.entity.FileBase.checksum;
-import static org.structr.web.entity.FileBase.size;
-import static org.structr.web.entity.FileBase.version;
+import org.structr.web.entity.File;
+import static org.structr.web.entity.File.checksum;
+import static org.structr.web.entity.File.size;
+import static org.structr.web.entity.File.version;
 
 public class CopyFileContentsFunction extends Function<Object, Object> {
 
@@ -45,10 +45,10 @@ public class CopyFileContentsFunction extends Function<Object, Object> {
 			final Object toCopy = sources[0];
 			final Object toBeReplaced = sources[1];
 
-			if (toCopy instanceof FileBase && toBeReplaced instanceof FileBase) {
+			if (toCopy instanceof File && toBeReplaced instanceof File) {
 
-				FileBase nodeToCopy = (FileBase) toCopy;
-				FileBase nodeToBeReplaced = (FileBase) toBeReplaced;
+				File nodeToCopy = (File) toCopy;
+				File nodeToBeReplaced = (File) toBeReplaced;
 
 				try {
 

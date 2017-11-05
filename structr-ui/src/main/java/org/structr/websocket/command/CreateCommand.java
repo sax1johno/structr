@@ -30,7 +30,7 @@ import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.TransactionCommand;
 import org.structr.core.property.PropertyMap;
 import org.structr.schema.SchemaHelper;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
@@ -70,9 +70,9 @@ public class CreateCommand extends AbstractCommand {
 			TransactionCommand.registerNodeCallback(newNode, callback);
 
 			// check for File node and store in WebSocket to receive chunks
-			if (newNode instanceof FileBase) {
+			if (newNode instanceof File) {
 
-				getWebSocket().createFileUploadHandler((FileBase) newNode);
+				getWebSocket().createFileUploadHandler((File) newNode);
 
 			}
 

@@ -26,14 +26,14 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Video extends DOMElement {
-	
+public interface Video extends DOMElement {
+
 	public static final Property<String> _src		= new HtmlProperty("src");
 	public static final Property<String> _crossorigin	= new HtmlProperty("crossorigin");
 	public static final Property<String> _poster		= new HtmlProperty("poster");
 	public static final Property<String> _preload		= new HtmlProperty("preload");
 	public static final Property<String> _autoplay		= new HtmlProperty("autoplay");
-	public static final Property<String> _mediagroup		= new HtmlProperty("mediagroup");
+	public static final Property<String> _mediagroup	= new HtmlProperty("mediagroup");
 	public static final Property<String> _loop		= new HtmlProperty("loop");
 	public static final Property<String> _muted		= new HtmlProperty("muted");
 	public static final Property<String> _controls		= new HtmlProperty("controls");
@@ -43,5 +43,5 @@ public class Video extends DOMElement {
 	public static final org.structr.common.View htmlView	= new org.structr.common.View(Video.class, PropertyView.Html,
 		_src, _crossorigin, _poster, _preload, _autoplay, _mediagroup, _loop, _muted, _controls, _width, _height
 	);
-	
+
 }

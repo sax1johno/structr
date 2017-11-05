@@ -23,5 +23,5 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Map extends DOMElement {
+public interface Map extends DOMElement {
 }

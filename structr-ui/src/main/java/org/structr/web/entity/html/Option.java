@@ -27,16 +27,16 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Option extends DOMElement {
-	
+public interface Option extends DOMElement {
+
 	public static final Property<String> _value	= new HtmlProperty("value");
 	public static final Property<String> _disabled	= new HtmlProperty("disabled");
 	public static final Property<String> _selected	= new HtmlProperty("selected");
 	public static final Property<String> _label	= new HtmlProperty("label");
-	
+
 	public static final View htmlView = new View(Option.class, PropertyView.Html,
-	    
+
 		_value, _disabled, _selected, _label
 	 );
-	
+
 }

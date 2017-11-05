@@ -23,5 +23,5 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Thead extends DOMElement {
+public interface Thead extends DOMElement {
 }

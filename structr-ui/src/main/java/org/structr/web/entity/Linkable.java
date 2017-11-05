@@ -29,8 +29,6 @@ import org.structr.core.property.StartNodes;
 import org.structr.core.property.StringProperty;
 import org.structr.web.entity.html.relation.ResourceLink;
 
-//~--- interfaces -------------------------------------------------------------
-
 /**
  *
  *

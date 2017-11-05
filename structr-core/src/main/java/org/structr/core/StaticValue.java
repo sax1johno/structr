@@ -34,7 +34,7 @@ public class StaticValue<T> implements Value<T> {
 	public StaticValue(T value) {
 		this.value = value;
 	}
-	
+
 	@Override
 	public void set(SecurityContext securityContext, T value) {
 		this.value = value;
@@ -42,6 +42,14 @@ public class StaticValue<T> implements Value<T> {
 
 	@Override
 	public T get(SecurityContext securityContext) {
+		return value;
+	}
+
+	public void set(T value) {
+		this.value = value;
+	}
+
+	public T get() {
 		return value;
 	}
 }

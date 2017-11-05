@@ -18,19 +18,16 @@
  */
 package org.structr.web.entity.html;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.structr.common.PropertyView;
 import org.structr.common.View;
 import org.structr.core.property.Property;
 import org.structr.web.common.HtmlProperty;
 import org.structr.web.entity.LinkSource;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
  *
  */
-public class Img extends LinkSource {
+public interface Img extends LinkSource {
 
 	public static final Property<String> _alt         = new HtmlProperty("alt");
 	public static final Property<String> _src         = new HtmlProperty("src");
@@ -39,37 +36,25 @@ public class Img extends LinkSource {
 	public static final Property<String> _ismap       = new HtmlProperty("ismap");
 	public static final Property<String> _width       = new HtmlProperty("width");
 	public static final Property<String> _height      = new HtmlProperty("height");
-	
-//	public static final EndNodes<Div> divs = new EndNodes<Div>("divs", Div.class, RelType.CONTAINS, Direction.INCOMING, false);
-//	public static final EndNodes<P>   ps   = new EndNodes<P>("ps", P.class, RelType.CONTAINS, Direction.INCOMING, false);
-//	public static final EndNodes<A>   as   = new EndNodes<A>("as", A.class, RelType.CONTAINS, Direction.INCOMING, false);
-	
+
 	public static final View htmlView = new View(Img.class, PropertyView.Html,
 	    _alt, _src, _crossorigin, _usemap, _ismap, _width, _height
 	);
 
-	//~--- methods --------------------------------------------------------
-
+	/*
 	@Override
 	public boolean avoidWhitespace() {
-
 		return true;
-
 	}
-
-	//~--- get methods ----------------------------------------------------
 
 	@Override
 	public boolean isVoidElement() {
-
 		return true;
-
 	}
 
 	@Override
 	public Property[] getHtmlAttributes() {
-
 		return (Property[]) ArrayUtils.addAll(super.getHtmlAttributes(), htmlView.properties());
-
 	}
+	*/
 }

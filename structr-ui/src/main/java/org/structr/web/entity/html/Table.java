@@ -20,14 +20,8 @@ package org.structr.web.entity.html;
 
 import org.structr.web.entity.dom.DOMElement;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
  *
  */
-public class Table extends DOMElement {
-
-//	public static final EndNodes<Tr>    trs    = new EndNodes<Tr>("trs", Tr.class, RelType.CONTAINS, Direction.OUTGOING, false);
-//	public static final EndNodes<Thead> theads = new EndNodes<Thead>("theads", Thead.class, RelType.CONTAINS, Direction.OUTGOING, false);
-//	public static final EndNodes<Tbody> tbodys = new EndNodes<Tbody>("tbodys", Tbody.class, RelType.CONTAINS, Direction.OUTGOING, false);
+public interface Table extends DOMElement {
 }

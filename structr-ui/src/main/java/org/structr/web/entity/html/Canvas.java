@@ -27,12 +27,12 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Canvas extends DOMElement {
+public interface Canvas extends DOMElement {
 
-	public static final Property<String> _width       = new HtmlProperty("width");
-	public static final Property<String> _height      = new HtmlProperty("height");
+	public static final Property<String> _width  = new HtmlProperty("width");
+	public static final Property<String> _height = new HtmlProperty("height");
 
-	public static final View htmlView = new View(Img.class, PropertyView.Html,
+	public static final View htmlView = new View(Canvas.class, PropertyView.Html,
 	    _width, _height
 	);
 }

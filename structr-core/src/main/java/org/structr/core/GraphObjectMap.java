@@ -19,9 +19,7 @@
 package org.structr.core;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -32,8 +30,6 @@ import org.structr.common.SecurityContext;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.graph.ModificationQueue;
-import org.structr.core.graph.NodeInterface;
-import org.structr.core.graph.RelationshipInterface;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.core.script.Scripting;
@@ -280,12 +276,6 @@ public class GraphObjectMap extends PropertyMap implements GraphObject {
 		return null;
 	}
 
-	// ----- Cloud synchronization and replication -----
-	@Override
-	public List<GraphObject> getSyncData() {
-		return Collections.EMPTY_LIST;
-	}
-
 	@Override
 	public boolean isNode() {
 		return false;
@@ -294,15 +284,5 @@ public class GraphObjectMap extends PropertyMap implements GraphObject {
 	@Override
 	public boolean isRelationship() {
 		return false;
-	}
-
-	@Override
-	public NodeInterface getSyncNode() {
-		return null;
-	}
-
-	@Override
-	public RelationshipInterface getSyncRelationship() {
-		return null;
 	}
 }

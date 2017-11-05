@@ -40,7 +40,7 @@ import org.structr.core.graph.MaintenanceCommand;
 import org.structr.core.graph.NodeServiceCommand;
 import org.structr.core.graph.Tx;
 import org.structr.rest.resource.MaintenanceParameterResource;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 
 //~--- classes ----------------------------------------------------------------
 /**
@@ -83,15 +83,15 @@ public class BulkMoveUnusedFilesCommand extends NodeServiceCommand implements Ma
 
 		if (graphDb != null) {
 
-			List<FileBase> fileNodes = null;
+			List<File> fileNodes = null;
 
 			try (final Tx tx = StructrApp.getInstance().tx()) {
 
-				fileNodes = app.nodeQuery(FileBase.class).getAsList();
+				fileNodes = app.nodeQuery(File.class).getAsList();
 
-				for (final FileBase fileNode : fileNodes) {
+				for (final File fileNode : fileNodes) {
 
-					final String relativeFilePath = fileNode.getProperty(FileBase.relativeFilePath);
+					final String relativeFilePath = fileNode.getProperty(File.relativeFilePath);
 
 					if (relativeFilePath != null) {
 						filePaths.add(relativeFilePath);

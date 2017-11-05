@@ -84,7 +84,7 @@ public class ValidationHelper {
 
 		}
 
-		errorBuffer.add(new EmptyPropertyToken(type, key));
+		errorBuffer.add(new EmptyPropertyToken(type, key, node.getUuid()));
 		return false;
 	}
 
@@ -105,7 +105,7 @@ public class ValidationHelper {
 			return true;
 		}
 
-		errorBuffer.add(new EmptyPropertyToken(node.getType(), key));
+		errorBuffer.add(new EmptyPropertyToken(node.getType(), key, node.getUuid()));
 
 		return false;
 	}
@@ -125,7 +125,7 @@ public class ValidationHelper {
 		final String type  = node.getType();
 		if (key == null) {
 
-			errorBuffer.add(new EmptyPropertyToken(type, UnknownType));
+			errorBuffer.add(new EmptyPropertyToken(type, UnknownType, node.getUuid()));
 			return false;
 		}
 
@@ -146,7 +146,7 @@ public class ValidationHelper {
 			}
 		}
 
-		errorBuffer.add(new EmptyPropertyToken(type, key));
+		errorBuffer.add(new EmptyPropertyToken(type, key, node.getUuid()));
 
 		return false;
 	}

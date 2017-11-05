@@ -42,7 +42,7 @@ public class TestTwo extends AbstractNode {
 
 			if (getTestOne() == null) {
 
-				errorBuffer.add(new EmptyPropertyToken(TestTwo.class.getSimpleName(), testOne));
+				errorBuffer.add(new EmptyPropertyToken(TestTwo.class.getSimpleName(), testOne, getUuid()));
 
 				return false;
 			}

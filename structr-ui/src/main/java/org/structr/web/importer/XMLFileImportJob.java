@@ -34,13 +34,13 @@ import org.structr.core.Services;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.Principal;
 import org.structr.core.graph.Tx;
 import org.structr.core.property.PropertyMap;
 import org.structr.module.StructrModule;
 import org.structr.module.xml.XMLModule;
 import org.structr.rest.common.XMLHandler;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
+import org.structr.core.entity.Principal;
 
 public class XMLFileImportJob extends ImportJob {
 
@@ -48,7 +48,7 @@ public class XMLFileImportJob extends ImportJob {
 
 	private String contentType;
 
-	public XMLFileImportJob(FileBase file, Principal user, Map<String, Object> configuration) throws FrameworkException {
+	public XMLFileImportJob(File file, Principal user, Map<String, Object> configuration) throws FrameworkException {
 		super(file, user, configuration);
 
 		contentType = file.getContentType();

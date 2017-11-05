@@ -59,17 +59,16 @@ import org.structr.core.GraphObject;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.Principal;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.Tx;
 import org.structr.core.property.PropertyMap;
-import org.structr.dynamic.File;
 import org.structr.files.cmis.wrapper.CMISContentStream;
 import org.structr.files.cmis.wrapper.CMISPagingListWrapper;
 import org.structr.web.common.FileHelper;
 import org.structr.web.entity.AbstractFile;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Folder;
+import org.structr.core.entity.Principal;
 
 /**
  *
@@ -87,7 +86,7 @@ public class CMISObjectService extends AbstractStructrCmisService implements Obj
 	public String createDocument(final String repositoryId, final Properties properties, final String folderId, final ContentStream contentStream, final VersioningState versioningState, final List<String> policies, final Acl addAces, final Acl removeAces, final ExtensionsData extension) {
 
 		final App app = StructrApp.getInstance(securityContext);
-		FileBase newFile  = null;
+		File newFile  = null;
 		String uuid       = null;
 
 		try (final Tx tx = app.tx()) {
@@ -176,7 +175,7 @@ public class CMISObjectService extends AbstractStructrCmisService implements Obj
 
 		try (final Tx tx = app.tx()) {
 
-			final FileBase existingDocument = app.get(FileBase.class, sourceId);
+			final File existingDocument = app.get(File.class, sourceId);
 			if (existingDocument != null) {
 
 				try (final InputStream inputStream = existingDocument.getInputStream()) {
@@ -372,7 +371,7 @@ public class CMISObjectService extends AbstractStructrCmisService implements Obj
 
 		try (final Tx tx = app.tx()) {
 
-			final FileBase file = app.get(FileBase.class, objectId);
+			final File file = app.get(File.class, objectId);
 			if (file != null) {
 
 				return new CMISContentStream(file, offset, length);
@@ -466,8 +465,8 @@ public class CMISObjectService extends AbstractStructrCmisService implements Obj
 			final App app = StructrApp.getInstance(securityContext);
 			try (final Tx tx = app.tx()) {
 
-				final FileBase file = get(app, FileBase.class, objectId.getValue());
-				final Folder parent = file.getProperty(FileBase.parent);
+				final File file = get(app, File.class, objectId.getValue());
+				final Folder parent = file.getProperty(File.parent);
 
 				// check if the file to be moved is filed in the root folder (=> null parent)
 				if (CMISInfo.ROOT_FOLDER_ID.equals(sourceFolderId) && parent != null) {
@@ -483,12 +482,12 @@ public class CMISObjectService extends AbstractStructrCmisService implements Obj
 				if (CMISInfo.ROOT_FOLDER_ID.equals(targetFolderId)) {
 
 					// root folder => null parent
-					file.setProperties(securityContext, new PropertyMap(FileBase.parent, null));
+					file.setProperties(securityContext, new PropertyMap(File.parent, null));
 
 				} else {
 
 					// get will throw an exception if the folder doesn't exist
-					file.setProperties(securityContext, new PropertyMap(FileBase.parent, get(app, Folder.class, targetFolderId)));
+					file.setProperties(securityContext, new PropertyMap(File.parent, get(app, Folder.class, targetFolderId)));
 
 				}
 
@@ -519,16 +518,7 @@ public class CMISObjectService extends AbstractStructrCmisService implements Obj
 
 				if (principal.isGranted(Permission.delete, securityContext)) {
 
-					if (obj.isNode()) {
-
-						// getSyncNode() returns the node or null
-						app.delete(obj.getSyncNode());
-
-					} else {
-
-						// getSyncRelationship() return the relationship or null
-						app.delete(obj.getSyncRelationship());
-					}
+					app.delete(obj);
 
 				} else {
 

@@ -18,19 +18,9 @@
  */
 package org.structr.web.entity.dom;
 
-import java.util.List;
 import org.structr.common.PropertyView;
-import org.structr.common.error.FrameworkException;
-import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.AbstractRelationship;
-import org.structr.web.common.AsyncBuffer;
-import org.structr.web.common.RenderContext;
-import org.structr.web.common.RenderContext.EditMode;
-import org.structr.web.entity.dom.relationship.DOMChildren;
 
-
-
-public class Template extends Content {
+public interface Template extends Content {
 
 	public static final org.structr.common.View uiView                                   = new org.structr.common.View(Content.class, PropertyView.Ui,
 		children, childrenIds, content, contentType, parent, pageId, hideOnDetail, hideOnIndex, sharedComponent, syncedNodes, dataKey, restQuery, cypherQuery, xpathQuery, functionQuery,
@@ -42,6 +32,7 @@ public class Template extends Content {
 		showForLocales, hideForLocales, showConditions, hideConditions, isContent
 	);
 
+	/*
 	@Override
 	public void renderContent(final RenderContext renderContext, final int depth) throws FrameworkException {
 
@@ -104,4 +95,5 @@ public class Template extends Content {
 			super.renderContent(renderContext, depth);
 		}
 	}
+	*/
 }

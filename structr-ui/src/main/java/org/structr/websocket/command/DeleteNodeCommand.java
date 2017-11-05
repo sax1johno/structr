@@ -27,7 +27,6 @@ import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
-import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.LinkedTreeNode;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.Tx;
@@ -37,7 +36,6 @@ import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
 import org.w3c.dom.DOMException;
 
-//~--- classes ----------------------------------------------------------------
 /**
  * Websocket command to delete a single node.
  */
@@ -46,12 +44,9 @@ public class DeleteNodeCommand extends AbstractCommand {
 	private static final Logger logger = LoggerFactory.getLogger(DeleteNodeCommand.class.getName());
 
 	static {
-
 		StructrWebSocket.addCommand(DeleteNodeCommand.class);
-
 	}
 
-	//~--- methods --------------------------------------------------------
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
@@ -74,8 +69,7 @@ public class DeleteNodeCommand extends AbstractCommand {
 	protected static void deleteNode(final StructrWebSocket ws, final NodeInterface obj, final Boolean recursive) {
 
 		final SecurityContext securityContext = ws.getSecurityContext();
-		
-		final App app = StructrApp.getInstance(securityContext);
+		final App app                         = StructrApp.getInstance(securityContext);
 
 		try (final Tx tx = app.tx()) {
 
@@ -98,7 +92,7 @@ public class DeleteNodeCommand extends AbstractCommand {
 			// Remove all child nodes first
 			try {
 
-				final List<AbstractNode> filteredResults = new LinkedList();
+				final List<NodeInterface> filteredResults = new LinkedList();
 				if (obj instanceof DOMNode) {
 
 					DOMNode node = (DOMNode) obj;
@@ -138,7 +132,7 @@ public class DeleteNodeCommand extends AbstractCommand {
 			logger.warn("Unable to delete node(s)", fex);
 		}
 	}
-	
+
 	//~--- get methods ----------------------------------------------------
 	@Override
 	public String getCommand() {

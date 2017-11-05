@@ -23,22 +23,14 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class G extends DOMElement {
-//
-//	static {
-//
-//		StructrApp.getConfiguration().registerPropertySet(G.class, PropertyView.All, HtmlElement.UiKey.values());
-//		StructrApp.getConfiguration().registerPropertySet(G.class, PropertyView.Public, HtmlElement.UiKey.values());
-//		StructrApp.getConfiguration().registerPropertySet(G.class, PropertyView.Html, PropertyView.Html, htmlAttributes);
-//
-//	}
+public interface G extends DOMElement {
 
-	//~--- methods --------------------------------------------------------
-
+	/*
 	@Override
 	public boolean avoidWhitespace() {
 
 		return true;
 
 	}
+	*/
 }

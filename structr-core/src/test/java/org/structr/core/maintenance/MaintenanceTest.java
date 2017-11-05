@@ -43,7 +43,6 @@ import org.structr.api.util.Iterables;
 import org.structr.common.StructrTest;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.Result;
-import org.structr.core.entity.Group;
 import org.structr.core.entity.TestEleven;
 import org.structr.core.entity.TestOne;
 import org.structr.core.entity.TestTwo;
@@ -52,6 +51,7 @@ import org.structr.core.graph.BulkRebuildIndexCommand;
 import org.structr.core.graph.BulkSetNodePropertiesCommand;
 import org.structr.core.graph.SyncCommand;
 import org.structr.core.graph.Tx;
+import org.structr.core.entity.Group;
 
 /**
  *

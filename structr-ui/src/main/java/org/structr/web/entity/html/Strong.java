@@ -23,22 +23,14 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Strong extends DOMElement {
-//
-//	static {
-//
-//		StructrApp.getConfiguration().registerPropertySet(Strong.class, PropertyView.All, HtmlElement.UiKey.values());
-//		StructrApp.getConfiguration().registerPropertySet(Strong.class, PropertyView.Public, HtmlElement.UiKey.values());
-//		StructrApp.getConfiguration().registerPropertySet(Strong.class, PropertyView.Html, PropertyView.Html, htmlAttributes);
-//
-//	}
+public interface Strong extends DOMElement {
 
-	//~--- methods --------------------------------------------------------
-
+	/*
 	@Override
 	public boolean avoidWhitespace() {
 
 		return true;
 
 	}
+	*/
 }

@@ -36,17 +36,16 @@ import org.structr.core.entity.ManyEndpoint;
 import org.structr.core.entity.ManyStartpoint;
 import org.structr.core.entity.OneEndpoint;
 import org.structr.core.entity.OneStartpoint;
-import org.structr.core.entity.Principal;
 import org.structr.core.entity.Relation;
 import org.structr.core.entity.Security;
 import org.structr.core.entity.Source;
 import org.structr.core.entity.Target;
 import org.structr.core.graph.ModificationQueue;
 import org.structr.core.graph.NodeInterface;
-import org.structr.core.graph.RelationshipInterface;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.schema.action.ActionContext;
+import org.structr.core.entity.Principal;
 
 /**
  * A container that is used internally to combine a related node (determined
@@ -180,6 +179,11 @@ public class EntityAndPropertiesContainer implements NodeInterface {
 
 	@Override
 	public long getId() {
+		throw new UnsupportedOperationException("Not supported by this container.");
+	}
+
+	@Override
+	public Long getNodeId() {
 		throw new UnsupportedOperationException("Not supported by this container.");
 	}
 
@@ -349,27 +353,12 @@ public class EntityAndPropertiesContainer implements NodeInterface {
 	}
 
 	@Override
-	public List<GraphObject> getSyncData() throws FrameworkException {
-		throw new UnsupportedOperationException("Not supported by this container.");
-	}
-
-	@Override
 	public boolean isNode() {
 		throw new UnsupportedOperationException("Not supported by this container.");
 	}
 
 	@Override
 	public boolean isRelationship() {
-		throw new UnsupportedOperationException("Not supported by this container.");
-	}
-
-	@Override
-	public NodeInterface getSyncNode() {
-		throw new UnsupportedOperationException("Not supported by this container.");
-	}
-
-	@Override
-	public RelationshipInterface getSyncRelationship() {
 		throw new UnsupportedOperationException("Not supported by this container.");
 	}
 
@@ -450,6 +439,31 @@ public class EntityAndPropertiesContainer implements NodeInterface {
 
 	@Override
 	public Class getEntityType() {
+		throw new UnsupportedOperationException("Not supported by this container.");
+	}
+
+	@Override
+	public List<Security> getSecurityRelationships() {
+		throw new UnsupportedOperationException("Not supported by this container.");
+	}
+
+	@Override
+	public <A extends NodeInterface, B extends NodeInterface, S extends Source, T extends Target> boolean hasRelationship(Class<? extends Relation<A, B, S, T>> type) {
+		throw new UnsupportedOperationException("Not supported by this container.");
+	}
+
+	@Override
+	public <A extends NodeInterface, B extends NodeInterface, S extends Source, T extends Target, R extends Relation<A, B, S, T>> boolean hasIncomingRelationships(Class<R> type) {
+		throw new UnsupportedOperationException("Not supported by this container.");
+	}
+
+	@Override
+	public <A extends NodeInterface, B extends NodeInterface, S extends Source, T extends Target, R extends Relation<A, B, S, T>> boolean hasOutgoingRelationships(Class<R> type) {
+		throw new UnsupportedOperationException("Not supported by this container.");
+	}
+
+	@Override
+	public <A extends NodeInterface, B extends NodeInterface, T extends Target, R extends Relation<A, B, ManyStartpoint<A>, T>> R getOutgoingRelationshipAsSuperUser(Class<R> type) {
 		throw new UnsupportedOperationException("Not supported by this container.");
 	}
 }

@@ -40,7 +40,6 @@ import org.structr.common.ValidationHelper;
 import org.structr.common.View;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.GraphObject;
 import org.structr.core.Services;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
@@ -71,36 +70,37 @@ import org.structr.schema.parser.Validator;
  */
 public class SchemaNode extends AbstractSchemaNode {
 
-	private static final Logger logger = LoggerFactory.getLogger(SchemaNode.class.getName());
+	private static final Logger logger                   = LoggerFactory.getLogger(SchemaNode.class.getName());
 
 	private static final Set<String> EntityNameBlacklist = new LinkedHashSet<>(Arrays.asList(new String[] {
 		"Relation"
 	}));
 
-	public static final Property<List<SchemaRelationshipNode>> relatedTo        = new EndNodes<>("relatedTo", SchemaRelationshipSourceNode.class);
-	public static final Property<List<SchemaRelationshipNode>> relatedFrom      = new StartNodes<>("relatedFrom", SchemaRelationshipTargetNode.class);
-	public static final Property<String>                       extendsClass     = new StringProperty("extendsClass").indexed();
-	public static final Property<String>                       defaultSortKey   = new StringProperty("defaultSortKey");
-	public static final Property<String>                       defaultSortOrder = new StringProperty("defaultSortOrder");
-	public static final Property<Boolean>                      isBuiltinType    = new BooleanProperty("isBuiltinType").readOnly().indexed();
-	public static final Property<Integer>                      hierarchyLevel   = new IntProperty("hierarchyLevel").indexed();
-	public static final Property<Integer>                      relCount         = new IntProperty("relCount").indexed();
-	public static final Property<Boolean>                      shared           = new BooleanProperty("shared").indexed();
+	public static final Property<List<SchemaRelationshipNode>> relatedTo            = new EndNodes<>("relatedTo", SchemaRelationshipSourceNode.class);
+	public static final Property<List<SchemaRelationshipNode>> relatedFrom          = new StartNodes<>("relatedFrom", SchemaRelationshipTargetNode.class);
+	public static final Property<String>                       extendsClass         = new StringProperty("extendsClass").indexed();
+	public static final Property<String>                       implementsInterfaces = new StringProperty("implementsInterfaces");
+	public static final Property<String>                       defaultSortKey       = new StringProperty("defaultSortKey");
+	public static final Property<String>                       defaultSortOrder     = new StringProperty("defaultSortOrder");
+	public static final Property<Boolean>                      isBuiltinType        = new BooleanProperty("isBuiltinType").readOnly().indexed();
+	public static final Property<Integer>                      hierarchyLevel       = new IntProperty("hierarchyLevel").indexed();
+	public static final Property<Integer>                      relCount             = new IntProperty("relCount").indexed();
+	public static final Property<Boolean>                      shared               = new BooleanProperty("shared").indexed();
 
 	public static final View defaultView = new View(SchemaNode.class, PropertyView.Public,
-		extendsClass, relatedTo, relatedFrom, defaultSortKey, defaultSortOrder, isBuiltinType, hierarchyLevel, relCount
+		extendsClass, implementsInterfaces, relatedTo, relatedFrom, defaultSortKey, defaultSortOrder, isBuiltinType, hierarchyLevel, relCount
 	);
 
 	public static final View uiView = new View(SchemaNode.class, PropertyView.Ui,
-		name, extendsClass, relatedTo, relatedFrom, defaultSortKey, defaultSortOrder, isBuiltinType, hierarchyLevel, relCount
+		name, extendsClass, implementsInterfaces, relatedTo, relatedFrom, defaultSortKey, defaultSortOrder, isBuiltinType, hierarchyLevel, relCount
 	);
 
 	public static final View schemaView = new View(SchemaNode.class, "schema",
-		name, extendsClass, relatedTo, relatedFrom, defaultSortKey, defaultSortOrder, isBuiltinType, hierarchyLevel, relCount
+		name, extendsClass, implementsInterfaces, relatedTo, relatedFrom, defaultSortKey, defaultSortOrder, isBuiltinType, hierarchyLevel, relCount
 	);
 
 	public static final View exportView = new View(SchemaNode.class, "export",
-		extendsClass, defaultSortKey, defaultSortOrder, isBuiltinType, hierarchyLevel, relCount
+		extendsClass, implementsInterfaces, defaultSortKey, defaultSortOrder, isBuiltinType, hierarchyLevel, relCount
 	);
 
 	private final Set<String> dynamicViews = new LinkedHashSet<>();
@@ -159,23 +159,35 @@ public class SchemaNode extends AbstractSchemaNode {
 		final Set<String> compoundIndexKeys                    = new LinkedHashSet<>();
 		final Set<String> propertyNames                        = new LinkedHashSet<>();
 		final Set<Validator> validators                        = new LinkedHashSet<>();
+		final Set<Class> implementedInterfaces                 = new LinkedHashSet<>();
+		final List<String> importStatements                    = new LinkedList<>();
 		final Set<String> enums                                = new LinkedHashSet<>();
 		final StringBuilder src                                = new StringBuilder();
+		final StringBuilder mixinCodeBuffer                    = new StringBuilder();
 		final Class baseType                                   = AbstractNode.class;
 		final String _className                                = getProperty(name);
 		final String _extendsClass                             = getProperty(extendsClass);
 		final String superClass                                = _extendsClass != null ? _extendsClass : baseType.getSimpleName();
 
+		// import mixins
+		SchemaHelper.importMixins(this, implementedInterfaces, importStatements, mixinCodeBuffer);
+
 		src.append("package org.structr.dynamic;\n\n");
 
-		SchemaHelper.formatImportStatements(this, src, baseType);
+		// include import statements from mixins
+		SchemaHelper.formatImportStatements(this, src, baseType, importStatements);
 
 		src.append("public class ");
 		src.append(_className);
 		src.append(" extends ");
 		src.append(superClass);
 
-		SchemaHelper.formatInterfacesFromModules(src, this);
+		// output implemented interfaces
+		if (!implementedInterfaces.isEmpty()) {
+
+			src.append(" implements ");
+			src.append(StringUtils.join(implementedInterfaces.stream().map((final Class element) -> element.getName()).iterator(), ", "));
+		}
 
 		src.append(" {\n\n");
 
@@ -293,6 +305,9 @@ public class SchemaNode extends AbstractSchemaNode {
 
 		SchemaHelper.formatValidators(src, validators, compoundIndexKeys);
 		SchemaHelper.formatSaveActions(this, src, saveActions);
+
+		// insert dynamic code here
+		src.append(mixinCodeBuffer);
 
 		// insert source code from module
 		for (final StructrModule module : modules) {
@@ -502,7 +517,7 @@ public class SchemaNode extends AbstractSchemaNode {
 
 			src.append("package org.structr.dynamic;\n\n");
 
-			SchemaHelper.formatImportStatements(this, src, AbstractNode.class);
+			SchemaHelper.formatImportStatements(this, src, AbstractNode.class, Collections.emptyList());
 
 			src.append("public class _").append(_className).append("Helper {\n");
 
@@ -597,31 +612,5 @@ public class SchemaNode extends AbstractSchemaNode {
 				throw new FrameworkException(422, "Type '" + typeName + "' already exists. To prevent unwanted/unexpected behavior this is forbidden.");
 			}
 		}
-	}
-
-	// ----- interface GraphObject -----
-	@Override
-	public List<GraphObject> getSyncData() throws FrameworkException {
-
-		final List<GraphObject> data = super.getSyncData();
-
-		// special SchemaNode behaviour when syncing:
-		// the schema needs to be transferred as a whole
-		// because the individual nodes and relationships
-		// depend on each other, so each schema node adds
-		// all other schema nodes to its list.
-		data.addAll(StructrApp.getInstance(securityContext).nodeQuery(SchemaNode.class).getAsList());
-
-		// outgoing relationships
-		for (final SchemaRelationshipNode rel : getProperty(SchemaNode.relatedTo)) {
-			data.add(rel);
-		}
-
-		// incoming relationships
-		for (final SchemaRelationshipNode rel : getProperty(SchemaNode.relatedFrom)) {
-			data.add(rel);
-		}
-
-		return data;
 	}
 }

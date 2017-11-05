@@ -18,12 +18,18 @@
  */
 package org.structr.core.entity;
 
+import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import org.apache.commons.lang3.ArrayUtils;
 import org.structr.common.AccessControllable;
 import org.structr.common.ValidationHelper;
 import org.structr.common.error.ErrorBuffer;
+import org.structr.common.error.FrameworkException;
 import org.structr.common.error.SemanticErrorToken;
+import org.structr.core.auth.HashHelper;
+import org.structr.core.entity.relationship.Groups;
 import org.structr.core.entity.relationship.PrincipalOwnsNode;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.property.ArrayProperty;
@@ -32,11 +38,13 @@ import org.structr.core.property.EndNodes;
 import org.structr.core.property.LowercaseStringProperty;
 import org.structr.core.property.PasswordProperty;
 import org.structr.core.property.Property;
+import org.structr.core.property.PropertyMap;
 import org.structr.core.property.StringProperty;
 
 public interface Principal extends NodeInterface, AccessControllable {
 
-	public static final String SUPERUSER_ID =                    "00000000000000000000000000000000";
+	public static final Object HIDDEN                            = "****** HIDDEN ******";
+	public static final String SUPERUSER_ID                      = "00000000000000000000000000000000";
 	public static final String ANONYMOUS                         = "anonymous";
 	public static final String ANYONE                            = "anyone";
 
@@ -55,21 +63,128 @@ public interface Principal extends NodeInterface, AccessControllable {
 	public static final Property<String> proxyUsername           = new StringProperty("proxyUsername");
 	public static final Property<String> proxyPassword           = new StringProperty("proxyPassword");
 
-	public List<Principal> getParents();
+	default void addSessionId(final String sessionId) {
 
-	public boolean isValidPassword(final String password);
-	public String getEncryptedPassword();
-	public String getSalt();
+		try {
 
-	public void addSessionId(final String sessionId);
+			final String[] ids = getProperty(Principal.sessionIds);
+			if (ids != null) {
 
-	public void removeSessionId(final String sessionId);
+				if (!ArrayUtils.contains(ids, sessionId)) {
 
-	public boolean isAdmin();
-	public boolean shouldSkipSecurityRelationships();
+					setProperty(Principal.sessionIds, (String[]) ArrayUtils.add(getProperty(Principal.sessionIds), sessionId));
+				}
 
-	public Set<String> getAllowedPermissions();
-	public Set<String> getDeniedPermissions();
+			} else {
+
+				setProperty(Principal.sessionIds, new String[] {  sessionId } );
+			}
+
+		} catch (FrameworkException ex) {
+			logger.error("Could not add sessionId " + sessionId + " to array of sessionIds", ex);
+		}
+	}
+
+	default void removeSessionId(final String sessionId) {
+
+		try {
+
+			final String[] ids = getProperty(Principal.sessionIds);
+			List<String> newSessionIds = new ArrayList<>();
+
+			if (ids != null) {
+
+				for (final String id : ids) {
+
+					if (!id.equals(sessionId)) {
+
+						newSessionIds.add(id);
+					}
+				}
+			}
+
+			setProperties(getSecurityContext(), new PropertyMap(Principal.sessionIds, (String[]) newSessionIds.toArray(new String[newSessionIds.size()])));
+
+		} catch (FrameworkException ex) {
+			logger.error("Could not remove sessionId " + sessionId + " from array of sessionIds", ex);
+		}
+	}
+
+	default boolean isAdmin() {
+		return getProperty(Principal.isAdmin);
+	}
+
+	default List<Principal> getParents() {
+
+		List<Principal> parents = new LinkedList<>();
+
+		for (Groups rel : getIncomingRelationships(Groups.class)) {
+
+			if (rel != null && rel.getSourceNode() != null) {
+
+				parents.add(rel.getSourceNode());
+			}
+		}
+
+		return parents;
+	}
+
+	default boolean isValidPassword(final String password) {
+
+		final String encryptedPasswordFromDatabase = getEncryptedPassword();
+		if (encryptedPasswordFromDatabase != null) {
+
+			final String encryptedPasswordToCheck = HashHelper.getHash(password, getSalt());
+
+			if (encryptedPasswordFromDatabase.equals(encryptedPasswordToCheck)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	default String getEncryptedPassword() {
+
+		final org.structr.api.graph.Node dbNode = getNode();
+		if (dbNode.hasProperty(salt.dbName())) {
+
+			Object dbValue = dbNode.getProperty(password.dbName());
+
+			return (String) dbValue;
+
+		} else {
+
+			return null;
+		}
+	}
+
+	default String getSalt() {
+
+		final org.structr.api.graph.Node dbNode = getNode();
+		if (dbNode.hasProperty(salt.dbName())) {
+
+			Object dbValue = dbNode.getProperty(salt.dbName());
+
+			return (String) dbValue;
+
+		} else {
+
+			return null;
+		}
+	}
+
+	default Set<String> getAllowedPermissions() {
+		return null;
+	}
+
+	default Set<String> getDeniedPermissions() {
+		return null;
+	}
+
+	default boolean shouldSkipSecurityRelationships() {
+		return false;
+	}
 
 	@Override
 	default public boolean isValid(final ErrorBuffer errorBuffer) {

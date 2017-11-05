@@ -26,20 +26,20 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Time extends DOMElement {
+public interface Time extends DOMElement {
 
 	public static final Property<String> _datetime = new HtmlProperty("datetime");
 
 	public static final org.structr.common.View htmlView	= new org.structr.common.View(Time.class, PropertyView.Html,
 		_datetime
 	);
-	
-	//~--- methods --------------------------------------------------------
 
+	/*
 	@Override
 	public boolean avoidWhitespace() {
 
 		return false;
 
 	}
+	*/
 }

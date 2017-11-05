@@ -30,7 +30,6 @@ import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.Result;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.Principal;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.property.PropertyKey;
 import org.structr.rest.ResourceProvider;
@@ -39,6 +38,7 @@ import org.structr.schema.action.Function;
 import org.structr.web.entity.dom.DOMNode;
 import org.structr.web.entity.dom.Page;
 import org.structr.web.entity.html.relation.ResourceLink;
+import org.structr.core.entity.Principal;
 
 /**
  * Holds information about the context in which a resource is rendered, like

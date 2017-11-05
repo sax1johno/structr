@@ -23,5 +23,5 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Output extends DOMElement {
+public interface Output extends DOMElement {
 }

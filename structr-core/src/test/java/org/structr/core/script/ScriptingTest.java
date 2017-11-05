@@ -50,15 +50,13 @@ import org.structr.core.GraphObject;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.Group;
-import org.structr.core.entity.MailTemplate;
-import org.structr.core.entity.Principal;
 import org.structr.core.entity.SchemaMethod;
 import org.structr.core.entity.SchemaNode;
 import org.structr.core.entity.SchemaProperty;
 import org.structr.core.entity.SchemaRelationshipNode;
 import org.structr.core.entity.SuperUser;
 import org.structr.core.entity.TestFour;
+import org.structr.core.entity.TestMailTemplate;
 import org.structr.core.entity.TestOne;
 import org.structr.core.entity.TestOne.Status;
 import org.structr.core.entity.TestSix;
@@ -81,6 +79,9 @@ import org.structr.core.property.StringProperty;
 import org.structr.schema.ConfigurationProvider;
 import org.structr.schema.action.ActionContext;
 import org.structr.schema.action.Actions;
+import org.structr.core.entity.Principal;
+import org.structr.core.entity.MailTemplate;
+import org.structr.core.entity.Group;
 
 
 /**
@@ -683,13 +684,13 @@ public class ScriptingTest extends StructrTest {
 			}
 
 			// create mail template
-			template = createTestNode(MailTemplate.class);
+			template = createTestNode(TestMailTemplate.class);
 			template.setProperty(MailTemplate.name, "TEST");
 			template.setProperty(MailTemplate.locale, "en_EN");
 			template.setProperty(MailTemplate.text, "This is a template for ${this.name}");
 
 			// create mail template
-			template2 = createTestNode(MailTemplate.class);
+			template2 = createTestNode(TestMailTemplate.class);
 			template2.setProperty(MailTemplate.name, "TEST2");
 			template2.setProperty(MailTemplate.locale, "en_EN");
 			template2.setProperty(MailTemplate.text, "${this.aDouble}");

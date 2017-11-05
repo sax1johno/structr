@@ -21,24 +21,13 @@ package org.structr.web.entity.html;
 import org.structr.web.entity.dom.DOMElement;
 
 /**
- *
  */
-public class Abbr extends DOMElement {
+public interface Abbr extends DOMElement {
 
-//	static {
-//
-//		StructrApp.getConfiguration().registerPropertySet(Abbr.class, PropertyView.All, HtmlElement.UiKey.values());
-//		StructrApp.getConfiguration().registerPropertySet(Abbr.class, PropertyView.Public, HtmlElement.UiKey.values());
-//		StructrApp.getConfiguration().registerPropertySet(Abbr.class, PropertyView.Html, PropertyView.Html, htmlAttributes);
-//
-//	}
-
-	//~--- methods --------------------------------------------------------
-
+	/*
 	@Override
 	public boolean avoidWhitespace() {
-
 		return true;
-
 	}
+	*/
 }

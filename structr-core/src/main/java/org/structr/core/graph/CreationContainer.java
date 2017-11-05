@@ -19,7 +19,6 @@
 package org.structr.core.graph;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.structr.api.NotInTransactionException;
@@ -248,27 +247,12 @@ public class CreationContainer implements GraphObject, PropertyContainer {
 	}
 
 	@Override
-	public List<GraphObject> getSyncData() throws FrameworkException {
-		throw new UnsupportedOperationException("Not supported."); //To change body of generated methods, choose Tools | Templates.
-	}
-
-	@Override
 	public boolean isNode() {
 		throw new UnsupportedOperationException("Not supported."); //To change body of generated methods, choose Tools | Templates.
 	}
 
 	@Override
 	public boolean isRelationship() {
-		throw new UnsupportedOperationException("Not supported."); //To change body of generated methods, choose Tools | Templates.
-	}
-
-	@Override
-	public NodeInterface getSyncNode() {
-		throw new UnsupportedOperationException("Not supported."); //To change body of generated methods, choose Tools | Templates.
-	}
-
-	@Override
-	public RelationshipInterface getSyncRelationship() {
 		throw new UnsupportedOperationException("Not supported."); //To change body of generated methods, choose Tools | Templates.
 	}
 

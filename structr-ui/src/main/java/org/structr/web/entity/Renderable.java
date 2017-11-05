@@ -22,12 +22,10 @@ import org.structr.common.error.FrameworkException;
 import org.structr.web.common.RenderContext;
 
 /**
- *
- *
+ * Interface for HTML elements that produce output.
  */
 public interface Renderable {
 
 	public void render(RenderContext renderContext, int depth) throws FrameworkException;
 	public void renderContent(RenderContext renderContext, int depth) throws FrameworkException;
-
 }

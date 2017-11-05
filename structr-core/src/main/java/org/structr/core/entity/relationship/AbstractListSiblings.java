@@ -22,8 +22,6 @@ import org.structr.core.entity.LinkedListNode;
 import org.structr.core.entity.OneToOne;
 
 /**
- *
- *
  */
 public abstract class AbstractListSiblings<S extends LinkedListNode, T extends LinkedListNode> extends OneToOne<S, T> {
 

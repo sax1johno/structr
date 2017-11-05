@@ -43,12 +43,11 @@ import org.structr.core.graph.Tx;
 import org.structr.core.property.GenericProperty;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
-import org.structr.dynamic.File;
 import org.structr.web.common.FileHelper;
 import org.structr.web.common.ImageHelper;
 import org.structr.web.entity.AbstractFile;
 import org.structr.web.entity.AbstractMinifiedFile;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Folder;
 import org.structr.web.entity.Image;
 import org.structr.web.entity.relation.MinificationSource;
@@ -64,7 +63,7 @@ public class FileImportVisitor implements FileVisitor<Path> {
 	private SecurityContext securityContext = null;
 	private Path basePath                   = null;
 	private App app                         = null;
-	private List<FileBase> deferredFiles    = null;
+	private List<File> deferredFiles    = null;
 
 	public FileImportVisitor(final Path basePath, final Map<String, Object> config) {
 
@@ -114,7 +113,7 @@ public class FileImportVisitor implements FileVisitor<Path> {
 
 		if (!this.deferredFiles.isEmpty()) {
 
-			for (FileBase file : this.deferredFiles) {
+			for (File file : this.deferredFiles) {
 
 				try (final Tx tx = app.tx(true, false, false)) {
 
@@ -136,7 +135,7 @@ public class FileImportVisitor implements FileVisitor<Path> {
 
 						if (source != null) {
 
-							app.create(app.get(AbstractMinifiedFile.class, file.getUuid()), (FileBase)source, MinificationSource.class, new PropertyMap(MinificationSource.position, position));
+							app.create(app.get(AbstractMinifiedFile.class, file.getUuid()), (File)source, MinificationSource.class, new PropertyMap(MinificationSource.position, position));
 
 						} else {
 							logger.warn("Source file {} for minified file {} at position {} not found - please verify that it is included in the export", sourcePath, file.getPath(), positionString);
@@ -194,7 +193,7 @@ public class FileImportVisitor implements FileVisitor<Path> {
 
 			} else {
 
-				FileBase file = app.nodeQuery(FileBase.class).and(FileBase.parent, parent).and(FileBase.name, fileName).getFirst();
+				File file = app.nodeQuery(File.class).and(File.parent, parent).and(File.name, fileName).getFirst();
 
 				if (file != null) {
 
@@ -231,7 +230,7 @@ public class FileImportVisitor implements FileVisitor<Path> {
 						}
 
 						// move file to folder
-						file.setProperty(FileBase.parent, parent);
+						file.setProperty(File.parent, parent);
 
 						file.unlockSystemPropertiesOnce();
 						file.setProperties(securityContext, changedProperties);
@@ -262,7 +261,7 @@ public class FileImportVisitor implements FileVisitor<Path> {
 
 			if (newFileUuid != null) {
 
-				final FileBase createdFile = app.get(FileBase.class, newFileUuid);
+				final File createdFile = app.get(File.class, newFileUuid);
 				String type                = createdFile.getType();
 				boolean isImage            = createdFile.getProperty(Image.isImage);
 				boolean isThumbnail        = createdFile.getProperty(Image.isThumbnail);
@@ -337,7 +336,7 @@ public class FileImportVisitor implements FileVisitor<Path> {
 				final Path part   = it.next();
 				final String name = part.toString();
 
-				current = app.nodeQuery(Folder.class).andName(name).and(FileBase.parent, parent).getFirst();
+				current = app.nodeQuery(Folder.class).andName(name).and(File.parent, parent).getFirst();
 				if (current == null) {
 
 					current = app.create(Folder.class,

@@ -20,11 +20,11 @@ package org.structr.core.function;
 
 import org.structr.common.Permissions;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.entity.Principal;
 import org.structr.core.entity.Security;
 import org.structr.core.graph.NodeInterface;
 import org.structr.schema.action.ActionContext;
 import org.structr.schema.action.Function;
+import org.structr.core.entity.Principal;
 
 
 public class CopyPermissionsFunction extends Function<Object, Object> {

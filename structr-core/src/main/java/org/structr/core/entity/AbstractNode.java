@@ -27,9 +27,7 @@ import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -97,12 +95,8 @@ import org.structr.core.script.Scripting;
 import org.structr.schema.action.ActionContext;
 import org.structr.schema.action.Function;
 
-//~--- classes ----------------------------------------------------------------
 /**
  * Abstract base class for all node entities in structr.
- *
- *
- *
  */
 public abstract class AbstractNode implements NodeInterface, AccessControllable, CMISInfo, CMISItemInfo {
 
@@ -387,15 +381,6 @@ public abstract class AbstractNode implements NodeInterface, AccessControllable,
 		return cachedUuid;
 	}
 
-	public final Long getNodeId() {
-		return getId();
-
-	}
-
-	public final String getIdString() {
-		return Long.toString(getId());
-	}
-
 	/**
 	 * Indicates whether this node is visible to public users.
 	 *
@@ -412,53 +397,6 @@ public abstract class AbstractNode implements NodeInterface, AccessControllable,
 	 */
 	public final boolean getVisibleToAuthenticatedUsers() {
 		return getProperty(visibleToPublicUsers);
-	}
-
-	/**
-	 * Indicates whether this node is hidden.
-	 *
-	 * @return whether this node is hidden
-	 */
-	public final boolean getHidden() {
-		return getProperty(hidden);
-	}
-
-	/**
-	 * Indicates whether this node is deleted.
-	 *
-	 * @return whether this node is deleted
-	 */
-	public final boolean getDeleted() {
-		return getProperty(deleted);
-	}
-
-	/**
-	 * Returns the property set for the given view as an Iterable.
-	 *
-	 * @param propertyView
-	 * @return the property set for the given view
-	 */
-	@Override
-	public Set<PropertyKey> getPropertyKeys(final String propertyView) {
-
-		// check for custom view in content-type field
-		if (securityContext != null && securityContext.hasCustomView()) {
-
-			final Set<PropertyKey> keys = new LinkedHashSet<>(StructrApp.getConfiguration().getPropertySet(entityType, propertyView));
-			final Set<String> customView = securityContext.getCustomView();
-
-			for (Iterator<PropertyKey> it = keys.iterator(); it.hasNext();) {
-				if (!customView.contains(it.next().jsonName())) {
-
-					it.remove();
-				}
-			}
-
-			return keys;
-		}
-
-		// this is the default if no application/json; properties=[...] content-type header is present on the request
-		return StructrApp.getConfiguration().getPropertySet(entityType, propertyView);
 	}
 
 	/**
@@ -671,15 +609,8 @@ public abstract class AbstractNode implements NodeInterface, AccessControllable,
 		return new IterableAdapter<>(dbNode.getRelationships(), new RelationshipFactory<R>(SecurityContext.getSuperUserInstance()));
 	}
 
-	protected final <A extends NodeInterface, B extends NodeInterface, T extends Target, R extends Relation<A, B, ManyStartpoint<A>, T>> Iterable<R> getIncomingRelationshipsAsSuperUser(final Class<R> type) {
-
-		final RelationshipFactory<R> factory = new RelationshipFactory<>(SecurityContext.getSuperUserInstance());
-		final R template = getRelationshipForType(type);
-
-		return new IterableAdapter<>(template.getSource().getRawSource(SecurityContext.getSuperUserInstance(), dbNode, null), factory);
-	}
-
-	protected final <A extends NodeInterface, B extends NodeInterface, T extends Target, R extends Relation<A, B, ManyStartpoint<A>, T>> R getOutgoingRelationshipAsSuperUser(final Class<R> type) {
+	@Override
+	public final <A extends NodeInterface, B extends NodeInterface, T extends Target, R extends Relation<A, B, ManyStartpoint<A>, T>> R getOutgoingRelationshipAsSuperUser(final Class<R> type) {
 
 		final RelationshipFactory<R> factory = new RelationshipFactory<>(SecurityContext.getSuperUserInstance());
 		final R template                     = getRelationshipForType(type);
@@ -690,6 +621,14 @@ public abstract class AbstractNode implements NodeInterface, AccessControllable,
 		}
 
 		return null;
+	}
+
+	protected final <A extends NodeInterface, B extends NodeInterface, T extends Target, R extends Relation<A, B, ManyStartpoint<A>, T>> Iterable<R> getIncomingRelationshipsAsSuperUser(final Class<R> type) {
+
+		final RelationshipFactory<R> factory = new RelationshipFactory<>(SecurityContext.getSuperUserInstance());
+		final R template = getRelationshipForType(type);
+
+		return new IterableAdapter<>(template.getSource().getRawSource(SecurityContext.getSuperUserInstance(), dbNode, null), factory);
 	}
 
 	protected final <A extends NodeInterface, B extends NodeInterface, S extends Source, T extends Target, R extends Relation<A, B, S, T>> Iterable<R> getRelationshipsAsSuperUser(final Class<R> type) {
@@ -769,14 +708,17 @@ public abstract class AbstractNode implements NodeInterface, AccessControllable,
 	 * @param type
 	 * @return relationships
 	 */
+	@Override
 	public final <A extends NodeInterface, B extends NodeInterface, S extends Source, T extends Target> boolean hasRelationship(final Class<? extends Relation<A, B, S, T>> type) {
 		return this.getRelationships(type).iterator().hasNext();
 	}
 
+	@Override
 	public final <A extends NodeInterface, B extends NodeInterface, S extends Source, T extends Target, R extends Relation<A, B, S, T>> boolean hasIncomingRelationships(final Class<R> type) {
 		return getRelationshipForType(type).getSource().hasElements(securityContext, dbNode, null);
 	}
 
+	@Override
 	public final <A extends NodeInterface, B extends NodeInterface, S extends Source, T extends Target, R extends Relation<A, B, S, T>> boolean hasOutgoingRelationships(final Class<R> type) {
 		return getRelationshipForType(type).getTarget().hasElements(securityContext, dbNode, null);
 	}
@@ -1337,18 +1279,6 @@ public abstract class AbstractNode implements NodeInterface, AccessControllable,
 	}
 
 	// ----- end interface AccessControllable -----
-	public final boolean isNotDeleted() {
-
-		return !getDeleted();
-
-	}
-
-	@Override
-	public final boolean isDeleted() {
-
-		return getDeleted();
-
-	}
 
 	/**
 	 * Return true if node is the root node
@@ -1804,6 +1734,7 @@ public abstract class AbstractNode implements NodeInterface, AccessControllable,
 		}
 	}
 
+	@Override
 	public List<Security> getSecurityRelationships() {
 
 		final List<Security> grants = Iterables.toList(getIncomingRelationshipsAsSuperUser(Security.class));
@@ -1837,12 +1768,6 @@ public abstract class AbstractNode implements NodeInterface, AccessControllable,
 		return grants;
 	}
 
-	// ----- Cloud synchronization and replication -----
-	@Override
-	public List<GraphObject> getSyncData() throws FrameworkException {
-		return new ArrayList<>(); // provide a basis for super.getSyncData() calls
-	}
-
 	@Override
 	public final boolean isNode() {
 		return true;
@@ -1851,16 +1776,6 @@ public abstract class AbstractNode implements NodeInterface, AccessControllable,
 	@Override
 	public final boolean isRelationship() {
 		return false;
-	}
-
-	@Override
-	public final NodeInterface getSyncNode() {
-		return this;
-	}
-
-	@Override
-	public final RelationshipInterface getSyncRelationship() {
-		throw new ClassCastException(this.getClass() + " cannot be cast to org.structr.core.graph.RelationshipInterface");
 	}
 
 	// ----- CMIS support methods -----

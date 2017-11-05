@@ -19,35 +19,19 @@
 package org.structr.web.entity;
 
 import java.util.*;
-import javax.servlet.http.HttpServletRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.structr.common.PropertyView;
-import org.structr.common.error.FrameworkException;
-import org.structr.core.GraphObject;
-import org.structr.core.app.App;
-import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.AbstractRelationship;
-import org.structr.core.property.GenericProperty;
 import org.structr.core.property.IntProperty;
 import org.structr.core.property.Property;
-import org.structr.core.property.PropertyKey;
 import org.structr.core.property.StringProperty;
-import org.structr.schema.SchemaHelper;
-import org.structr.web.common.RenderContext;
-import org.structr.web.entity.dom.Content;
 import org.structr.web.entity.dom.DOMElement;
-import org.structr.web.entity.dom.DOMNode;
 
 /**
  * Represents a component. A component is an assembly of elements
  */
-public class Component extends DOMElement {
+public interface Component extends DOMElement {
 
-	private static final int MAX_DEPTH                          = 10;
 	public static final String REQUEST_CONTAINS_UUID_IDENTIFIER = "request_contains_uuids";
-	private static final Logger logger                          = LoggerFactory.getLogger(Component.class.getName());
 
 	public static final Property<Integer> position   = new IntProperty("position").indexed();
 	public static final Property<String>  kind       = new StringProperty("kind").indexed();
@@ -60,8 +44,12 @@ public class Component extends DOMElement {
 		type, name, kind
 	);
 
+	Map<String, AbstractNode> getContentNodes();
+
+	/*
 	private final Map<String, AbstractNode> contentNodes = new WeakHashMap<>();
 	private final Set<String> subTypes                   = new LinkedHashSet<>();
+
 
 	@Override
 	public void onNodeDeletion() {
@@ -169,9 +157,6 @@ public class Component extends DOMElement {
 		return super.getProperty(key);
 	}
 
-	public Map<String, AbstractNode> getContentNodes() {
-		return contentNodes;
-	}
 
 	private static boolean hasAttribute(HttpServletRequest request, String key) {
 		return (key != null) && (request.getAttribute(key) != null);
@@ -226,8 +211,6 @@ public class Component extends DOMElement {
 		return false;
 	}
 
-	//~--- set methods ----------------------------------------------------
-
 	@Override
 	public <T> Object setProperty(PropertyKey<T> key, T value) throws FrameworkException {
 
@@ -259,4 +242,5 @@ public class Component extends DOMElement {
 	public void render(RenderContext renderContext, int depth) throws FrameworkException {
 		super.render(renderContext, depth - 1);
 	}
+	*/
 }

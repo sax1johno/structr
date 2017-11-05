@@ -23,36 +23,30 @@ import org.structr.api.config.Settings;
 import org.structr.common.KeyAndClass;
 import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
-import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
-import org.structr.common.error.SemanticErrorToken;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
-import org.structr.core.entity.AbstractUser;
 import org.structr.core.entity.Favoritable;
-import org.structr.core.entity.Group;
-import static org.structr.core.entity.Principal.eMail;
+import org.structr.core.entity.Principal;
 import org.structr.core.entity.relationship.Groups;
-import org.structr.core.graph.ModificationQueue;
 import org.structr.core.graph.NodeAttribute;
 import org.structr.core.property.BooleanProperty;
 import org.structr.core.property.ConstantBooleanProperty;
 import org.structr.core.property.EndNode;
 import org.structr.core.property.EndNodes;
 import org.structr.core.property.Property;
-import org.structr.core.property.PropertyMap;
 import org.structr.core.property.StartNode;
 import org.structr.core.property.StartNodes;
 import org.structr.core.property.StringProperty;
-import org.structr.schema.SchemaService;
 import org.structr.web.entity.relation.UserFavoriteFavoritable;
 import org.structr.web.entity.relation.UserHomeDir;
 import org.structr.web.entity.relation.UserImage;
 import org.structr.web.entity.relation.UserWorkDir;
 import org.structr.web.property.ImageDataProperty;
 import org.structr.web.property.UiNotion;
+import org.structr.core.entity.Group;
 
-public class User extends AbstractUser {
+public interface User extends Principal {
 
 	public static final Property<String>            confirmationKey           = new StringProperty("confirmationKey").indexed();
 	public static final Property<Boolean>           backendUser               = new BooleanProperty("backendUser").indexed();
@@ -78,77 +72,18 @@ public class User extends AbstractUser {
 		type, name, isUser
 	);
 
-	static {
-
-		// register this type as an overridden builtin type
-		SchemaService.registerBuiltinTypeOverride("User", User.class.getName());
-	}
-
-	@Override
-	public boolean isValid(ErrorBuffer errorBuffer) {
-
-		if ( getProperty(skipSecurityRelationships).equals(Boolean.TRUE) && !isAdmin()) {
-
-			errorBuffer.add(new SemanticErrorToken(getClass().getSimpleName(), skipSecurityRelationships, "can_only_be_set_for_admin_accounts"));
-			return false;
-		}
-
-		return super.isValid(errorBuffer);
-	}
-
-
-	@Override
-	public boolean onCreation(SecurityContext securityContext, ErrorBuffer errorBuffer) throws FrameworkException {
-
-		if (super.onCreation(securityContext, errorBuffer)) {
-
-			checkAndCreateHomeDirectory(securityContext);
-
-			return true;
-		}
-
-		return false;
-	}
-
-	@Override
-	public boolean onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
-
-		if (super.onModification(securityContext, errorBuffer, modificationQueue)) {
-
-			checkAndCreateHomeDirectory(securityContext);
-
-			return true;
-		}
-
-		return false;
-	}
-
-	@Override
-	public boolean onDeletion(SecurityContext securityContext, ErrorBuffer errorBuffer, PropertyMap properties) throws FrameworkException {
-
-		if (super.onDeletion(securityContext, errorBuffer, properties)) {
-
-			checkAndRemoveHomeDirectory(securityContext);
-
-			return true;
-		}
-
-		return false;
-	}
-
-	// ----- private methods -----
-	private void checkAndCreateHomeDirectory(final SecurityContext securityContext) throws FrameworkException {
+	default void checkAndCreateHomeDirectory(final SecurityContext securityContext) throws FrameworkException {
 
 		if (Settings.FilesystemEnabled.getValue()) {
 
 			// use superuser context here
-			final SecurityContext storedContext = this.securityContext;
+			final SecurityContext storedContext = SecurityContext.getSuperUserInstance();
 
 			try {
 
-				this.securityContext = SecurityContext.getSuperUserInstance();
-				Folder homeDir = getProperty(User.homeDirectory);
+				setSecurityContext(SecurityContext.getSuperUserInstance());
 
+				Folder homeDir = getProperty(User.homeDirectory);
 				if (homeDir == null) {
 
 					// create home directory
@@ -179,21 +114,21 @@ public class User extends AbstractUser {
 			} finally {
 
 				// restore previous context
-				this.securityContext = storedContext;
+				setSecurityContext(storedContext);
 			}
 		}
 	}
 
-	private void checkAndRemoveHomeDirectory(final SecurityContext securityContext) throws FrameworkException {
+	default void checkAndRemoveHomeDirectory(final SecurityContext securityContext) throws FrameworkException {
 
 		if (Settings.FilesystemEnabled.getValue()) {
 
 			// use superuser context here
-			final SecurityContext storedContext = this.securityContext;
+			final SecurityContext storedContext = getSecurityContext();
 
 			try {
 
-				this.securityContext = SecurityContext.getSuperUserInstance();
+				setSecurityContext(SecurityContext.getSuperUserInstance());
 
 				final Folder homeDir = getProperty(User.homeDirectory);
 				if (homeDir != null) {
@@ -207,14 +142,14 @@ public class User extends AbstractUser {
 			} finally {
 
 				// restore previous context
-				this.securityContext = storedContext;
+				setSecurityContext(storedContext);
 			}
 
 		}
 	}
 
 	@Override
-	public boolean shouldSkipSecurityRelationships() {
+	default boolean shouldSkipSecurityRelationships() {
 		return getProperty(User.skipSecurityRelationships);
 	}
 }

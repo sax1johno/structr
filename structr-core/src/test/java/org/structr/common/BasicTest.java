@@ -45,10 +45,8 @@ import org.structr.core.entity.AbstractRelationship;
 import org.structr.core.entity.DynamicResourceAccess;
 import org.structr.core.entity.GenericNode;
 import org.structr.core.entity.GenericRelationship;
-import org.structr.core.entity.Group;
 import org.structr.core.entity.Localization;
 import org.structr.core.entity.Location;
-import org.structr.core.entity.MailTemplate;
 import org.structr.core.entity.OneThreeOneToOne;
 import org.structr.core.entity.OneTwoOneToOne;
 import org.structr.core.entity.Person;
@@ -79,6 +77,8 @@ import org.structr.core.graph.Tx;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.core.property.StringProperty;
+import org.structr.core.entity.MailTemplate;
+import org.structr.core.entity.Group;
 
 /**
  *
@@ -916,9 +916,9 @@ public class BasicTest extends StructrTest {
 
 					}
 
-					logger.info("Creating node of type {}", type);
-
 					NodeInterface node = app.create(type, props);
+
+					logger.info("Created node of type {} with ID {}", type, node.getUuid());
 
 					assertTrue(type.getSimpleName().equals(node.getProperty(AbstractNode.type)));
 
@@ -933,13 +933,13 @@ public class BasicTest extends StructrTest {
 				}
 			}
 
+			logger.info("Done.");
+
 			tx.success();
 
 		} catch (FrameworkException ex) {
 
-			logger.error(ex.toString());
-
-			logger.warn("", ex);
+			logger.error("Unable to commit transaction: {}", ex.getErrorBuffer().getErrorTokens());
 
 			fail("Unexpected exception");
 		}

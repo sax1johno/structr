@@ -42,9 +42,6 @@ import org.apache.chemistry.opencmis.commons.enums.BaseTypeId;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.structr.api.config.Settings;
 import org.structr.cmis.CMISInfo;
 import org.structr.cmis.info.CMISDocumentInfo;
 import org.structr.cmis.info.CMISFolderInfo;
@@ -54,9 +51,7 @@ import org.structr.cmis.info.CMISRelationshipInfo;
 import org.structr.cmis.info.CMISSecondaryInfo;
 import org.structr.common.Permission;
 import org.structr.common.PropertyView;
-import org.structr.common.SecurityContext;
 import org.structr.common.View;
-import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.common.error.UnlicensedException;
 import org.structr.common.fulltext.FulltextIndexer;
@@ -89,7 +84,6 @@ import org.structr.schema.action.JavaScriptSource;
 import org.structr.web.common.FileHelper;
 import org.structr.web.common.ImageHelper;
 import org.structr.web.common.RenderContext;
-import org.structr.web.entity.relation.Folders;
 import org.structr.web.entity.relation.MinificationSource;
 import org.structr.web.entity.relation.UserFavoriteFile;
 import org.structr.web.importer.CSVFileImportJob;
@@ -98,12 +92,9 @@ import org.structr.web.importer.XMLFileImportJob;
 import org.structr.web.property.FileDataProperty;
 
 /**
- *
- *
  */
-public class FileBase extends AbstractFile implements Indexable, Linkable, JavaScriptSource, CMISInfo, CMISDocumentInfo, Favoritable {
+public interface File extends AbstractFile, Indexable, Linkable, JavaScriptSource, CMISInfo, CMISDocumentInfo, Favoritable {
 
-	private static final Logger logger = LoggerFactory.getLogger(FileBase.class.getName());
 
 	public static final Property<String> relativeFilePath                        = new StringProperty("relativeFilePath").systemInternal();
 	public static final Property<Long> size                                      = new LongProperty("size").indexed().systemInternal();
@@ -117,171 +108,40 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 	public static final Property<List<User>> favoriteOfUsers                     = new StartNodes<>("favoriteOfUsers", UserFavoriteFile.class);
 	public static final Property<Boolean> isTemplate                             = new BooleanProperty("isTemplate");
 
-	public static final View publicView = new View(FileBase.class, PropertyView.Public,
+	public static final View publicView = new View(File.class, PropertyView.Public,
 		type, name, size, url, owner, path, isFile, visibleToPublicUsers, visibleToAuthenticatedUsers, includeInFrontendExport, isFavoritable, isTemplate
 	);
 
-	public static final View uiView = new View(FileBase.class, PropertyView.Ui,
+	public static final View uiView = new View(File.class, PropertyView.Ui,
 		type, relativeFilePath, size, url, parent, checksum, version, cacheForSeconds, owner, isFile, hasParent, includeInFrontendExport, isFavoritable, isTemplate
 	);
 
 	@Override
-	public boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
-
-		if (super.onCreation(securityContext, errorBuffer)) {
-
-			final PropertyMap changedProperties = new PropertyMap();
-
-			if (Settings.FilesystemEnabled.getValue() && !getProperty(AbstractFile.hasParent)) {
-
-				final Folder workingOrHomeDir = getCurrentWorkingDir();
-				if (workingOrHomeDir != null && getProperty(AbstractFile.parent) == null) {
-
-					changedProperties.put(AbstractFile.parent, workingOrHomeDir);
-				}
-			}
-
-			changedProperties.put(hasParent, getProperty(parentId) != null);
-
-			setProperties(securityContext, changedProperties);
-
-			return true;
-		}
-
-		return false;
-	}
-
-	@Override
-	public boolean onModification(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
-
-		if (super.onModification(securityContext, errorBuffer, modificationQueue)) {
-
-			synchronized (this) {
-
-				// save current security context
-				final SecurityContext previousSecurityContext = securityContext;
-
-				// replace with SU context
-				this.securityContext = SecurityContext.getSuperUserInstance();
-
-				// update metadata and parent as superuser
-				FileHelper.updateMetadata(this, new PropertyMap(hasParent, getProperty(parentId) != null));
-
-				// restore previous security context
-				this.securityContext = previousSecurityContext;
-			}
-
-			triggerMinificationIfNeeded(modificationQueue);
-
-			return true;
-		}
-
-		return false;
-	}
-
-	@Override
-	public void onNodeCreation() {
-
-		final String uuid = getUuid();
-		final String filePath = getDirectoryPath(uuid) + "/" + uuid;
-
-		try {
-			unlockSystemPropertiesOnce();
-			setProperties(securityContext, new PropertyMap(relativeFilePath, filePath));
-
-		} catch (Throwable t) {
-
-			logger.warn("Exception while trying to set relative file path {}: {}", new Object[]{filePath, t});
-
-		}
-	}
-
-	@Override
-	public void onNodeDeletion() {
-
-		String filePath = null;
-		try {
-			final String path = getRelativeFilePath();
-
-			if (path != null) {
-
-				filePath = FileHelper.getFilePath(path);
-
-				java.io.File toDelete = new java.io.File(filePath);
-
-				if (toDelete.exists() && toDelete.isFile()) {
-
-					toDelete.delete();
-				}
-			}
-
-		} catch (Throwable t) {
-
-			logger.debug("Exception while trying to delete file {}: {}", new Object[]{filePath, t});
-
-		}
-
-	}
-
-	@Override
-	public void afterCreation(SecurityContext securityContext) {
-
-		try {
-
-			final String filesPath        = Settings.FilesPath.getValue();
-			final java.io.File fileOnDisk = new java.io.File(filesPath + "/" + getRelativeFilePath());
-
-			if (fileOnDisk.exists()) {
-				return;
-			}
-
-			fileOnDisk.getParentFile().mkdirs();
-
-			try {
-
-				fileOnDisk.createNewFile();
-
-			} catch (IOException ex) {
-
-				logger.error("Could not create file", ex);
-				return;
-			}
-
-			FileHelper.updateMetadata(this, new PropertyMap(version, 0));
-
-		} catch (FrameworkException ex) {
-
-			logger.error("Could not create file", ex);
-		}
-
-	}
-
-	@Override
-	public String getPath() {
+	default String getPath() {
 		return FileHelper.getFolderPath(this);
 	}
 
 	@Export
 	@Override
-	public GraphObject getSearchContext(final String searchTerm, final int contextLength) {
+	default GraphObject getSearchContext(final String searchTerm, final int contextLength) {
 
 		final String text = getProperty(extractedContent);
 		if (text != null) {
 
-			final FulltextIndexer indexer = StructrApp.getInstance(securityContext).getFulltextIndexer();
+			final FulltextIndexer indexer = StructrApp.getInstance(getSecurityContext()).getFulltextIndexer();
 			return indexer.getContextObject(searchTerm, text, contextLength);
 		}
 
 		return null;
 	}
 
-	public void notifyUploadCompletion() {
+	default void notifyUploadCompletion() {
 
 		try {
 
 			FileHelper.updateMetadata(this, new PropertyMap());
 
-			final FulltextIndexer indexer = StructrApp.getInstance(securityContext).getFulltextIndexer();
+			final FulltextIndexer indexer = StructrApp.getInstance(getSecurityContext()).getFulltextIndexer();
 			indexer.addToFulltextIndex(this);
 
 		} catch (FrameworkException fex) {
@@ -290,39 +150,39 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 		}
 	}
 
-	public String getRelativeFilePath() {
+	default String getRelativeFilePath() {
 
-		return getProperty(FileBase.relativeFilePath);
-
-	}
-
-	public String getUrl() {
-
-		return getProperty(FileBase.url);
+		return getProperty(File.relativeFilePath);
 
 	}
 
-	@Override
-	public String getContentType() {
+	default String getUrl() {
 
-		return getProperty(FileBase.contentType);
+		return getProperty(File.url);
 
 	}
 
 	@Override
-	public Long getSize() {
+	default String getContentType() {
+
+		return getProperty(File.contentType);
+
+	}
+
+	@Override
+	default Long getSize() {
 
 		return getProperty(size);
 
 	}
 
-	public Long getChecksum() {
+	default Long getChecksum() {
 
 		return getProperty(checksum);
 
 	}
 
-	public String getFormattedSize() {
+	default String getFormattedSize() {
 
 		return FileUtils.byteCountToDisplaySize(getSize());
 
@@ -336,22 +196,22 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 
 	}
 
-	public void increaseVersion() throws FrameworkException {
+	default void increaseVersion() throws FrameworkException {
 
-		final Integer _version = getProperty(FileBase.version);
+		final Integer _version = getProperty(File.version);
 
 		unlockSystemPropertiesOnce();
 		if (_version == null) {
 
-			setProperties(securityContext, new PropertyMap(FileBase.version, 1));
+			setProperties(getSecurityContext(), new PropertyMap(File.version, 1));
 
 		} else {
 
-			setProperties(securityContext, new PropertyMap(FileBase.version, _version + 1));
+			setProperties(getSecurityContext(), new PropertyMap(File.version, _version + 1));
 		}
 	}
 
-	public void triggerMinificationIfNeeded(ModificationQueue modificationQueue) throws FrameworkException {
+	default void triggerMinificationIfNeeded(ModificationQueue modificationQueue) throws FrameworkException {
 
 		final List<AbstractMinifiedFile> targets = getProperty(minificationTargets);
 
@@ -364,9 +224,9 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 				if (getUuid().equals(modState.getUuid())) {
 
 					versionChanged = versionChanged ||
-							modState.getRemovedProperties().containsKey(FileBase.version) ||
-							modState.getModifiedProperties().containsKey(FileBase.version) ||
-							modState.getNewProperties().containsKey(FileBase.version);
+							modState.getRemovedProperties().containsKey(File.version) ||
+							modState.getModifiedProperties().containsKey(File.version) ||
+							modState.getNewProperties().containsKey(File.version);
 				}
 			}
 
@@ -389,7 +249,7 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 	}
 
 	@Override
-	public InputStream getInputStream() {
+	default InputStream getInputStream() {
 
 		final String relativeFilePath = getRelativeFilePath();
 
@@ -408,8 +268,8 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 				if (getProperty(isTemplate)) {
 
 					boolean editModeActive = false;
-					if (securityContext.getRequest() != null) {
-						final String editParameter = securityContext.getRequest().getParameter("edit");
+					if (getSecurityContext().getRequest() != null) {
+						final String editParameter = getSecurityContext().getRequest().getParameter("edit");
 						if (editParameter != null) {
 							editModeActive = !RenderContext.EditMode.NONE.equals(RenderContext.editMode(editParameter));
 						}
@@ -421,7 +281,7 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 
 						try {
 
-							final String result = Scripting.replaceVariables(new ActionContext(securityContext), this, content);
+							final String result = Scripting.replaceVariables(new ActionContext(getSecurityContext()), this, content);
 							return IOUtils.toInputStream(result, "UTF-8");
 
 						} catch (Throwable t) {
@@ -446,18 +306,18 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 
 				}
 			} catch (IOException ex) {
-				java.util.logging.Logger.getLogger(FileBase.class.getName()).log(Level.SEVERE, null, ex);
+				java.util.logging.Logger.getLogger(File.class.getName()).log(Level.SEVERE, null, ex);
 			}
 		}
 
 		return null;
 	}
 
-	public FileOutputStream getOutputStream() {
+	default FileOutputStream getOutputStream() {
 		return getOutputStream(true, false);
 	}
 
-	public FileOutputStream getOutputStream(final boolean notifyIndexerAfterClosing, final boolean append) {
+	default FileOutputStream getOutputStream(final boolean notifyIndexerAfterClosing, final boolean append) {
 
 		if (getProperty(isTemplate)) {
 
@@ -491,11 +351,11 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 
 							super.close();
 
-							final String _contentType = FileHelper.getContentMimeType(FileBase.this);
+							final String _contentType = FileHelper.getContentMimeType(File.this);
 
 							final PropertyMap changedProperties = new PropertyMap();
-							changedProperties.put(checksum, FileHelper.getChecksum(FileBase.this));
-							changedProperties.put(size, FileHelper.getSize(FileBase.this));
+							changedProperties.put(checksum, FileHelper.getChecksum(File.this));
+							changedProperties.put(size, FileHelper.getSize(File.this));
 							changedProperties.put(contentType, _contentType);
 
 							if (StringUtils.startsWith(_contentType, "image") || ImageHelper.isImageType(getProperty(name))) {
@@ -503,7 +363,7 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 							}
 
 							unlockSystemPropertiesOnce();
-							setProperties(securityContext, changedProperties);
+							setProperties(getSecurityContext(), changedProperties);
 
 							increaseVersion();
 
@@ -536,7 +396,7 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 
 	}
 
-	public java.io.File getFileOnDisk() {
+	default java.io.File getFileOnDisk() {
 
 		final String path = getRelativeFilePath();
 		if (path != null) {
@@ -547,7 +407,7 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 		return null;
 	}
 
-	public Path getPathOnDisk() {
+	default Path getPathOnDisk() {
 
 		final String path = getRelativeFilePath();
 		if (path != null) {
@@ -559,7 +419,7 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 	}
 
 	@Export
-	public Map<String, Object> getFirstLines(final Map<String, Object> parameters) {
+	default Map<String, Object> getFirstLines(final Map<String, Object> parameters) {
 
 		final Map<String, Object> result = new LinkedHashMap<>();
 		final LineAndSeparator ls        = getFirstLines(getNumberOrDefault(parameters, "num", 3));
@@ -586,9 +446,9 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 	}
 
 	@Export
-	public Map<String, Object> getCSVHeaders(final Map<String, Object> parameters) throws FrameworkException {
+	default Map<String, Object> getCSVHeaders(final Map<String, Object> parameters) throws FrameworkException {
 
-		if ("text/csv".equals(getProperty(FileBase.contentType))) {
+		if ("text/csv".equals(getProperty(File.contentType))) {
 
 			final Map<String, Object> map       = new LinkedHashMap<>();
 			final Function<Object, Object> func = Functions.get("get_csv_headers");
@@ -634,7 +494,7 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 					sources[2] = quoteChar;
 					sources[3] = recordSeparator;
 
-					map.put("headers", func.apply(new ActionContext(securityContext), null, sources));
+					map.put("headers", func.apply(new ActionContext(getSecurityContext()), null, sources));
 
 				} catch (UnlicensedException ex) {
 
@@ -651,17 +511,17 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 	}
 
 	@Export
-	public void doCSVImport(final Map<String, Object> parameters) throws FrameworkException {
+	default void doCSVImport(final Map<String, Object> parameters) throws FrameworkException {
 
-		CSVFileImportJob job = new CSVFileImportJob(this, securityContext.getUser(false), parameters);
+		CSVFileImportJob job = new CSVFileImportJob(this, getSecurityContext().getUser(false), parameters);
 		DataImportManager.getInstance().addJob(job);
 
 	}
 
 	@Export
-	public String getXMLStructure() throws FrameworkException {
+	default String getXMLStructure() throws FrameworkException {
 
-		final String contentType = getProperty(FileBase.contentType);
+		final String contentType = getProperty(File.contentType);
 
 		if ("text/xml".equals(contentType) || "application/xml".equals(contentType)) {
 
@@ -681,20 +541,14 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 	}
 
 	@Export
-	public void doXMLImport(final Map<String, Object> config) throws FrameworkException {
+	default void doXMLImport(final Map<String, Object> config) throws FrameworkException {
 
-		XMLFileImportJob job = new XMLFileImportJob(this, securityContext.getUser(false), config);
+		XMLFileImportJob job = new XMLFileImportJob(this, getSecurityContext().getUser(false), config);
 		DataImportManager.getInstance().addJob(job);
 
 	}
 
-	// ----- private methods -----
-	/**
-	 * Returns the Folder entity for the current working directory,
-	 * or the user's home directory as a fallback.
-	 * @return
-	 */
-	private Folder getCurrentWorkingDir() {
+	default Folder getCurrentWorkingDir() {
 
 		final Principal _owner  = getProperty(owner);
 		Folder workingOrHomeDir = null;
@@ -711,7 +565,7 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 		return workingOrHomeDir;
 	}
 
-	private int getNumberOrDefault(final Map<String, Object> data, final String key, final int defaultValue) {
+	default int getNumberOrDefault(final Map<String, Object> data, final String key, final int defaultValue) {
 
 		final Object value = data.get(key);
 
@@ -731,7 +585,7 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 		return defaultValue;
 	}
 
-	private LineAndSeparator getFirstLines(final int num) {
+	default LineAndSeparator getFirstLines(final int num) {
 
 		final StringBuilder lines = new StringBuilder();
 		int separator[]           = new int[10];
@@ -829,21 +683,9 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 		return new LineAndSeparator(lines.toString(), new String(separator, 0, separatorLength));
 	}
 
-	@Override
-	public List<GraphObject> getSyncData() throws FrameworkException {
-
-		final List<GraphObject> data = super.getSyncData();
-
-		// nodes
-		data.add(getProperty(parent));
-		data.add(getIncomingRelationship(Folders.class));
-
-		return data;
-	}
-
 	// ----- interface JavaScriptSource -----
 	@Override
-	public String getJavascriptLibraryCode() {
+	default String getJavascriptLibraryCode() {
 
 		try (final InputStream is = getInputStream()) {
 
@@ -858,69 +700,69 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 
 	// ----- CMIS support -----
 	@Override
-	public CMISInfo getCMISInfo() {
+	default CMISInfo getCMISInfo() {
 		return this;
 	}
 
 	@Override
-	public BaseTypeId getBaseTypeId() {
+	default BaseTypeId getBaseTypeId() {
 		return BaseTypeId.CMIS_DOCUMENT;
 	}
 
 	@Override
-	public CMISFolderInfo getFolderInfo() {
+	default CMISFolderInfo getFolderInfo() {
 		return null;
 	}
 
 	@Override
-	public CMISDocumentInfo getDocumentInfo() {
+	default CMISDocumentInfo getDocumentInfo() {
 		return this;
 	}
 
 	@Override
-	public CMISItemInfo geItemInfo() {
+	default CMISItemInfo geItemInfo() {
 		return null;
 	}
 
 	@Override
-	public CMISRelationshipInfo getRelationshipInfo() {
+	default CMISRelationshipInfo getRelationshipInfo() {
 		return null;
 	}
 
 	@Override
-	public CMISPolicyInfo getPolicyInfo() {
+	default CMISPolicyInfo getPolicyInfo() {
 		return null;
 	}
 
 	@Override
-	public CMISSecondaryInfo getSecondaryInfo() {
+	default CMISSecondaryInfo getSecondaryInfo() {
 		return null;
 	}
 
 	@Override
-	public String getParentId() {
-		return getProperty(FileBase.parentId);
+	default String getParentId() {
+		return getProperty(File.parentId);
 	}
 
 	@Override
-	public AllowableActions getAllowableActions() {
+	default AllowableActions getAllowableActions() {
 		return new StructrFileActions(isImmutable());
 	}
 
 	@Override
-	public String getChangeToken() {
+	default String getChangeToken() {
 
 		// versioning not supported yet.
 		return null;
 	}
 
 	@Override
-	public boolean isImmutable() {
+	default boolean isImmutable() {
 
 		final Principal _owner = getOwnerNode();
 		if (_owner != null) {
 
-			return !_owner.isGranted(Permission.write, securityContext);
+			return !_owner.isGranted(Permission.write, getSecurityContext());
 		}
 
 		return true;
@@ -928,16 +770,16 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 
 	// ----- interface Favoritable -----
 	@Override
-	public String getContext() {
-		return getProperty(FileBase.path);
+	default String getContext() {
+		return getProperty(File.path);
 	}
 
 	@Override
-	public String getFavoriteContent() {
+	default String getFavoriteContent() {
 
 		try (final InputStream is = getInputStream()) {
 
-			return IOUtils.toString(is);
+			return IOUtils.toString(is, "utf-8");
 
 		} catch (IOException ioex) {
 			logger.warn("", ioex);
@@ -947,12 +789,12 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 	}
 
 	@Override
-	public String getFavoriteContentType() {
+	default String getFavoriteContentType() {
 		return getContentType();
 	}
 
 	@Override
-	public void setFavoriteContent(final String content) throws FrameworkException {
+	default void setFavoriteContent(final String content) throws FrameworkException {
 
 		try (final OutputStream os = getOutputStream(true, false)) {
 
@@ -965,7 +807,7 @@ public class FileBase extends AbstractFile implements Indexable, Linkable, JavaS
 	}
 
 	// ----- nested classes -----
-	private class LineAndSeparator {
+	class LineAndSeparator {
 
 		private String line      = null;
 		private String separator = null;

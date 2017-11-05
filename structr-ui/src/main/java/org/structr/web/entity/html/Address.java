@@ -23,5 +23,5 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Address extends DOMElement {
+public interface Address extends DOMElement {
 }

@@ -18,7 +18,6 @@
  */
 package org.structr.core.entity;
 
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.LinkedHashMap;
@@ -761,11 +760,6 @@ public abstract class AbstractRelationship<S extends NodeInterface, T extends No
 
 	// ----- Cloud synchronization and replication -----
 	@Override
-	public List<GraphObject> getSyncData() {
-		return new ArrayList<>(); // provide a basis for super.getSyncData() calls
-	}
-
-	@Override
 	public boolean isNode() {
 		return false;
 	}
@@ -773,16 +767,6 @@ public abstract class AbstractRelationship<S extends NodeInterface, T extends No
 	@Override
 	public boolean isRelationship() {
 		return true;
-	}
-
-	@Override
-	public NodeInterface getSyncNode() {
-		throw new ClassCastException(this.getClass() + " cannot be cast to org.structr.core.graph.NodeInterface");
-	}
-
-	@Override
-	public RelationshipInterface getSyncRelationship() {
-		return this;
 	}
 
 	// ----- CMIS support methods -----
@@ -840,8 +824,6 @@ public abstract class AbstractRelationship<S extends NodeInterface, T extends No
 				}
 			}
 		}
-
-
 
 		return propertyMap;
 	}

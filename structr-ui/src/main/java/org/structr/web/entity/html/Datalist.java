@@ -20,10 +20,8 @@ package org.structr.web.entity.html;
 
 import org.structr.web.entity.dom.DOMElement;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
  *
  */
-public class Datalist extends DOMElement {
+public interface Datalist extends DOMElement {
 }

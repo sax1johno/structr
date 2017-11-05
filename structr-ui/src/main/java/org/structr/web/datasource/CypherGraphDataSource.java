@@ -21,8 +21,8 @@ package org.structr.web.datasource;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.app.StructrApp;
-import org.structr.core.entity.AbstractNode;
 import org.structr.core.graph.CypherQueryCommand;
+import org.structr.core.graph.NodeInterface;
 import org.structr.web.common.GraphDataSource;
 import org.structr.web.common.RenderContext;
 import org.structr.web.entity.dom.DOMNode;
@@ -31,10 +31,10 @@ import org.structr.web.entity.dom.DOMNode;
  *
  *
  */
-public class CypherGraphDataSource implements GraphDataSource<Iterable<GraphObject>> {
+public class CypherGraphDataSource implements GraphDataSource {
 
 	@Override
-	public Iterable<GraphObject> getData(final RenderContext renderContext, final AbstractNode referenceNode) throws FrameworkException {
+	public Iterable<GraphObject> getData(final RenderContext renderContext, final NodeInterface referenceNode) throws FrameworkException {
 
 		final String cypherQuery = ((DOMNode) referenceNode).getPropertyWithVariableReplacement(renderContext, DOMNode.cypherQuery);
 		if (cypherQuery == null || cypherQuery.isEmpty()) {

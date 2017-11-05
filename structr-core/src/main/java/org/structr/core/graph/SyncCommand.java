@@ -200,9 +200,9 @@ public class SyncCommand extends NodeServiceCommand implements MaintenanceComman
 				for (final GraphObject obj : result) {
 
 					if (obj.isNode()) {
-						nodes.add((AbstractNode)obj.getSyncNode());
+						nodes.add((AbstractNode)obj);
 					} else {
-						rels.add((AbstractRelationship)obj.getSyncRelationship());
+						rels.add((AbstractRelationship)obj);
 					}
 				}
 

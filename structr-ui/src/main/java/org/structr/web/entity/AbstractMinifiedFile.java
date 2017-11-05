@@ -23,30 +23,24 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.structr.common.SecurityContext;
-import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.Export;
 import org.structr.core.graph.ModificationEvent;
-import org.structr.core.graph.ModificationQueue;
 import org.structr.core.property.EndNodes;
 import org.structr.core.property.Property;
 import org.structr.core.property.PropertyMap;
-import org.structr.dynamic.File;
 import org.structr.web.entity.relation.MinificationSource;
 
 /**
  * Base class for minifiable files in structr
  *
  */
-public abstract class AbstractMinifiedFile extends File {
+public interface AbstractMinifiedFile extends File {
 
-	private static final Logger logger = LoggerFactory.getLogger(AbstractMinifiedFile.class.getName());
+	public static final Property<List<File>> minificationSources = new EndNodes<>("minificationSources", MinificationSource.class);
 
-	public static final Property<List<FileBase>> minificationSources = new EndNodes<>("minificationSources", MinificationSource.class);
-
+	/*
 	@Override
 	public boolean onModification(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
 
@@ -76,13 +70,13 @@ public abstract class AbstractMinifiedFile extends File {
 
 		return super.onModification(securityContext, errorBuffer, modificationQueue);
 	}
+	*/
 
 	@Export
-	public abstract void minify() throws FrameworkException, IOException;
+	public void minify() throws FrameworkException, IOException;
+	public boolean shouldModificationTriggerMinifcation(ModificationEvent modState);
 
-	public abstract boolean shouldModificationTriggerMinifcation(ModificationEvent modState);
-
-	public int getMaxPosition () {
+	default public int getMaxPosition () {
 		int max = -1;
 		for (final MinificationSource neighbor : getOutgoingRelationships(MinificationSource.class)) {
 			max = Math.max(max, neighbor.getProperty(MinificationSource.position));
@@ -90,20 +84,20 @@ public abstract class AbstractMinifiedFile extends File {
 		return max;
 	}
 
-	public String getConcatenatedSource () throws FrameworkException, IOException {
+	default public String getConcatenatedSource () throws FrameworkException, IOException {
 
 		final StringBuilder concatenatedSource = new StringBuilder();
 		int cnt = 0;
 
 		for (MinificationSource rel : getSortedRelationships()) {
 
-			final FileBase src = rel.getTargetNode();
+			final File src = rel.getTargetNode();
 
 			concatenatedSource.append(FileUtils.readFileToString(src.getFileOnDisk()));
 
 			// compact the relationships (if necessary)
 			if (rel.getProperty(MinificationSource.position) != cnt) {
-				rel.setProperties(securityContext, new PropertyMap(MinificationSource.position, cnt));
+				rel.setProperties(getSecurityContext(), new PropertyMap(MinificationSource.position, cnt));
 			}
 
 			cnt++;
@@ -112,7 +106,7 @@ public abstract class AbstractMinifiedFile extends File {
 		return concatenatedSource.toString();
 	}
 
-	public List<MinificationSource> getSortedRelationships() {
+	default public List<MinificationSource> getSortedRelationships() {
 		final List<MinificationSource> rels = new ArrayList();
 		getOutgoingRelationships(MinificationSource.class).forEach(rels::add);
 
@@ -130,7 +124,9 @@ public abstract class AbstractMinifiedFile extends File {
 	 * @throws FrameworkException
 	 */
 	@Export
-	public void moveMinificationSource(final int from, final int to) throws FrameworkException {
+	default public void moveMinificationSource(final int from, final int to) throws FrameworkException {
+
+		final SecurityContext securityContext = getSecurityContext();
 
 		for (MinificationSource rel : getOutgoingRelationships(MinificationSource.class)) {
 

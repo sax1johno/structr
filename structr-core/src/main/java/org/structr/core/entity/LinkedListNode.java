@@ -23,24 +23,19 @@ import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.relationship.AbstractListSiblings;
+import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.RelationshipInterface;
-import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
-import org.structr.core.property.StringProperty;
 
 /**
  * Abstract base class for a multi-dimensional linked list data structure.
  *
- *
  * @param <R>
  * @param <T>
  */
-public abstract class LinkedListNode<R extends AbstractListSiblings<T, T>, T extends LinkedListNode> extends ValidatedNode {
+public interface LinkedListNode<R extends AbstractListSiblings<T, T>, T extends LinkedListNode> extends NodeInterface {
 
-	// this is not used for the node itself but for the relationship(s) this node maintains
-	public static final PropertyKey<String>      keyProperty     = new StringProperty("key");
-
-	public abstract Class<R> getSiblingLinkType();
+	public Class<R> getSiblingLinkType();
 
 	/**
 	 * Returns the predecessor of the given element in the list structure
@@ -49,7 +44,7 @@ public abstract class LinkedListNode<R extends AbstractListSiblings<T, T>, T ext
 	 * @param currentElement
 	 * @return previous element
 	 */
-	public  T listGetPrevious(final T currentElement) {
+	default public T listGetPrevious(final T currentElement) {
 
 		R prevRel = currentElement.getIncomingRelationship(getSiblingLinkType());
 		if (prevRel != null) {
@@ -67,7 +62,7 @@ public abstract class LinkedListNode<R extends AbstractListSiblings<T, T>, T ext
 	 * @param currentElement
 	 * @return next element
 	 */
-	public T listGetNext(final T currentElement) {
+	default public T listGetNext(final T currentElement) {
 
 		R nextRel = currentElement.getOutgoingRelationship(getSiblingLinkType());
 		if (nextRel != null) {
@@ -86,7 +81,7 @@ public abstract class LinkedListNode<R extends AbstractListSiblings<T, T>, T ext
 	 * @param newElement the new element
 	 * @throws org.structr.common.error.FrameworkException
 	 */
-	public void listInsertBefore(final T currentElement, final T newElement) throws FrameworkException {
+	default public void listInsertBefore(final T currentElement, final T newElement) throws FrameworkException {
 
 		if (currentElement.getId() == newElement.getId()) {
 			throw new IllegalStateException("Cannot link a node to itself!");
@@ -120,7 +115,7 @@ public abstract class LinkedListNode<R extends AbstractListSiblings<T, T>, T ext
 	 * @param currentElement the reference element
 	 * @param newElement the new element
 	 */
-	public void listInsertAfter(final T currentElement, final T newElement) throws FrameworkException {
+	default public void listInsertAfter(final T currentElement, final T newElement) throws FrameworkException {
 
 		if (currentElement.getId() == newElement.getId()) {
 			throw new IllegalStateException("Cannot link a node to itself!");
@@ -154,7 +149,7 @@ public abstract class LinkedListNode<R extends AbstractListSiblings<T, T>, T ext
 	 *
 	 * @param currentElement the element to be removed
 	 */
-	public void listRemove(final T currentElement) throws FrameworkException {
+	default public void listRemove(final T currentElement) throws FrameworkException {
 
 		final T previousElement = listGetPrevious(currentElement);
 		final T nextElement     = listGetNext(currentElement);
@@ -183,17 +178,17 @@ public abstract class LinkedListNode<R extends AbstractListSiblings<T, T>, T ext
 		}
 	}
 
-	public <R extends Relation<T, T, ?, ?>> void linkNodes(final Class<R> linkType, final T startNode, final T endNode) throws FrameworkException {
+	default public <R extends Relation<T, T, ?, ?>> void linkNodes(final Class<R> linkType, final T startNode, final T endNode) throws FrameworkException {
 		linkNodes(linkType, startNode, endNode, null);
 	}
 
-	public <R extends Relation<T, T, ?, ?>> void linkNodes(final Class<R> linkType, final T startNode, final T endNode, final PropertyMap properties) throws FrameworkException {
-		StructrApp.getInstance(securityContext).create(startNode, endNode, linkType, properties);
+	default public <R extends Relation<T, T, ?, ?>> void linkNodes(final Class<R> linkType, final T startNode, final T endNode, final PropertyMap properties) throws FrameworkException {
+		StructrApp.getInstance(getSecurityContext()).create(startNode, endNode, linkType, properties);
 	}
 
-	private void unlinkNodes(final Class<R> linkType, final T startNode, final T endNode) throws FrameworkException {
+	default void unlinkNodes(final Class<R> linkType, final T startNode, final T endNode) throws FrameworkException {
 
-		final App app = StructrApp.getInstance(securityContext);
+		final App app = StructrApp.getInstance(getSecurityContext());
 
 		for (RelationshipInterface rel : startNode.getRelationships(linkType)) {
 

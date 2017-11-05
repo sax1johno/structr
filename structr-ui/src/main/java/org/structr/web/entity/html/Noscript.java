@@ -23,5 +23,5 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Noscript extends DOMElement {
+public interface Noscript extends DOMElement {
 }

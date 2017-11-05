@@ -27,7 +27,7 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Select extends DOMElement {
+public interface Select extends DOMElement {
 
 	public static final Property<String> _name       = new HtmlProperty("name");
 	public static final Property<String> _disabled   = new HtmlProperty("disabled");

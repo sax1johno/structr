@@ -47,6 +47,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.api.config.Settings;
+import org.structr.common.AccessControllable;
 import org.structr.common.GraphObjectComparator;
 import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
@@ -57,7 +58,6 @@ import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.AbstractRelationship;
 import org.structr.core.entity.Localization;
 import org.structr.core.entity.MailTemplate;
-import org.structr.core.entity.Principal;
 import org.structr.core.entity.ResourceAccess;
 import org.structr.core.entity.SchemaMethod;
 import org.structr.core.entity.Security;
@@ -68,6 +68,7 @@ import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.NodeServiceCommand;
 import org.structr.core.graph.TransactionCommand;
 import org.structr.core.graph.Tx;
+import org.structr.core.entity.Principal;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.core.script.Scripting;
@@ -80,8 +81,7 @@ import org.structr.web.common.FileHelper;
 import org.structr.web.common.RenderContext;
 import org.structr.web.entity.AbstractFile;
 import org.structr.web.entity.AbstractMinifiedFile;
-import org.structr.web.entity.FileBase;
-import org.structr.web.entity.Folder;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Image;
 import org.structr.web.entity.MinifiedCssFile;
 import org.structr.web.entity.MinifiedJavaScriptFile;
@@ -107,6 +107,7 @@ import org.structr.web.maintenance.deploy.FileImportVisitor;
 import org.structr.web.maintenance.deploy.PageImportVisitor;
 import org.structr.web.maintenance.deploy.SchemaImportVisitor;
 import org.structr.web.maintenance.deploy.TemplateImportVisitor;
+import org.structr.web.entity.Folder;
 
 /**
  *
@@ -623,12 +624,12 @@ public class DeployCommand extends NodeServiceCommand implements MaintenanceComm
 			}
 
 			// fetch toplevel files that are marked for export or for use as a javascript library
-			for (final FileBase file : app.nodeQuery(FileBase.class)
+			for (final File file : app.nodeQuery(File.class)
 				.and(Folder.parent, null)
-				.sort(FileBase.name)
+				.sort(File.name)
 				.and()
 					.or(AbstractFile.includeInFrontendExport, true)
-					.or(FileBase.useAsJavascriptLibrary, true)
+					.or(File.useAsJavascriptLibrary, true)
 				.getAsList()) {
 
 				exportFile(target, file, config);
@@ -676,15 +677,15 @@ public class DeployCommand extends NodeServiceCommand implements MaintenanceComm
 			exportFilesAndFolders(path, child, config);
 		}
 
-		final List<FileBase> files = folder.getProperty(Folder.files);
+		final List<File> files = folder.getProperty(Folder.files);
 		Collections.sort(files, new GraphObjectComparator(AbstractNode.name, false));
 
-		for (final FileBase file : files) {
+		for (final File file : files) {
 			exportFile(path, file, config);
 		}
 	}
 
-	private void exportFile(final Path target, final FileBase file, final Map<String, Object> config) throws IOException {
+	private void exportFile(final Path target, final File file, final Map<String, Object> config) throws IOException {
 
 		if (!DeployCommand.okToExport(file)) {
 			return;
@@ -1036,15 +1037,15 @@ public class DeployCommand extends NodeServiceCommand implements MaintenanceComm
 
 		if (file.isVisibleToPublicUsers())         { putIf(config, "visibleToPublicUsers", true); }
 		if (file.isVisibleToAuthenticatedUsers())  { putIf(config, "visibleToAuthenticatedUsers", true); }
-		if (file.getProperty(FileBase.isTemplate)) { putIf(config, "isTemplate", true); }
+		if (file.getProperty(File.isTemplate)) { putIf(config, "isTemplate", true); }
 
-		putIf(config, "type",                        file.getProperty(FileBase.type));
-		putIf(config, "contentType",                 file.getProperty(FileBase.contentType));
-		putIf(config, "cacheForSeconds",             file.getProperty(FileBase.cacheForSeconds));
-		putIf(config, "useAsJavascriptLibrary",      file.getProperty(FileBase.useAsJavascriptLibrary));
-		putIf(config, "includeInFrontendExport",     file.getProperty(FileBase.includeInFrontendExport));
-		putIf(config, "basicAuthRealm",              file.getProperty(FileBase.basicAuthRealm));
-		putIf(config, "enableBasicAuth",             file.getProperty(FileBase.enableBasicAuth));
+		putIf(config, "type",                        file.getProperty(File.type));
+		putIf(config, "contentType",                 file.getProperty(File.contentType));
+		putIf(config, "cacheForSeconds",             file.getProperty(File.cacheForSeconds));
+		putIf(config, "useAsJavascriptLibrary",      file.getProperty(File.useAsJavascriptLibrary));
+		putIf(config, "includeInFrontendExport",     file.getProperty(File.includeInFrontendExport));
+		putIf(config, "basicAuthRealm",              file.getProperty(File.basicAuthRealm));
+		putIf(config, "enableBasicAuth",             file.getProperty(File.enableBasicAuth));
 
 		if (file instanceof Image) {
 			putIf(config, "isThumbnail",             file.getProperty(Image.isThumbnail));
@@ -1085,7 +1086,7 @@ public class DeployCommand extends NodeServiceCommand implements MaintenanceComm
 		exportOwnershipAndSecurity(file, config);
 	}
 
-	private void exportOwnershipAndSecurity(final AbstractNode node, final Map<String, Object> config) {
+	private void exportOwnershipAndSecurity(final AccessControllable node, final Map<String, Object> config) {
 
 		// export unique name of owner node to pages.json
 		final Principal owner = node.getOwnerNode();

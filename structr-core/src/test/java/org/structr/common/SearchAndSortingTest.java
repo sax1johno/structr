@@ -40,7 +40,6 @@ import org.structr.core.app.App;
 import org.structr.core.app.Query;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.Principal;
 import org.structr.core.entity.SixOneManyToMany;
 import org.structr.core.entity.TestOne;
 import org.structr.core.entity.TestSeven;
@@ -54,6 +53,7 @@ import org.structr.core.graph.Tx;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.core.property.StringProperty;
+import org.structr.core.entity.Principal;
 
 /**
  */
@@ -410,13 +410,6 @@ public class SearchAndSortingTest extends StructrTest {
 				long t2 = System.currentTimeMillis();
 				logger.info("Query with exact type took {} ms", t2-t1);
 				assertEquals(1006, result.size());
-
-				// TODO: Implement app.nodeQuery() to return all nodes in the system as an alternative to the (slow) app.nodeQuery(NodeInterface.class)
-//				result = app.nodeQuery().getResult();
-//
-//				long t3 = System.currentTimeMillis();
-//				logger.info("Query without type took {} ms", t3-t2);
-//				assertEquals(1012, result.size());
 
 				tx.success();
 			}

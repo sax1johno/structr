@@ -18,18 +18,7 @@
  */
 package org.structr.web.entity;
 
-import org.structr.dynamic.File;
-
 /**
- *
- *
- *
  */
-public class CsvFile extends File {
-//
-//	static {
-//
-//		StructrApp.getConfiguration().registerPropertySet(CsvFile.class, PropertyView.All, Key.values());
-//	}
-//
+public interface CsvFile extends File {
 }

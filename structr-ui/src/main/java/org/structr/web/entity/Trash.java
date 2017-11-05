@@ -20,15 +20,6 @@ package org.structr.web.entity;
 
 /**
  * Trash folder
- *
- *
- *
  */
-public class Trash extends Folder {
-//
-//	static {
-//
-//		StructrApp.getConfiguration().registerPropertySet(Trash.class, PropertyView.All, Key.values());
-//	}
-//
+public interface Trash extends Folder {
 }

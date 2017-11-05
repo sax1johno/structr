@@ -23,5 +23,5 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Meter extends DOMElement {
+public interface Meter extends DOMElement {
 }

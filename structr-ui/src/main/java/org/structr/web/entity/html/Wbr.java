@@ -23,18 +23,9 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Wbr extends DOMElement {
-//
-//	static {
-//
-//		StructrApp.getConfiguration().registerPropertySet(Wbr.class, PropertyView.All, HtmlElement.UiKey.values());
-//		StructrApp.getConfiguration().registerPropertySet(Wbr.class, PropertyView.Public, HtmlElement.UiKey.values());
-//		StructrApp.getConfiguration().registerPropertySet(Wbr.class, PropertyView.Html, PropertyView.Html, htmlAttributes);
-//
-//	}
+public interface Wbr extends DOMElement {
 
-	//~--- methods --------------------------------------------------------
-
+	/*
 	@Override
 	public boolean avoidWhitespace() {
 
@@ -42,12 +33,11 @@ public class Wbr extends DOMElement {
 
 	}
 
-	//~--- get methods ----------------------------------------------------
-
 	@Override
 	public boolean isVoidElement() {
 
 		return true;
 
 	}
+	*/
 }

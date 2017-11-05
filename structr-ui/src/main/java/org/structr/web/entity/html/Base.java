@@ -18,19 +18,16 @@
  */
 package org.structr.web.entity.html;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.structr.common.PropertyView;
 import org.structr.common.View;
 import org.structr.core.property.Property;
 import org.structr.web.common.HtmlProperty;
 import org.structr.web.entity.dom.DOMElement;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
  *
  */
-public class Base extends DOMElement {
+public interface Base extends DOMElement {
 
 	public static final Property<String> _href   = new HtmlProperty("href");
 	public static final Property<String> _target = new HtmlProperty("target");
@@ -39,18 +36,7 @@ public class Base extends DOMElement {
 		_href, _target
 	);
 
-//	//~--- static initializers --------------------------------------------
-//
-//	static {
-//
-//		StructrApp.getConfiguration().registerPropertySet(Base.class, PropertyView.All, HtmlElement.UiKey.values());
-//		StructrApp.getConfiguration().registerPropertySet(Base.class, PropertyView.Public, HtmlElement.UiKey.values());
-//		StructrApp.getConfiguration().registerPropertySet(Base.class, PropertyView.Html, PropertyView.Html, htmlAttributes);
-//
-//	}
-
-	//~--- get methods ----------------------------------------------------
-
+	/*
 	@Override
 	public Property[] getHtmlAttributes() {
 
@@ -64,4 +50,5 @@ public class Base extends DOMElement {
 		return true;
 
 	}
+	*/
 }

@@ -22,8 +22,6 @@ import org.structr.core.entity.relationship.AbstractChildren;
 import org.structr.web.entity.AbstractFile;
 
 /**
- *
- *
  */
 public class FileChildren extends AbstractChildren<AbstractFile, AbstractFile> {
 

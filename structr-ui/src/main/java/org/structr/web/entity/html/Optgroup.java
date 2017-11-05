@@ -27,7 +27,7 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Optgroup extends DOMElement {
+public interface Optgroup extends DOMElement {
 
 	public static final Property<String> _disabled	= new HtmlProperty("disabled");
 	public static final Property<String> _label	= new HtmlProperty("label");

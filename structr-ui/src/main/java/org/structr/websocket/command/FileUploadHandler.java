@@ -26,29 +26,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.property.PropertyMap;
-import org.structr.dynamic.File;
 import org.structr.web.common.FileHelper;
-import org.structr.web.entity.FileBase;
-
-//~--- classes ----------------------------------------------------------------
+import org.structr.web.entity.File;
 
 /**
- *
  *
  */
 public class FileUploadHandler {
 
 	private static final Logger logger = LoggerFactory.getLogger(FileUploadHandler.class.getName());
 
-	//~--- fields ---------------------------------------------------------
-
-	private FileBase file                  = null;
+	private File file                  = null;
 	private FileChannel privateFileChannel = null;
 	private Long size                      = 0L;
 
-	//~--- constructors ---------------------------------------------------
-
-	public FileUploadHandler(final FileBase file) {
+	public FileUploadHandler(final File file) {
 
 		this.size = file.getProperty(File.size);
 		this.file = file;
@@ -71,12 +63,9 @@ public class FileUploadHandler {
 
 	}
 
-	//~--- methods --------------------------------------------------------
-
 	public void handleChunk(int sequenceNumber, int chunkSize, byte[] data, int chunks) throws IOException {
 
-		FileChannel channel = getChannel(sequenceNumber > 0);
-
+		final FileChannel channel = getChannel(sequenceNumber > 0);
 		if (channel != null) {
 
 			channel.position(sequenceNumber * chunkSize);
@@ -85,7 +74,6 @@ public class FileUploadHandler {
 			if (this.size == null) {
 
 				this.size = channel.size();
-
 			}
 
 			// finish upload
@@ -93,11 +81,8 @@ public class FileUploadHandler {
 
 				finish();
 				updateSize(this.size);
-
 			}
-
 		}
-
 	}
 
 	private void updateSize(final Long size) {
@@ -114,9 +99,7 @@ public class FileUploadHandler {
 		} catch (FrameworkException ex) {
 
 			logger.warn("Could not set size to " + size, ex);
-
 		}
-
 	}
 
 	/**
@@ -137,18 +120,13 @@ public class FileUploadHandler {
 
 				//file.increaseVersion();
 				file.notifyUploadCompletion();
-
 			}
 
 		} catch (IOException e) {
 
 			logger.warn("Unable to finish file upload", e);
-
 		}
-
 	}
-
-	//~--- get methods ----------------------------------------------------
 
 	// ----- private methods -----
 	private FileChannel getChannel(final boolean append) throws IOException {
@@ -176,7 +154,5 @@ public class FileUploadHandler {
 		}
 
 		return this.privateFileChannel;
-
 	}
-
 }

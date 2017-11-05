@@ -26,7 +26,7 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Embed extends DOMElement {
+public interface Embed extends DOMElement {
 
 	public static final Property<String> _src		= new HtmlProperty("src");
 	public static final Property<String> _type		= new HtmlProperty("type");
@@ -36,13 +36,13 @@ public class Embed extends DOMElement {
 	public static final org.structr.common.View htmlView	= new org.structr.common.View(Embed.class, PropertyView.Html,
 		_src, _type, _width, _height
 	);
-	
-	//~--- get methods ----------------------------------------------------
 
+	/*
 	@Override
 	public boolean isVoidElement() {
 
 		return true;
 
 	}
+	*/
 }

@@ -18,7 +18,6 @@
  */
 package org.structr.core.entity;
 
-import java.util.LinkedList;
 import java.util.List;
 import org.structr.common.PropertyView;
 import org.structr.common.error.FrameworkException;
@@ -26,9 +25,8 @@ import org.structr.core.entity.relationship.Groups;
 import org.structr.core.property.ConstantBooleanProperty;
 import org.structr.core.property.EndNodes;
 import org.structr.core.property.Property;
-import org.structr.schema.SchemaService;
 
-public class Group extends AbstractUser implements Principal {
+public interface Group extends Principal {
 
 	public static final Property<List<Principal>> members = new EndNodes<>("members", Groups.class);
 	public static final Property<Boolean>        isGroup  = new ConstantBooleanProperty("isGroup", true);
@@ -41,11 +39,7 @@ public class Group extends AbstractUser implements Principal {
 		type, name, members, blocked, isGroup
 	);
 
-	static {
-		SchemaService.registerBuiltinTypeOverride("Group", Group.class.getName());
-	}
-
-	public void addMember(final Principal user) throws FrameworkException {
+	default void addMember(final Principal user) throws FrameworkException {
 
 		List<Principal> _users = getProperty(members);
 		_users.add(user);
@@ -53,57 +47,11 @@ public class Group extends AbstractUser implements Principal {
 		setProperty(members, _users);
 	}
 
-	public void removeMember(final Principal user) throws FrameworkException {
+	default void removeMember(final Principal user) throws FrameworkException {
 
 		List<Principal> _users = getProperty(members);
 		_users.remove(user);
 
 		setProperty(members, _users);
 	}
-
-	@Override
-	public List<Principal> getParents() {
-
-		final List<Principal> principals = new LinkedList<>();
-		for (final Groups groups : getIncomingRelationships(Groups.class)) {
-
-			principals.add(groups.getSourceNode());
-
-		}
-
-		return principals;
-	}
-
-	@Override
-	public boolean shouldSkipSecurityRelationships() {
-		return false;
-	}
-
-	/*
-	public void addAllowedPermission(final Permission permission) {
-		SecurityDelegate.addPermission(this, Principal.allowed, permission);
-	}
-
-	public void removeAllowedPermission(final Permission permission) {
-		SecurityDelegate.removePermission(this, Principal.allowed, permission);
-	}
-
-	public void addDeniedPermission(final Permission permission) {
-		SecurityDelegate.addPermission(this, Principal.denied, permission);
-	}
-
-	public void removeDeniedPermission(final Permission permission) {
-		SecurityDelegate.removePermission(this, Principal.denied, permission);
-	}
-
-	@Override
-	public Set<String> getAllowedPermissions() {
-		return SecurityDelegate.getPermissionSet(dbNode, Principal.allowed);
-	}
-
-	@Override
-	public Set<String> getDeniedPermissions() {
-		return SecurityDelegate.getPermissionSet(dbNode, Principal.denied);
-	}
-	*/
 }

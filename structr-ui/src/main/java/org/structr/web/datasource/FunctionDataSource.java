@@ -25,7 +25,7 @@ import org.structr.api.util.Iterables;
 import org.structr.common.error.FrameworkException;
 import org.structr.common.error.UnlicensedException;
 import org.structr.core.GraphObject;
-import org.structr.core.entity.AbstractNode;
+import org.structr.core.graph.NodeInterface;
 import org.structr.core.script.Scripting;
 import org.structr.schema.action.Function;
 import org.structr.web.common.GraphDataSource;
@@ -37,10 +37,10 @@ import org.structr.web.function.UiFunction;
  *
  *
  */
-public class FunctionDataSource implements GraphDataSource<Iterable<GraphObject>> {
+public class FunctionDataSource implements GraphDataSource {
 
 	@Override
-	public Iterable<GraphObject> getData(final RenderContext renderContext, final AbstractNode referenceNode) throws FrameworkException {
+	public Iterable<GraphObject> getData(final RenderContext renderContext, final NodeInterface referenceNode) throws FrameworkException {
 
 		final String functionQuery = referenceNode.getProperty(DOMNode.functionQuery);
 		if (functionQuery == null || functionQuery.isEmpty()) {

@@ -19,14 +19,12 @@
 package org.structr.core.entity.relationship;
 
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Set;
 import org.structr.api.util.Iterables;
 import org.structr.common.PropertyView;
 import org.structr.common.ValidationHelper;
 import org.structr.common.View;
 import org.structr.common.error.ErrorBuffer;
-import org.structr.core.GraphObject;
 import org.structr.core.entity.ManyToMany;
 import org.structr.core.entity.Relation;
 import org.structr.core.entity.SchemaNode;
@@ -133,83 +131,5 @@ public class SchemaRelationship extends ManyToMany<SchemaNode, SchemaNode> {
 	@Override
 	public boolean isInternal() {
 		return true;
-	}
-
-	// ----- interface Syncable -----
-	@Override
-	public List<GraphObject> getSyncData() {
-
-		final List<GraphObject> syncables = super.getSyncData();
-
-		syncables.add(getSourceNode());
-		syncables.add(getTargetNode());
-
-		return syncables;
-	}
-
-	// ----- private methods -----
-	private void formatRelationshipFlags(final StringBuilder src) {
-
-		Long cascadingDelete = getProperty(cascadingDeleteFlag);
-		if (cascadingDelete != null) {
-
-			src.append("\n\t@Override\n");
-			src.append("\tpublic int getCascadingDeleteFlag() {\n");
-
-			switch (cascadingDelete.intValue()) {
-
-				case Relation.ALWAYS :
-					src.append("\t\treturn Relation.ALWAYS;\n");
-					break;
-
-				case Relation.CONSTRAINT_BASED :
-					src.append("\t\treturn Relation.CONSTRAINT_BASED;\n");
-					break;
-
-				case Relation.SOURCE_TO_TARGET :
-					src.append("\t\treturn Relation.SOURCE_TO_TARGET;\n");
-					break;
-
-				case Relation.TARGET_TO_SOURCE :
-					src.append("\t\treturn Relation.TARGET_TO_SOURCE;\n");
-					break;
-
-				case Relation.NONE :
-
-				default :
-					src.append("\t\treturn Relation.NONE;\n");
-
-			}
-
-			src.append("\t}\n\n");
-		}
-
-		Long autocreate = getProperty(autocreationFlag);
-		if (autocreate != null) {
-
-			src.append("\n\t@Override\n");
-			src.append("\tpublic int getAutocreationFlag() {\n");
-
-			switch (autocreate.intValue()) {
-
-				case Relation.ALWAYS :
-					src.append("\t\treturn Relation.ALWAYS;\n");
-					break;
-
-				case Relation.SOURCE_TO_TARGET :
-					src.append("\t\treturn Relation.SOURCE_TO_TARGET;\n");
-					break;
-
-				case Relation.TARGET_TO_SOURCE :
-					src.append("\t\treturn Relation.TARGET_TO_SOURCE;\n");
-					break;
-
-				default :
-					src.append("\t\treturn Relation.NONE;\n");
-
-			}
-
-			src.append("\t}\n\n");
-		}
 	}
 }

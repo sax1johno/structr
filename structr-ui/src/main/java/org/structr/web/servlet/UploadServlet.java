@@ -59,14 +59,10 @@ import org.structr.rest.service.StructrHttpServiceConfig;
 import org.structr.schema.SchemaHelper;
 import org.structr.web.auth.UiAuthenticator;
 import org.structr.web.common.FileHelper;
-import org.structr.web.entity.FileBase;
 import org.structr.web.entity.Folder;
 
-//~--- classes ----------------------------------------------------------------
 /**
  * Simple upload servlet.
- *
- *
  */
 public class UploadServlet extends HttpServlet implements HttpServiceServlet {
 
@@ -254,7 +250,7 @@ public class UploadServlet extends HttpServlet implements HttpServiceServlet {
 
 							if (isImage) {
 
-								cls = org.structr.dynamic.Image.class;
+								cls = org.structr.web.entity.Image.class;
 
 							} else if (isVideo) {
 
@@ -266,7 +262,7 @@ public class UploadServlet extends HttpServlet implements HttpServiceServlet {
 
 							} else {
 
-								cls = org.structr.dynamic.File.class;
+								cls = org.structr.web.entity.File.class;
 							}
 						}
 
@@ -274,10 +270,10 @@ public class UploadServlet extends HttpServlet implements HttpServiceServlet {
 							type = cls.getSimpleName();
 						}
 
-						final String name = item.getName().replaceAll("\\\\", "/");
-						FileBase newFile  = null;
-						String uuid       = null;
-						boolean retry     = true;
+						final String name                  = item.getName().replaceAll("\\\\", "/");
+						org.structr.web.entity.File newFile = null;
+						String uuid                        = null;
+						boolean retry                      = true;
 
 						while (retry) {
 
@@ -312,8 +308,8 @@ public class UploadServlet extends HttpServlet implements HttpServiceServlet {
 								// can only happen if the configuration value is invalid or maps to the root folder
 								if (uploadFolder != null) {
 
-									changedProperties.put(FileBase.hasParent, true);
-									changedProperties.put(FileBase.parent, uploadFolder);
+									changedProperties.put(org.structr.web.entity.File.hasParent, true);
+									changedProperties.put(org.structr.web.entity.File.parent, uploadFolder);
 								}
 
 								newFile.setProperties(securityContext, changedProperties);
@@ -443,9 +439,9 @@ public class UploadServlet extends HttpServlet implements HttpServiceServlet {
 
 					}
 
-					if (node instanceof org.structr.web.entity.AbstractFile) {
+					if (node instanceof org.structr.web.entity.File) {
 
-						final org.structr.dynamic.File file = (org.structr.dynamic.File) node;
+						final org.structr.web.entity.File file = (org.structr.web.entity.File) node;
 						if (file.isGranted(Permission.write, securityContext)) {
 
 							FileHelper.writeToFile(file, fileItem.getInputStream());

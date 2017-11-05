@@ -16,19 +16,18 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with Structr.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.structr.dynamic;
+package org.structr.web.entity.html;
 
+import org.structr.core.entity.AbstractNode;
 import org.structr.schema.SchemaService;
 
 /**
- * Base class for all File entities. This class is intended to be overridden
- * by a dynamic class with the exact same FQCN.
+ *
  */
-public class Image extends org.structr.web.entity.Image {
+public class HeadMixin extends AbstractNode implements Head {
 
-	// register this type as an overridden builtin type
 	static {
 
-		SchemaService.registerBuiltinTypeOverride("Image", org.structr.web.entity.Image.class.getName());
+		SchemaService.registerMixinType("Head", AbstractNode.class, Head.class);
 	}
 }

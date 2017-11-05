@@ -38,12 +38,12 @@ import org.slf4j.LoggerFactory;
 import org.structr.cmis.CMISInfo;
 import org.structr.cmis.common.CMISExtensionsData;
 import org.structr.common.Permission;
-import org.structr.core.entity.Principal;
 import org.structr.files.cmis.repository.StructrAccessControlPermissionMapping;
 import org.structr.files.cmis.repository.StructrDeletePermissionMapping;
 import org.structr.files.cmis.repository.StructrPermissionDefinition;
 import org.structr.files.cmis.repository.StructrReadPermissionMapping;
 import org.structr.files.cmis.repository.StructrWritePermissionMapping;
+import org.structr.core.entity.Principal;
 
 /**
  *

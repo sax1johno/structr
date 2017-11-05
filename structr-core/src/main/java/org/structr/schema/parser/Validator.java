@@ -26,10 +26,11 @@ import org.structr.schema.SchemaHelper;
  */
 public class Validator {
 
-	private String validator    = null;
-	private String className    = null;
-	private String propertyName = null;
-	private String expression   = null;
+	private boolean appendSuffix = true;
+	private String validator     = null;
+	private String className     = null;
+	private String propertyName  = null;
+	private String expression    = null;
 
 	public Validator(final String validator, final String className, final String propertyName) {
 
@@ -39,10 +40,15 @@ public class Validator {
 	}
 
 	public Validator(final String validator, final String className, final String propertyName, final String expression) {
+		this(validator, className, propertyName, expression, true);
+	}
+
+	public Validator(final String validator, final String className, final String propertyName, final String expression, final boolean appendSuffix) {
 
 		this(validator, className, propertyName);
 
-		this.expression = expression;
+		this.appendSuffix = appendSuffix;
+		this.expression   = expression;
 	}
 
 	public String getSource(final String obj, final boolean includeClassName) {
@@ -51,11 +57,15 @@ public class Validator {
 
 		buf.append("ValidationHelper.").append(validator).append("(").append(obj).append(", ");
 
-		if (includeClassName) {
+		if (includeClassName && className != null) {
 			buf.append(className).append(".");
 		}
 
-		buf.append(SchemaHelper.cleanPropertyName(propertyName)).append("Property");
+		buf.append(SchemaHelper.cleanPropertyName(propertyName));
+
+		if (appendSuffix){
+			buf.append("Property");
+		}
 
 		if (expression != null) {
 			buf.append(", \"").append(expression).append("\"");

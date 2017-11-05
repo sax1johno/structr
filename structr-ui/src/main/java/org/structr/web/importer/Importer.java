@@ -69,7 +69,6 @@ import org.structr.core.graph.Tx;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.core.property.StringProperty;
-import org.structr.dynamic.File;
 import org.structr.rest.common.HttpHelper;
 import org.structr.schema.ConfigurationProvider;
 import org.structr.schema.action.Actions;
@@ -82,7 +81,7 @@ import org.structr.web.diff.DeleteOperation;
 import org.structr.web.diff.InvertibleModificationOperation;
 import org.structr.web.diff.MoveOperation;
 import org.structr.web.diff.UpdateOperation;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Folder;
 import org.structr.web.entity.Image;
 import org.structr.web.entity.LinkSource;
@@ -1056,8 +1055,8 @@ public class Importer {
 	/**
 	 * Check whether a file with given path and checksum already exists
 	 */
-	private FileBase fileExists(final String path, final long checksum) throws FrameworkException {
-		return app.nodeQuery(FileBase.class).and(FileBase.path, path).and(File.checksum, checksum).getFirst();
+	private File fileExists(final String path, final long checksum) throws FrameworkException {
+		return app.nodeQuery(File.class).and(File.path, path).and(File.checksum, checksum).getFirst();
 	}
 
 	private Linkable downloadFile(final String downloadAddress, final URL base) {
@@ -1198,7 +1197,7 @@ public class Importer {
 
 			final String fullPath = path + fileName;
 
-			FileBase fileNode = fileExists(fullPath, checksum);
+			File fileNode = fileExists(fullPath, checksum);
 			if (fileNode == null) {
 
 				if (ImageHelper.isImageType(fileName)) {
@@ -1232,15 +1231,15 @@ public class Importer {
 
 	}
 
-	private FileBase createFileNode(final String uuid, final String path, final String contentType, final long size, final long checksum) throws FrameworkException {
+	private File createFileNode(final String uuid, final String path, final String contentType, final long size, final long checksum) throws FrameworkException {
 		return createFileNode(uuid, path, contentType, size, checksum, null);
 	}
 
-	private FileBase createFileNode(final String uuid, final String path, final String contentType, final long size, final long checksum, final Class fileClass) throws FrameworkException {
+	private File createFileNode(final String uuid, final String path, final String contentType, final long size, final long checksum, final Class fileClass) throws FrameworkException {
 
 		final String relativeFilePath = File.getDirectoryPath(uuid) + "/" + uuid;
 
-		final FileBase fileNode = app.create(fileClass != null ? fileClass : File.class,
+		final File fileNode = app.create(fileClass != null ? fileClass : File.class,
 			new NodeAttribute(GraphObject.id, uuid),
 			new NodeAttribute(AbstractNode.name, PathHelper.getName(path)),
 			new NodeAttribute(File.relativeFilePath, relativeFilePath),
@@ -1252,7 +1251,7 @@ public class Importer {
 			new NodeAttribute(AbstractNode.visibleToAuthenticatedUsers, authVisible));
 
 		final Folder parentFolder = FileHelper.createFolderPath(securityContext, PathHelper.getFolderPath(path));
-		fileNode.setProperty(FileBase.parent, parentFolder);
+		fileNode.setProperty(File.parent, parentFolder);
 
 		return fileNode;
 
@@ -1264,7 +1263,7 @@ public class Importer {
 
 	}
 
-	private void processCssFileNode(final FileBase fileNode, final URL base) throws IOException {
+	private void processCssFileNode(final File fileNode, final URL base) throws IOException {
 
 		StringWriter sw = new StringWriter();
 

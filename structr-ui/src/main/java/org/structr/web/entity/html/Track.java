@@ -26,24 +26,24 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Track extends DOMElement {
+public interface Track extends DOMElement {
 
 	public static final Property<String> _kind		= new HtmlProperty("kind");
 	public static final Property<String> _src		= new HtmlProperty("src");
 	public static final Property<String> _srclang		= new HtmlProperty("srclang");
 	public static final Property<String> _label		= new HtmlProperty("label");
 	public static final Property<String> _default		= new HtmlProperty("default");
-	
+
 	public static final org.structr.common.View htmlView	= new org.structr.common.View(Track.class, PropertyView.Html,
 		_kind, _src, _srclang, _label, _default
 	);
-	
-	//~--- get methods ----------------------------------------------------
 
+	/*
 	@Override
 	public boolean isVoidElement() {
 
 		return true;
 
 	}
+	*/
 }

@@ -26,20 +26,14 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.map.LRUMap;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.structr.api.util.Iterables;
 import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
-import org.structr.common.ValidationHelper;
-import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.GraphObject;
 import org.structr.core.Result;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.AbstractRelationship;
-import org.structr.core.graph.ModificationQueue;
 import org.structr.core.property.BooleanProperty;
 import org.structr.core.property.Property;
 import org.structr.core.property.PropertyKey;
@@ -51,9 +45,9 @@ import org.structr.web.common.AsyncBuffer;
 import org.structr.web.common.HtmlProperty;
 import org.structr.web.common.RenderContext;
 import org.structr.web.common.RenderContext.EditMode;
+import static org.structr.web.entity.dom.DOMNode.escapeForHtmlAttributes;
 import org.structr.web.entity.dom.relationship.DOMChildren;
 import org.structr.web.entity.html.Body;
-import org.structr.web.entity.relation.PageLink;
 import org.structr.web.entity.relation.Sync;
 import org.w3c.dom.Attr;
 import org.w3c.dom.DOMException;
@@ -63,21 +57,16 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.w3c.dom.TypeInfo;
 
-//~--- classes ----------------------------------------------------------------
 /**
- *
- *
- *
  */
-public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonIndexed {
+public interface DOMElement extends DOMNode, Element, NamedNodeMap, NonIndexed {
 
-	private static final Logger logger = LoggerFactory.getLogger(DOMElement.class.getName());
-	private static final int HtmlPrefixLength = PropertyView.Html.length();
+	static final int HtmlPrefixLength = PropertyView.Html.length();
 
-	private static final String STRUCTR_ACTION_PROPERTY = "data-structr-action";
+	static final String STRUCTR_ACTION_PROPERTY = "data-structr-action";
 
-	private static final Map<String, HtmlProperty> htmlProperties = new LRUMap(1000);	// use LURMap here to avoid infinite growing
-	private static final String lowercaseBodyName = Body.class.getSimpleName().toLowerCase();
+	static final Map<String, HtmlProperty> htmlProperties = new LRUMap(1000);	// use LURMap here to avoid infinite growing
+	static final String lowercaseBodyName = Body.class.getSimpleName().toLowerCase();
 
  	public static final Property<String> tag              = new StringProperty("tag").indexed();
  	public static final Property<String> path             = new StringProperty("path").indexed();
@@ -195,26 +184,33 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 		_ontimeupdate, _onvolumechange, _onwaiting, _role
 	);
 
+	/*
 	@Override
-	public boolean isValid(ErrorBuffer errorBuffer) {
+	default boolean isValid(ErrorBuffer errorBuffer) {
 
-		boolean valid = super.isValid(errorBuffer);
+		boolean valid = DOMNode.super.isValid(errorBuffer);
 
-		valid &= nonEmpty(tag, errorBuffer);
+		valid &= ValidationHelper.isValidStringNotBlank(this, tag, errorBuffer);
 		valid &= ValidationHelper.isValidStringMatchingRegex(this, tag, "^[a-zA-Z0-9]+$", errorBuffer);
 
 		return valid;
 	}
+	*/
 
 	@Override
-	public boolean contentEquals(DOMNode otherNode) {
+	default Object getFeature(final String version, final String feature) {
+		return null;
+	}
+
+	@Override
+	default boolean contentEquals(DOMNode otherNode) {
 
 		// two elements can not have the same content
 		return false;
 	}
 
 	@Override
-	public String getContextName() {
+	default String getContextName() {
 
 		final String _name = getProperty(DOMElement.name);
 		if (_name != null) {
@@ -226,7 +222,7 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 	}
 
 	@Override
-	public void updateFromNode(final DOMNode newNode) throws FrameworkException {
+	default void updateFromNode(final DOMNode newNode) throws FrameworkException {
 
 		if (newNode instanceof DOMElement) {
 
@@ -239,19 +235,22 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 			// copy tag
 			properties.put(DOMElement.tag, newNode.getProperty(DOMElement.tag));
 
-			setProperties(securityContext, properties);
+			setProperties(getSecurityContext(), properties);
 		}
 	}
 
-	public Property[] getHtmlAttributes() {
+	default Property[] getHtmlAttributes() {
 
 		return htmlView.properties();
 
 	}
 
-	public void openingTag(final AsyncBuffer out, final String tag, final EditMode editMode, final RenderContext renderContext, final int depth) throws FrameworkException {
+	default void openingTag(final AsyncBuffer out, final String tag, final EditMode editMode, final RenderContext renderContext, final int depth) throws FrameworkException {
 
-		final DOMElement _syncedNode = (DOMElement) getProperty(sharedComponent);
+		final SecurityContext securityContext = getSecurityContext();
+		final DOMElement _syncedNode          = (DOMElement) getProperty(sharedComponent);
+		final Class entityType                = getEntityType();
+
 		if (_syncedNode != null && EditMode.DEPLOYMENT.equals(editMode)) {
 
 			final String name = _syncedNode.getProperty(AbstractNode.name);
@@ -337,17 +336,18 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 	 * @throws FrameworkException
 	 */
 	@Override
-	public void renderContent(final RenderContext renderContext, final int depth) throws FrameworkException {
+	default void renderContent(final RenderContext renderContext, final int depth) throws FrameworkException {
 
 		if (isDeleted() || isHidden() || !displayForLocale(renderContext) || !displayForConditions(renderContext)) {
 			return;
 		}
 
 		// final variables
-		final AsyncBuffer out    = renderContext.getBuffer();
-		final EditMode editMode  = renderContext.getEditMode(securityContext.getUser(false));
-		final boolean isVoid     = isVoidElement();
-		final String _tag        = getProperty(DOMElement.tag);
+		final SecurityContext securityContext = getSecurityContext();
+		final AsyncBuffer out                 = renderContext.getBuffer();
+		final EditMode editMode               = renderContext.getEditMode(securityContext.getUser(false));
+		final boolean isVoid                  = isVoidElement();
+		final String _tag                     = getProperty(DOMElement.tag);
 
 		// non-final variables
 		Result localResult                 = renderContext.getResult();
@@ -357,7 +357,7 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 
 		if (depth > 0 && !avoidWhitespace()) {
 
-			out.append(indent(depth, renderContext));
+			out.append(DOMNode.indent(depth, renderContext));
 
 		}
 
@@ -372,7 +372,7 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 
 					// restore indentation
 					if (depth > 0 && !avoidWhitespace()) {
-						out.append(indent(depth, renderContext));
+						out.append(DOMNode.indent(depth, renderContext));
 					}
 				}
 			}
@@ -441,7 +441,7 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 
 				if (anyChildNodeCreatesNewLine || isTemplate) {
 
-					out.append(indent(depth, renderContext));
+					out.append(DOMNode.indent(depth, renderContext));
 				}
 
 				if (_syncedNode != null && EditMode.DEPLOYMENT.equals(editMode)) {
@@ -466,11 +466,11 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 		}
 	}
 
-	public boolean isVoidElement() {
+	default boolean isVoidElement() {
 		return false;
 	}
 
-	public String getOffsetAttributeName(String name, int offset) {
+	default String getOffsetAttributeName(String name, int offset) {
 
 		int namePosition = -1;
 		int index = 0;
@@ -507,7 +507,7 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 		return null;
 	}
 
-	public List<String> getHtmlAttributeNames() {
+	default List<String> getHtmlAttributeNames() {
 
 		List<String> names = new ArrayList<>(10);
 
@@ -524,8 +524,9 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 	}
 
 	// ----- protected methods -----
-	protected HtmlProperty findOrCreateAttributeKey(String name) {
+	default HtmlProperty findOrCreateAttributeKey(String name) {
 
+		final Class entityType    = getEntityType();
 		HtmlProperty htmlProperty = null;
 
 		synchronized (htmlProperties) {
@@ -565,27 +566,27 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 
 	// ----- interface org.w3c.dom.Element -----
 	@Override
-	public String getTagName() {
+	default String getTagName() {
 
 		return getProperty(tag);
 	}
 
 	@Override
-	public String getAttribute(String name) {
+	default String getAttribute(String name) {
 
 		HtmlProperty htmlProperty = findOrCreateAttributeKey(name);
 
-		return htmlProperty.getProperty(securityContext, this, true);
+		return htmlProperty.getProperty(getSecurityContext(), this, true);
 	}
 
 	@Override
-	public void setAttribute(final String name, final String value) throws DOMException {
+	default void setAttribute(final String name, final String value) throws DOMException {
 
 		try {
 			HtmlProperty htmlProperty = findOrCreateAttributeKey(name);
 			if (htmlProperty != null) {
 
-				htmlProperty.setProperty(securityContext, DOMElement.this, value);
+				htmlProperty.setProperty(getSecurityContext(), DOMElement.this, value);
 			}
 
 		} catch (FrameworkException fex) {
@@ -596,13 +597,13 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 	}
 
 	@Override
-	public void removeAttribute(final String name) throws DOMException {
+	default void removeAttribute(final String name) throws DOMException {
 
 		try {
 			HtmlProperty htmlProperty = findOrCreateAttributeKey(name);
 			if (htmlProperty != null) {
 
-				htmlProperty.setProperty(securityContext, DOMElement.this, null);
+				htmlProperty.setProperty(getSecurityContext(), DOMElement.this, null);
 			}
 
 		} catch (FrameworkException fex) {
@@ -613,10 +614,10 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 	}
 
 	@Override
-	public Attr getAttributeNode(String name) {
+	default Attr getAttributeNode(String name) {
 
 		HtmlProperty htmlProperty = findOrCreateAttributeKey(name);
-		String value = htmlProperty.getProperty(securityContext, this, true);
+		String value = htmlProperty.getProperty(getSecurityContext(), this, true);
 
 		if (value != null) {
 
@@ -634,7 +635,7 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 	}
 
 	@Override
-	public Attr setAttributeNode(final Attr attr) throws DOMException {
+	default Attr setAttributeNode(final Attr attr) throws DOMException {
 
 		// save existing attribute node
 		Attr attribute = getAttributeNode(attr.getName());
@@ -651,7 +652,7 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 	}
 
 	@Override
-	public Attr removeAttributeNode(final Attr attr) throws DOMException {
+	default Attr removeAttributeNode(final Attr attr) throws DOMException {
 
 		// save existing attribute node
 		Attr attribute = getAttributeNode(attr.getName());
@@ -663,7 +664,7 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 	}
 
 	@Override
-	public NodeList getElementsByTagName(final String tagName) {
+	default NodeList getElementsByTagName(final String tagName) {
 
 		DOMNodeList results = new DOMNodeList();
 
@@ -673,55 +674,55 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 	}
 
 	@Override
-	public String getAttributeNS(String string, String string1) throws DOMException {
+	default String getAttributeNS(String string, String string1) throws DOMException {
 		return null;
 	}
 
 	@Override
-	public void setAttributeNS(String string, String string1, String string2) throws DOMException {
+	default void setAttributeNS(String string, String string1, String string2) throws DOMException {
 	}
 
 	@Override
-	public void removeAttributeNS(String string, String string1) throws DOMException {
+	default void removeAttributeNS(String string, String string1) throws DOMException {
 	}
 
 	@Override
-	public Attr getAttributeNodeNS(String string, String string1) throws DOMException {
+	default Attr getAttributeNodeNS(String string, String string1) throws DOMException {
 		return null;
 	}
 
 	@Override
-	public Attr setAttributeNodeNS(Attr attr) throws DOMException {
+	default Attr setAttributeNodeNS(Attr attr) throws DOMException {
 		return null;
 	}
 
 	@Override
-	public NodeList getElementsByTagNameNS(String string, String string1) throws DOMException {
+	default NodeList getElementsByTagNameNS(String string, String string1) throws DOMException {
 		return null;
 	}
 
 	@Override
-	public boolean hasAttribute(String name) {
+	default boolean hasAttribute(String name) {
 		return getAttribute(name) != null;
 	}
 
 	@Override
-	public boolean hasAttributeNS(String string, String string1) throws DOMException {
+	default boolean hasAttributeNS(String string, String string1) throws DOMException {
 		return false;
 	}
 
 	@Override
-	public TypeInfo getSchemaTypeInfo() {
+	default TypeInfo getSchemaTypeInfo() {
 		return null;
 	}
 
 	@Override
-	public void setIdAttribute(final String idString, boolean isId) throws DOMException {
+	default void setIdAttribute(final String idString, boolean isId) throws DOMException {
 
 		checkWriteAccess();
 
 		try {
-			setProperties(securityContext, new PropertyMap(DOMElement._id, idString));
+			setProperties(getSecurityContext(), new PropertyMap(DOMElement._id, idString));
 
 		} catch (FrameworkException fex) {
 
@@ -731,60 +732,60 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 	}
 
 	@Override
-	public void setIdAttributeNS(String string, String string1, boolean bln) throws DOMException {
+	default void setIdAttributeNS(String string, String string1, boolean bln) throws DOMException {
 		throw new UnsupportedOperationException("Namespaces not supported.");
 	}
 
 	@Override
-	public void setIdAttributeNode(Attr idAttr, boolean isId) throws DOMException {
+	default void setIdAttributeNode(Attr idAttr, boolean isId) throws DOMException {
 		throw new UnsupportedOperationException("Attribute nodes not supported in HTML5.");
 	}
 
 	// ----- interface org.w3c.dom.Node -----
 	@Override
-	public String getLocalName() {
+	default String getLocalName() {
 		return null;
 	}
 
 	@Override
-	public String getNodeName() {
+	default String getNodeName() {
 		return getTagName();
 	}
 
 	@Override
-	public String getNodeValue() throws DOMException {
+	default String getNodeValue() throws DOMException {
 		return null;
 	}
 
 	@Override
-	public void setNodeValue(String string) throws DOMException {
+	default void setNodeValue(String string) throws DOMException {
 		// the nodeValue of an Element cannot be set
 	}
 
 	@Override
-	public short getNodeType() {
+	default short getNodeType() {
 
 		return ELEMENT_NODE;
 	}
 
 	@Override
-	public NamedNodeMap getAttributes() {
+	default NamedNodeMap getAttributes() {
 		return this;
 	}
 
 	@Override
-	public boolean hasAttributes() {
+	default boolean hasAttributes() {
 		return getLength() > 0;
 	}
 
 	// ----- interface org.w3c.dom.NamedNodeMap -----
 	@Override
-	public Node getNamedItem(String name) {
+	default Node getNamedItem(String name) {
 		return getAttributeNode(name);
 	}
 
 	@Override
-	public Node setNamedItem(Node node) throws DOMException {
+	default Node setNamedItem(Node node) throws DOMException {
 
 		if (node instanceof Attr) {
 			return setAttributeNode((Attr) node);
@@ -794,7 +795,7 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 	}
 
 	@Override
-	public Node removeNamedItem(String name) throws DOMException {
+	default Node removeNamedItem(String name) throws DOMException {
 
 		// save existing attribute node
 		Attr attribute = getAttributeNode(name);
@@ -806,7 +807,7 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 	}
 
 	@Override
-	public Node item(int i) {
+	default Node item(int i) {
 
 		List<String> htmlAttributeNames = getHtmlAttributeNames();
 		if (i >= 0 && i < htmlAttributeNames.size()) {
@@ -818,28 +819,28 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 	}
 
 	@Override
-	public int getLength() {
+	default int getLength() {
 		return getHtmlAttributeNames().size();
 	}
 
 	@Override
-	public Node getNamedItemNS(String string, String string1) throws DOMException {
+	default Node getNamedItemNS(String string, String string1) throws DOMException {
 		return null;
 	}
 
 	@Override
-	public Node setNamedItemNS(Node node) throws DOMException {
+	default Node setNamedItemNS(Node node) throws DOMException {
 		return null;
 	}
 
 	@Override
-	public Node removeNamedItemNS(String string, String string1) throws DOMException {
+	default Node removeNamedItemNS(String string, String string1) throws DOMException {
 		return null;
 	}
 
 	// ----- interface DOMImportable -----
 	@Override
-	public Node doImport(final Page newPage) throws DOMException {
+	default Node doImport(final Page newPage) throws DOMException {
 
 		DOMElement newElement = (DOMElement) newPage.createElement(getTagName());
 
@@ -856,55 +857,6 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 		return newElement;
 	}
 
-	// ----- nested classes -----
-	@Override
-	public boolean onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
-
-		if (super.onModification(securityContext, errorBuffer, modificationQueue)) {
-
-			final PropertyMap map = new PropertyMap();
-
-			for (Sync rel : getOutgoingRelationships(Sync.class)) {
-
-				final DOMElement syncedNode = (DOMElement) rel.getTargetNode();
-
-				map.clear();
-
-				// sync HTML properties only
-				for (Property htmlProp : syncedNode.getHtmlAttributes()) {
-					map.put(htmlProp, getProperty(htmlProp));
-				}
-
-				map.put(name, getProperty(name));
-
-				syncedNode.setProperties(securityContext, map);
-			}
-
-			final Sync rel = getIncomingRelationship(Sync.class);
-			if (rel != null) {
-
-				final DOMElement otherNode = (DOMElement) rel.getSourceNode();
-				if (otherNode != null) {
-
-					map.clear();
-
-					// sync both ways
-					for (Property htmlProp : otherNode.getHtmlAttributes()) {
-						map.put(htmlProp, getProperty(htmlProp));
-					}
-
-					map.put(name, getProperty(name));
-
-					otherNode.setProperties(securityContext, map);
-				}
-			}
-
-			return true;
-		}
-
-		return false;
-	}
-
 	/**
 	 * Render script tags with jQuery and structr-app.js to current tag.
 	 *
@@ -912,7 +864,7 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 	 *
 	 * @param out
 	 */
-	private void renderStructrAppLib(final AsyncBuffer out, final SecurityContext securityContext, final RenderContext renderContext, final int depth) throws FrameworkException {
+	default void renderStructrAppLib(final AsyncBuffer out, final SecurityContext securityContext, final RenderContext renderContext, final int depth) throws FrameworkException {
 
 		EditMode editMode = renderContext.getEditMode(securityContext.getUser(false));
 
@@ -920,17 +872,17 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 
 			out
 				.append("<!--")
-				.append(indent(depth, renderContext))
+				.append(DOMNode.indent(depth, renderContext))
 				.append("--><script>if (!window.jQuery) { document.write('<script src=\"/structr/js/lib/jquery-1.11.1.min.js\"><\\/script>'); }</script><!--")
-				.append(indent(depth, renderContext))
+				.append(DOMNode.indent(depth, renderContext))
 				.append("--><script>if (!window.jQuery.ui) { document.write('<script src=\"/structr/js/lib/jquery-ui-1.11.0.custom.min.js\"><\\/script>'); }</script><!--")
-				.append(indent(depth, renderContext))
+				.append(DOMNode.indent(depth, renderContext))
 				.append("--><script>if (!window.jQuery.ui.timepicker) { document.write('<script src=\"/structr/js/lib/jquery-ui-timepicker-addon.min.js\"><\\/script>'); }</script><!--")
-				.append(indent(depth, renderContext))
+				.append(DOMNode.indent(depth, renderContext))
 				.append("--><script>if (!window.StructrApp) { document.write('<script src=\"/structr/js/structr-app.js\"><\\/script>'); }</script><!--")
-				.append(indent(depth, renderContext))
+				.append(DOMNode.indent(depth, renderContext))
 				.append("--><script>if (!window.moment) { document.write('<script src=\"/structr/js/lib/moment.min.js\"><\\/script>'); }</script><!--")
-				.append(indent(depth, renderContext))
+				.append(DOMNode.indent(depth, renderContext))
 				.append("--><link rel=\"stylesheet\" type=\"text/css\" href=\"/structr/css/lib/jquery-ui-1.10.3.custom.min.css\">");
 
 			renderContext.setAppLibRendered(true);
@@ -947,11 +899,10 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 	 * @return property key
 	 */
 	@Override
-	public Set<PropertyKey> getPropertyKeys(String propertyView) {
+	default Set<PropertyKey> getPropertyKeys(String propertyView) {
 
-
+		final Set<PropertyKey> htmlAttrs     = DOMNode.super.getPropertyKeys(propertyView);
 		final Set<PropertyKey> allProperties = new LinkedHashSet<>();
-		final Set<PropertyKey> htmlAttrs     = super.getPropertyKeys(propertyView);
 
 		for (final PropertyKey attr : htmlAttrs) {
 
@@ -964,26 +915,7 @@ public class DOMElement extends DOMNode implements Element, NamedNodeMap, NonInd
 	}
 
 	@Override
-	public boolean isSynced() {
+	default boolean isSynced() {
 		return hasIncomingRelationships(Sync.class) || hasOutgoingRelationships(Sync.class);
-	}
-
-	// ----- interface Syncable -----
-	@Override
-	public List<GraphObject> getSyncData() throws FrameworkException {
-
-		final List<GraphObject> data = super.getSyncData();
-
-		data.add(getProperty(DOMElement.sharedComponent));
-		data.add(getIncomingRelationship(Sync.class));
-
-		if (isSynced()) {
-
-			// add parent
-			data.add(getProperty(ownerDocument));
-			data.add(getOutgoingRelationship(PageLink.class));
-		}
-
-		return data;
 	}
 }

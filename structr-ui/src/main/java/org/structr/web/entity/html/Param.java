@@ -26,20 +26,21 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Param extends DOMElement {
+public interface Param extends DOMElement {
 
 	public static final Property<String> _value		= new HtmlProperty("value");
 
 	public static final org.structr.common.View htmlView	= new org.structr.common.View(Param.class, PropertyView.Html,
 		_value
 	);
-	
-	//~--- get methods ----------------------------------------------------
 
+
+	/*
 	@Override
 	public boolean isVoidElement() {
 
 		return true;
 
 	}
+	*/
 }

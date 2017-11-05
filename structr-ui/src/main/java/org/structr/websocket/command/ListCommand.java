@@ -29,7 +29,7 @@ import org.structr.core.app.Query;
 import org.structr.core.app.StructrApp;
 import org.structr.core.property.PropertyKey;
 import org.structr.schema.SchemaHelper;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Folder;
 import org.structr.web.entity.Image;
 import org.structr.websocket.StructrWebSocket;
@@ -83,10 +83,10 @@ public class ListCommand extends AbstractCommand {
 		final PropertyKey sortProperty = StructrApp.getConfiguration().getPropertyKeyForJSONName(type, sortKey);
 		final Query query              = StructrApp.getInstance(securityContext).nodeQuery(type)/*.includeDeletedAndHidden()*/.sort(sortProperty).order("desc".equals(sortOrder)).page(page).pageSize(pageSize);
 
-		if (FileBase.class.isAssignableFrom(type)) {
+		if (File.class.isAssignableFrom(type)) {
 
 			if (rootOnly) {
-				query.and(FileBase.hasParent, false);
+				query.and(File.hasParent, false);
 			}
 
 			// inverted as isThumbnail is not necessarily present in all objects inheriting from FileBase

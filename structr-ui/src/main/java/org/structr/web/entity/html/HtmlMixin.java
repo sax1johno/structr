@@ -16,20 +16,20 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with Structr.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.structr.dynamic;
+package org.structr.web.entity.html;
 
+import org.structr.core.entity.AbstractNode;
 import org.structr.schema.SchemaService;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.dom.DOMElement;
 
 /**
- * Base class for all File entities. This class is intended to be overridden
- * by a dynamic class with the exact same FQCN.
+ *
  */
-public class File extends FileBase {
+public class HtmlMixin extends AbstractNode implements DOMElement {
 
-	// register this type as an overridden builtin type
 	static {
 
-		SchemaService.registerBuiltinTypeOverride("File", FileBase.class.getName());
+		SchemaService.registerMixinType("Html", AbstractNode.class, Html.class);
 	}
+
 }

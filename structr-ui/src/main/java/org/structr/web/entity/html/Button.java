@@ -27,8 +27,8 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Button extends DOMElement {
-	
+public interface Button extends DOMElement {
+
 	public static final Property<String> _autofocus      = new HtmlProperty("autofocus");
 	public static final Property<String> _disabled       = new HtmlProperty("disabled");
 	public static final Property<String> _form           = new HtmlProperty("form");
@@ -41,9 +41,9 @@ public class Button extends DOMElement {
 	public static final Property<String> _value          = new HtmlProperty("value");
 
 	public static final View htmlView = new View(Button.class, PropertyView.Html,
-	    
+
 		_autofocus, _disabled, _form, _formaction, _formenctype, _formmethod,
 		_formnovalidate, _formtarget, _type, _value
 	 );
-	
+
 }

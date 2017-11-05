@@ -63,7 +63,6 @@ import org.structr.core.entity.SchemaNode;
 import org.structr.core.graph.Tx;
 import org.structr.core.graph.search.SearchCommand;
 import org.structr.core.property.PropertyKey;
-import org.structr.dynamic.File;
 import org.structr.files.cmis.config.StructrRepositoryInfo;
 import org.structr.files.cmis.wrapper.CMISTypeDefinitionListWrapper;
 import org.structr.schema.ConfigurationProvider;
@@ -383,7 +382,7 @@ public class CMISRepositoryService extends AbstractStructrCmisService implements
 		switch (baseTypeId) {
 
 			case CMIS_DOCUMENT:
-				result.add(extendTypeDefinition(File.class, includePropertyDefinitions));
+				result.add(extendTypeDefinition(org.structr.web.entity.File.class, includePropertyDefinitions));
 				break;
 
 			case CMIS_FOLDER:

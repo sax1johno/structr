@@ -18,9 +18,9 @@
  */
 package org.structr.core.entity.relationship;
 
-import org.structr.core.entity.Group;
 import org.structr.core.entity.ManyToMany;
 import org.structr.core.entity.Principal;
+import org.structr.core.entity.Group;
 
 /**
  *

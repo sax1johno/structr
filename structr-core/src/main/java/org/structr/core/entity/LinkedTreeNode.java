@@ -35,14 +35,12 @@ import org.structr.core.property.PropertyMap;
 
 /**
  * Abstract base class for a multi-dimensional ordered tree datastructure.
- *
- *
  */
-public abstract class LinkedTreeNode<R extends AbstractChildren<T, T>, S extends AbstractListSiblings<T, T>, T extends LinkedTreeNode> extends LinkedListNode<S, T> {
+public interface LinkedTreeNode<R extends AbstractChildren<T, T>, S extends AbstractListSiblings<T, T>, T extends LinkedTreeNode> extends LinkedListNode<S, T> {
 
-	public abstract Class<R> getChildLinkType();
+	public Class<R> getChildLinkType();
 
-	public T treeGetParent() {
+	default public T treeGetParent() {
 
 		AbstractChildren prevRel = getIncomingRelationship(getChildLinkType());
 		if (prevRel != null) {
@@ -53,7 +51,7 @@ public abstract class LinkedTreeNode<R extends AbstractChildren<T, T>, S extends
 		return null;
 	}
 
-	public void treeAppendChild(final T childElement) throws FrameworkException {
+	default public void treeAppendChild(final T childElement) throws FrameworkException {
 
 		final T lastChild = treeGetLastChild();
 
@@ -65,13 +63,13 @@ public abstract class LinkedTreeNode<R extends AbstractChildren<T, T>, S extends
 
 		// add new node to linked list
 		if (lastChild != null) {
-			LinkedTreeNode.super.listInsertAfter(lastChild, childElement);
+			LinkedListNode.super.listInsertAfter(lastChild, childElement);
 		}
 
 		ensureCorrectChildPositions();
 	}
 
-	public void treeInsertBefore(final T newChild, final T refChild) throws FrameworkException {
+	default public void treeInsertBefore(final T newChild, final T refChild) throws FrameworkException {
 
 		List<R> rels = treeGetChildRelationships();
 		boolean found = false;
@@ -116,12 +114,12 @@ public abstract class LinkedTreeNode<R extends AbstractChildren<T, T>, S extends
 		}
 
 		// insert new node in linked list
-		LinkedTreeNode.super.listInsertBefore(refChild, newChild);
+		LinkedListNode.super.listInsertBefore(refChild, newChild);
 
 		ensureCorrectChildPositions();
 	}
 
-	public void treeInsertAfter(final T newChild, final T refChild) throws FrameworkException {
+	default public void treeInsertAfter(final T newChild, final T refChild) throws FrameworkException {
 
 		List<R> rels = treeGetChildRelationships();
 		int position = 0;
@@ -153,16 +151,16 @@ public abstract class LinkedTreeNode<R extends AbstractChildren<T, T>, S extends
 		}
 
 		// insert new node in linked list
-		LinkedTreeNode.super.listInsertAfter(refChild, newChild);
+		LinkedListNode.super.listInsertAfter(refChild, newChild);
 
 		ensureCorrectChildPositions();
 
 	}
 
-	public void treeRemoveChild(final T childToRemove) throws FrameworkException {
+	default public void treeRemoveChild(final T childToRemove) throws FrameworkException {
 
 		// remove element from linked list
-		LinkedTreeNode.super.listRemove(childToRemove);
+		LinkedListNode.super.listRemove(childToRemove);
 
 		unlinkNodes(getChildLinkType(), (T) LinkedTreeNode.this, childToRemove);
 
@@ -170,7 +168,7 @@ public abstract class LinkedTreeNode<R extends AbstractChildren<T, T>, S extends
 
 	}
 
-	public void treeReplaceChild(final T newChild, final T oldChild) throws FrameworkException {
+	default public void treeReplaceChild(final T newChild, final T oldChild) throws FrameworkException {
 
 		// save old position
 		int oldPosition = treeGetChildPosition(oldChild);
@@ -185,17 +183,17 @@ public abstract class LinkedTreeNode<R extends AbstractChildren<T, T>, S extends
 		linkNodes(getChildLinkType(), (T) LinkedTreeNode.this, newChild, properties);
 
 		// replace element in linked list as well
-		LinkedTreeNode.super.listInsertBefore(oldChild, newChild);
-		LinkedTreeNode.super.listRemove(oldChild);
+		LinkedListNode.super.listInsertBefore(oldChild, newChild);
+		LinkedListNode.super.listRemove(oldChild);
 
 		ensureCorrectChildPositions();
 	}
 
-	public T treeGetFirstChild() {
+	default public T treeGetFirstChild() {
 		return treeGetChild(0);
 	}
 
-	public T treeGetLastChild() {
+	default public T treeGetLastChild() {
 
 		int last = treeGetChildCount() - 1;
 		if (last >= 0) {
@@ -206,7 +204,7 @@ public abstract class LinkedTreeNode<R extends AbstractChildren<T, T>, S extends
 		return null;
 	}
 
-	public T treeGetChild(final int position) {
+	default public T treeGetChild(final int position) {
 
 		for (R rel : getOutgoingRelationships(getChildLinkType())) {
 
@@ -221,7 +219,7 @@ public abstract class LinkedTreeNode<R extends AbstractChildren<T, T>, S extends
 		return null;
 	}
 
-	public int treeGetChildPosition(final T child) {
+	default public int treeGetChildPosition(final T child) {
 
 		final R rel = child.getIncomingRelationship(getChildLinkType());
 		if (rel != null) {
@@ -236,7 +234,7 @@ public abstract class LinkedTreeNode<R extends AbstractChildren<T, T>, S extends
 		return 0;
 	}
 
-	public List<T> treeGetChildren() {
+	default public List<T> treeGetChildren() {
 
 		List<T> abstractChildren = new ArrayList<>();
 
@@ -248,11 +246,11 @@ public abstract class LinkedTreeNode<R extends AbstractChildren<T, T>, S extends
 		return abstractChildren;
 	}
 
-	public int treeGetChildCount() {
+	default public int treeGetChildCount() {
 		return (int)Iterables.count(getOutgoingRelationships(getChildLinkType()));
 	}
 
-	public List<R> treeGetChildRelationships() {
+	default public List<R> treeGetChildRelationships() {
 
 		// fetch all relationships
 		List<R> childRels = Iterables.toList(getOutgoingRelationships(getChildLinkType()));
@@ -288,7 +286,7 @@ public abstract class LinkedTreeNode<R extends AbstractChildren<T, T>, S extends
 	 * when called outside of modifying operations, because each setProperty
 	 * call creates its own transaction.
 	 */
-	private void ensureCorrectChildPositions() throws FrameworkException {
+	default void ensureCorrectChildPositions() throws FrameworkException {
 
 		List<R> childRels = treeGetChildRelationships();
 		int position = 0;
@@ -298,9 +296,9 @@ public abstract class LinkedTreeNode<R extends AbstractChildren<T, T>, S extends
 		}
 	}
 
-	private void unlinkNodes(final Class<R> linkType, final T startNode, final T endNode) throws FrameworkException {
+	default void unlinkNodes(final Class<R> linkType, final T startNode, final T endNode) throws FrameworkException {
 
-		final App app = StructrApp.getInstance(securityContext);
+		final App app = StructrApp.getInstance(getSecurityContext());
 
 		for (RelationshipInterface rel : startNode.getRelationships(linkType)) {
 
@@ -318,7 +316,7 @@ public abstract class LinkedTreeNode<R extends AbstractChildren<T, T>, S extends
 	 *
 	 * @return child nodes
 	 */
-	public Set<T> getAllChildNodes() {
+	default public Set<T> getAllChildNodes() {
 
 		Set<T> allChildNodes = new HashSet();
 

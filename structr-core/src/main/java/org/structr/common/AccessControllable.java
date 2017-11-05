@@ -19,9 +19,10 @@
 package org.structr.common;
 
 import java.util.Date;
+import java.util.List;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.entity.Principal;
 import org.structr.core.entity.Security;
+import org.structr.core.entity.Principal;
 
 /**
  * Interface to encapsulate query-able permissions. This interface exists
@@ -61,6 +62,7 @@ public interface AccessControllable {
 	 * @return incoming security relationship
 	 */
 	public Security getSecurityRelationship(final Principal principal);
+	public List<Security> getSecurityRelationships();
 
 	// visibility
 	public boolean isVisibleToPublicUsers();

@@ -34,9 +34,10 @@ import org.structr.core.graph.search.SearchCommand;
  */
 public class OtherNodeTypeFilter implements Predicate<Relationship> {
 
-	private Set<String> subtypes                 = null;
 	private Predicate<GraphObject> nodePredicate = null;
 	private NodeFactory nodeFactory              = null;
+	private Set<String> subtypes                 = null;
+	private Class desiredType                    = null;
 	private Node thisNode                        = null;
 
 	public OtherNodeTypeFilter(final SecurityContext securityContext, final Node thisNode, final Class desiredType) {
@@ -47,6 +48,7 @@ public class OtherNodeTypeFilter implements Predicate<Relationship> {
 
 		this.nodePredicate = nodePredicate;
 		this.nodeFactory   = new NodeFactory(securityContext);
+		this.desiredType   = desiredType;
 		this.thisNode      = thisNode;
 		this.subtypes      = SearchCommand.getAllSubtypesAsStringSet(desiredType.getSimpleName());
 	}
@@ -59,10 +61,9 @@ public class OtherNodeTypeFilter implements Predicate<Relationship> {
 		// check predicate if exists
 		if (otherNode != null && (nodePredicate == null || nodePredicate.accept(otherNode))) {
 
-			final Class otherNodeType                              = otherNode.getClass();
-			final boolean desiredTypeIsAssignableFromOtherNodeType = subtypes.contains(otherNodeType.getSimpleName());
+			final Class otherNodeType = otherNode.getClass();
 
-			return desiredTypeIsAssignableFromOtherNodeType;
+			return desiredType.isAssignableFrom(otherNodeType) ||  subtypes.contains(otherNodeType.getSimpleName());
 		}
 
 		return false;

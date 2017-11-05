@@ -39,10 +39,10 @@ import org.structr.core.GraphObject;
 import org.structr.core.Services;
 import org.structr.core.auth.Authenticator;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.Principal;
 import org.structr.core.entity.SuperUser;
 import org.structr.core.graph.NodeInterface;
 import org.structr.schema.SchemaHelper;
+import org.structr.core.entity.Principal;
 
 /**
  * Encapsulates the current user and access path and provides methods to query

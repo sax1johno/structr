@@ -25,7 +25,7 @@ import org.structr.common.error.FrameworkException;
  *
  *
  */
-public class TestUser extends AbstractUser implements Principal {
+public class TestUser extends AbstractNode implements Principal {
 
 	@Override
 	public void onNodeCreation() {

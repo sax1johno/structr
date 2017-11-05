@@ -18,35 +18,25 @@
  */
 package org.structr.web.entity;
 
-import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.structr.common.PropertyView;
 import org.structr.common.View;
-import org.structr.common.error.FrameworkException;
-import org.structr.core.graph.ModificationEvent;
 import org.structr.core.property.IntProperty;
 import org.structr.core.property.Property;
-import org.structr.web.common.FileHelper;
 
-public class MinifiedCssFile extends AbstractMinifiedFile {
-
-	private static final Logger logger = LoggerFactory.getLogger(MinifiedCssFile.class.getName());
+public interface MinifiedCssFile extends AbstractMinifiedFile {
 
 	public static final Property<Integer> lineBreak = new IntProperty("lineBreak").defaultValue(-1);
 
 	public static final View defaultView = new View(MinifiedJavaScriptFile.class, PropertyView.Public, minificationSources, lineBreak);
 	public static final View uiView      = new View(MinifiedJavaScriptFile.class, PropertyView.Ui, minificationSources, lineBreak);
 
+	/*
 	@Override
 	public boolean shouldModificationTriggerMinifcation(ModificationEvent modState) {
 
@@ -72,7 +62,7 @@ public class MinifiedCssFile extends AbstractMinifiedFile {
 			FileHelper.setFileData(this, FileUtils.readFileToString(temp).getBytes(), null);
 		}
 	}
-
+	*/
 
 
 
@@ -93,7 +83,7 @@ public class MinifiedCssFile extends AbstractMinifiedFile {
 	 * The copyrights embodied in the content of this file are licensed
 	 * by Yahoo! Inc. under the BSD (revised) open source license.
 	 */
-	private class CssCompressor {
+	static class CssCompressor {
 
 		private StringBuffer srcsb = new StringBuffer();
 

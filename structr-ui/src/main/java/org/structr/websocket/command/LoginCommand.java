@@ -26,13 +26,13 @@ import org.structr.core.Services;
 import org.structr.core.auth.Authenticator;
 import org.structr.core.auth.exception.AuthenticationException;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.Principal;
 import org.structr.rest.auth.SessionHelper;
 import org.structr.rest.service.HttpService;
 import org.structr.schema.action.Actions;
 import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
+import org.structr.core.entity.Principal;
 
 //~--- classes ----------------------------------------------------------------
 /**

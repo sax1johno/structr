@@ -31,11 +31,8 @@ import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
 import org.w3c.dom.DOMException;
 
-//~--- classes ----------------------------------------------------------------
 /**
  * Websocket command to clone a page
- *
- *
  */
 public class ClonePageCommand extends AbstractCommand {
 
@@ -47,7 +44,6 @@ public class ClonePageCommand extends AbstractCommand {
 
 	}
 
-	//~--- methods --------------------------------------------------------
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
@@ -72,6 +68,7 @@ public class ClonePageCommand extends AbstractCommand {
 					}
 
 					if (firstChild != null) {
+
 						final DOMNode newHtmlNode = DOMNode.cloneAndAppendChildren(securityContext, firstChild);
 						newPage.appendChild(newHtmlNode);
 					}
@@ -87,24 +84,17 @@ public class ClonePageCommand extends AbstractCommand {
 
 				logger.warn("Could not create node.", dex);
 				getWebSocket().send(MessageBuilder.status().code(422).message(dex.getMessage()).build(), true);
-
 			}
-
+			
 		} else {
 
 			logger.warn("Node with uuid {} not found.", webSocketData.getId());
 			getWebSocket().send(MessageBuilder.status().code(404).build(), true);
-
 		}
-
 	}
 
-	//~--- get methods ----------------------------------------------------
 	@Override
 	public String getCommand() {
-
 		return "CLONE_PAGE";
-
 	}
-
 }

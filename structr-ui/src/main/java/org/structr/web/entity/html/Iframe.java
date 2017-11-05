@@ -27,8 +27,8 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Iframe extends DOMElement {
-	
+public interface Iframe extends DOMElement {
+
 	public static final Property<String> _name            = new HtmlProperty("name");
 	public static final Property<String> _src             = new HtmlProperty("src");
 	public static final Property<String> _srcdoc          = new HtmlProperty("srcdoc");
@@ -41,5 +41,5 @@ public class Iframe extends DOMElement {
 	public static final View htmlView = new View(Img.class, PropertyView.Html,
 	    _name, _src, _srcdoc, _sandbox, _seamless, _allowfullscreen, _width, _height
 	);
-	
+
 }

@@ -50,7 +50,6 @@ import org.structr.common.SecurityContext;
 import org.structr.core.app.StructrApp;
 import org.structr.core.auth.Authenticator;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.Principal;
 import org.structr.core.graph.Tx;
 import org.structr.rest.service.HttpServiceServlet;
 import org.structr.rest.service.StructrHttpServiceConfig;
@@ -58,6 +57,7 @@ import org.structr.web.auth.UiAuthenticator;
 import org.structr.rest.common.HttpHelper;
 import org.structr.web.entity.User;
 import org.structr.web.entity.dom.Page;
+import org.structr.core.entity.Principal;
 
 //~--- classes ----------------------------------------------------------------
 /**

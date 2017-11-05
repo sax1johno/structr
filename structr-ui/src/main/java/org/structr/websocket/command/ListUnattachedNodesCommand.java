@@ -29,7 +29,7 @@ import org.structr.core.GraphObject;
 import org.structr.core.app.App;
 import org.structr.core.app.Query;
 import org.structr.core.app.StructrApp;
-import org.structr.core.entity.AbstractNode;
+import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.Tx;
 import org.structr.core.property.PropertyKey;
 import org.structr.web.entity.dom.Content;
@@ -71,7 +71,7 @@ public class ListUnattachedNodesCommand extends AbstractCommand {
 		try (final Tx tx = app.tx()) {
 
 			// do search
-			List<AbstractNode> filteredResults = getUnattachedNodes(app, securityContext, webSocketData);
+			List<NodeInterface> filteredResults = getUnattachedNodes(app, securityContext, webSocketData);
 
 			// save raw result count
 			int resultCountBeforePaging = filteredResults.size();
@@ -104,7 +104,7 @@ public class ListUnattachedNodesCommand extends AbstractCommand {
 	 * @return
 	 * @throws FrameworkException
 	 */
-	protected static List<AbstractNode> getUnattachedNodes(final App app, final SecurityContext securityContext, final WebSocketMessage webSocketData) throws FrameworkException {
+	protected static List<NodeInterface> getUnattachedNodes(final App app, final SecurityContext securityContext, final WebSocketMessage webSocketData) throws FrameworkException {
 
 		final String sortOrder = webSocketData.getSortOrder();
 		final String sortKey = webSocketData.getSortKey();
@@ -116,7 +116,7 @@ public class ListUnattachedNodesCommand extends AbstractCommand {
 		query.orType(Template.class);
 
 		// do search
-		final List<AbstractNode> filteredResults = new LinkedList();
+		final List<NodeInterface> filteredResults = new LinkedList();
 		List<? extends GraphObject> resultList   = null;
 
 		try (final Tx tx = app.tx()) {
@@ -133,9 +133,9 @@ public class ListUnattachedNodesCommand extends AbstractCommand {
 			// determine which of the nodes have no incoming CONTAINS relationships and no page id
 			for (GraphObject obj : resultList) {
 
-				if (obj instanceof AbstractNode) {
+				if (obj instanceof NodeInterface) {
 
-					AbstractNode node = (AbstractNode) obj;
+					NodeInterface node = (NodeInterface) obj;
 
 					if (!node.hasIncomingRelationships(DOMChildren.class) && node.getProperty(DOMNode.ownerDocument) == null && !(node instanceof ShadowDocument)) {
 

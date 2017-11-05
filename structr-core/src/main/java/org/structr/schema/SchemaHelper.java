@@ -18,6 +18,8 @@
  */
 package org.structr.schema;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -33,6 +35,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import javatools.parsers.PlingStemmer;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -108,9 +111,11 @@ import org.structr.schema.parser.Validator;
  */
 public class SchemaHelper {
 
-	private static final Logger logger = LoggerFactory.getLogger(SchemaHelper.class.getName());
-
-	private static final String WORD_SEPARATOR = "_";
+	private static final Logger logger                   = LoggerFactory.getLogger(SchemaHelper.class.getName());
+	private static final String BeginStructrMixinComment = "----- begin structr mixin -----";
+	private static final String EndStructrMixinComment   = "----- end structr mixin -----";
+	private static final String StructrImportPrefix      = "import ";
+	private static final String WORD_SEPARATOR           = "_";
 
 	public enum Type {
 
@@ -833,7 +838,7 @@ public class SchemaHelper {
 
 	}
 
-	public static void formatImportStatements(final AbstractSchemaNode schemaNode, final StringBuilder src, final Class baseType) {
+	public static void formatImportStatements(final AbstractSchemaNode schemaNode, final StringBuilder src, final Class baseType, final List<String> importStatements) {
 
 		src.append("import ").append(baseType.getName()).append(";\n");
 		src.append("import ").append(ConfigurationProvider.class.getName()).append(";\n");
@@ -878,32 +883,82 @@ public class SchemaHelper {
 		}
 
 		src.append("import org.structr.core.notion.*;\n");
-		src.append("import org.structr.core.entity.*;\n\n");
+		src.append("import org.structr.core.entity.*;\n");
+
+		// include imports from mixins
+		for (final String importLine : importStatements) {
+			src.append(importLine);
+			src.append("\n");
+		}
+
+		src.append("\n");
 
 	}
 
-	public static void formatInterfacesFromModules(final StringBuilder src, final SchemaNode schemaNode) {
+	public static void importMixins(final SchemaNode schemaNode, final Set<Class> classes, final List<String> imports, final StringBuilder src) {
 
-		final Set<String> interfaces = new LinkedHashSet<>();
-		boolean firstInterface       = true;
+		final String _implementsInterfaces = schemaNode.getProperty(SchemaNode.implementsInterfaces);
+		final ConfigurationProvider config = StructrApp.getConfiguration();
+		final Map<String, Class> mapping   = config.getInterfaces();
 
-		// collect all interfaces that a module wants to add to the given type
-		for (final StructrModule module : StructrApp.getConfiguration().getModules().values()) {
+		if (StringUtils.isNotBlank(_implementsInterfaces)) {
 
-			final Set<String> moduleInterfacesForType = module.getInterfacesForType(schemaNode);
-			if (moduleInterfacesForType != null) {
+			final String[] parts = _implementsInterfaces.split("[, ]+");
+			for (final String part : parts) {
 
-				interfaces.addAll(moduleInterfacesForType);
+				final String trimmed = part.trim();
+				if (StringUtils.isNotBlank(trimmed)) {
+
+					final Class type = mapping.get(trimmed);
+					if (type != null) {
+
+						classes.add(type);
+
+						// load mixin source code
+						final InputStream resource = type.getResourceAsStream("/" + type.getName().replace(".", "/") + "Mixin.java");
+						if (resource != null) {
+
+							boolean include = false;
+
+							try (final InputStream is = resource) {
+
+								for (final String line : IOUtils.readLines(is, "utf-8")) {
+
+									final String lowerLine = line.toLowerCase();
+
+									// start mixin code import
+									if (lowerLine.contains(EndStructrMixinComment)) {
+										include = false;
+									}
+
+									// include import statements
+									if (line.trim().startsWith(StructrImportPrefix)) {
+										imports.add(line);
+									}
+
+									if (include) {
+										src.append(line);
+										src.append("\n");
+									}
+
+									// end mixin code import
+									if (lowerLine.contains(BeginStructrMixinComment)) {
+
+										include = true;
+
+										src.append("\t// ----- dynamic code from ");
+										src.append(type.getSimpleName());
+										src.append("Mixin.java -----\n");
+									}
+								}
+
+							} catch (IOException ioex) {
+								ioex.printStackTrace();
+							}
+						}
+					}
+				}
 			}
-		}
-
-		// add all interfaces dynamically
-		for (final String iface : interfaces) {
-
-			src.append(firstInterface ? " implements " : ", ");
-			src.append(iface);
-
-			firstInterface = false;
 		}
 	}
 

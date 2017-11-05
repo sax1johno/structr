@@ -18,21 +18,16 @@
  */
 package org.structr.web.entity.dom;
 
-import org.structr.common.error.FrameworkException;
 import org.structr.schema.NonIndexed;
-import org.structr.web.common.RenderContext;
-import org.structr.web.entity.Renderable;
-import org.w3c.dom.DOMException;
-import org.w3c.dom.NamedNodeMap;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 
 /**
  *
  *
  */
 
-public class DocumentFragment extends DOMNode implements org.w3c.dom.DocumentFragment, NonIndexed {
+public interface DocumentFragment extends DOMNode, org.w3c.dom.DocumentFragment, NonIndexed {
+
+	/*
 
 	@Override
 	public String getContextName() {
@@ -126,4 +121,5 @@ public class DocumentFragment extends DOMNode implements org.w3c.dom.DocumentFra
 		// will be done by the Page method if deep importing is enabled.
 		return newPage.createDocumentFragment();
 	}
+	*/
 }

@@ -20,9 +20,6 @@ package org.structr.web.entity;
 
 
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.structr.api.config.Settings;
 import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
 import org.structr.common.ValidationHelper;
@@ -32,7 +29,6 @@ import org.structr.common.error.FrameworkException;
 import org.structr.common.error.UniqueToken;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.LinkedTreeNode;
-import org.structr.core.graph.ModificationQueue;
 import static org.structr.core.graph.NodeInterface.name;
 import org.structr.core.property.BooleanProperty;
 import org.structr.core.property.CollectionIdProperty;
@@ -52,9 +48,7 @@ import org.structr.web.property.PathProperty;
  *
  *
  */
-public class AbstractFile extends LinkedTreeNode<FileChildren, FileSiblings, AbstractFile> {
-
-	private static final Logger logger = LoggerFactory.getLogger(AbstractFile.class.getName());
+public interface AbstractFile extends LinkedTreeNode<FileChildren, FileSiblings, AbstractFile> {
 
 	public static final Property<Folder> parent                    = new StartNode<>("parent", FolderChildren.class);
 	public static final Property<List<AbstractFile>> children      = new EndNodes<>("children", FileChildren.class);
@@ -70,6 +64,7 @@ public class AbstractFile extends LinkedTreeNode<FileChildren, FileSiblings, Abs
 	public static final View defaultView = new View(AbstractFile.class, PropertyView.Public, path);
 	public static final View uiView      = new View(AbstractFile.class, PropertyView.Ui, path);
 
+	/*
 	@Override
 	public boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
 
@@ -93,8 +88,9 @@ public class AbstractFile extends LinkedTreeNode<FileChildren, FileSiblings, Abs
 
 		return valid && super.onModification(securityContext, errorBuffer, modificationQueue);
 	}
+	*/
 
-	public boolean validatePath(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
+	default boolean validatePath(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
 
 		final String filePath = getProperty(path);
 		if (filePath != null) {
@@ -120,7 +116,7 @@ public class AbstractFile extends LinkedTreeNode<FileChildren, FileSiblings, Abs
 		return true;
 	}
 
-	public boolean validateAndRenameFileOnce(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
+	default boolean validateAndRenameFileOnce(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
 
 		boolean valid = validatePath(securityContext, null);
 
@@ -146,34 +142,34 @@ public class AbstractFile extends LinkedTreeNode<FileChildren, FileSiblings, Abs
 	}
 
 	@Override
-	public boolean isValid(ErrorBuffer errorBuffer) {
+	default boolean isValid(ErrorBuffer errorBuffer) {
 
-		boolean valid = super.isValid(errorBuffer);
+		boolean valid = true;//LinkedTreeNode.super.isValid(errorBuffer);
 
-		valid &= nonEmpty(AbstractFile.name, errorBuffer);
+		valid &= ValidationHelper.isValidStringNotBlank(this, AbstractFile.name, errorBuffer);
 		valid &= ValidationHelper.isValidStringMatchingRegex(this, name, "[^\\/\\x00]+", errorBuffer);
 
 		return valid;
 	}
 
 	@Override
-	public Class<FileChildren> getChildLinkType() {
+	default Class<FileChildren> getChildLinkType() {
 		return FileChildren.class;
 	}
 
 	@Override
-	public Class<FileSiblings> getSiblingLinkType() {
+	default Class<FileSiblings> getSiblingLinkType() {
 		return FileSiblings.class;
 	}
 
-	public boolean includeInFrontendExport() {
+	default boolean includeInFrontendExport() {
 
-		if (getProperty(FileBase.includeInFrontendExport)) {
+		if (getProperty(AbstractFile.includeInFrontendExport)) {
 
 			return true;
 		}
 
-		final Folder _parent = getProperty(FileBase.parent);
+		final Folder _parent = getProperty(AbstractFile.parent);
 		if (_parent != null) {
 
 			// recurse

@@ -23,9 +23,9 @@ import java.util.List;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.StructrApp;
-import org.structr.core.entity.Principal;
 import org.structr.util.Writable;
 import org.structr.web.maintenance.DeployCommand;
+import org.structr.core.entity.Principal;
 
 /**
  * A console wrapper for DeployCommand, export mode.

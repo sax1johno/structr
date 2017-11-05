@@ -23,5 +23,5 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Legend extends DOMElement {
+public interface Legend extends DOMElement {
 }

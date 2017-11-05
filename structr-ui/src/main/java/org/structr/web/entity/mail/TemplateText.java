@@ -18,9 +18,9 @@
  */
 package org.structr.web.entity.mail;
 
-import org.structr.core.entity.MailTemplate;
 import org.structr.core.entity.OneToOne;
 import org.structr.web.entity.dom.Content;
+import org.structr.core.entity.MailTemplate;
 
 /**
  *

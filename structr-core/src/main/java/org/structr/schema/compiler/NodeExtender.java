@@ -64,10 +64,11 @@ public class NodeExtender {
 	private Set<String> fqcns            = null;
 	private String initiatedBySessionId  = null;
 
-	public NodeExtender() {
+	public NodeExtender(final String initiatedBySessionId) {
 
-		jfiles      = new ArrayList<>();
-		fqcns       = new LinkedHashSet<>();
+		this.initiatedBySessionId = initiatedBySessionId;
+		jfiles                    = new ArrayList<>();
+		fqcns                     = new LinkedHashSet<>();
 	}
 
 	public static ClassLoader getClassLoader() {
@@ -162,10 +163,6 @@ public class NodeExtender {
 
 	public String getInitiatedBySessionId () {
 		return initiatedBySessionId;
-	}
-
-	public void setInitiatedBySessionId (final String initiatedBySessionId) {
-		this.initiatedBySessionId = initiatedBySessionId;
 	}
 
 	private static class Listener implements DiagnosticListener<JavaFileObject> {

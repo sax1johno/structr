@@ -19,7 +19,6 @@
 package org.structr.web.common;
 
 import java.io.BufferedInputStream;
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -50,8 +49,7 @@ import org.structr.core.entity.LinkedTreeNode;
 import org.structr.core.property.PropertyMap;
 import org.structr.util.Base64;
 import org.structr.web.entity.AbstractFile;
-import org.structr.web.entity.FileBase;
-import static org.structr.web.entity.FileBase.size;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Folder;
 
 /**
@@ -76,18 +74,18 @@ public class FileHelper {
 	 * @throws FrameworkException
 	 * @throws IOException
 	 */
-	public static <T extends org.structr.web.entity.FileBase> T transformFile(final SecurityContext securityContext, final String uuid, final Class<T> fileType) throws FrameworkException, IOException {
+	public static <T extends org.structr.web.entity.File> T transformFile(final SecurityContext securityContext, final String uuid, final Class<T> fileType) throws FrameworkException, IOException {
 
 		AbstractFile existingFile = getFileByUuid(securityContext, uuid);
 
 		if (existingFile != null) {
 
 			existingFile.unlockSystemPropertiesOnce();
-			existingFile.setProperties(securityContext, new PropertyMap(AbstractNode.type, fileType == null ? org.structr.dynamic.File.class.getSimpleName() : fileType.getSimpleName()));
+			existingFile.setProperties(securityContext, new PropertyMap(AbstractNode.type, fileType == null ? File.class.getSimpleName() : fileType.getSimpleName()));
 
 			existingFile = getFileByUuid(securityContext, uuid);
 
-			return (T)(fileType != null ? fileType.cast(existingFile) : (org.structr.dynamic.File) existingFile);
+			return (T)(fileType != null ? fileType.cast(existingFile) : (File) existingFile);
 		}
 
 		return null;
@@ -107,7 +105,7 @@ public class FileHelper {
 	 * @throws FrameworkException
 	 * @throws IOException
 	 */
-	public static <T extends org.structr.web.entity.FileBase> T createFileBase64(final SecurityContext securityContext, final String rawData, final Class<T> t) throws FrameworkException, IOException {
+	public static <T extends File> T createFileBase64(final SecurityContext securityContext, final String rawData, final Class<T> t) throws FrameworkException, IOException {
 
 		Base64URIData uriData = new Base64URIData(rawData);
 
@@ -128,7 +126,7 @@ public class FileHelper {
 	 * @throws FrameworkException
 	 * @throws IOException
 	 */
-	public static <T extends org.structr.web.entity.FileBase> T createFile(final SecurityContext securityContext, final InputStream fileStream, final String contentType, final Class<T> fileType, final String name)
+	public static <T extends File> T createFile(final SecurityContext securityContext, final InputStream fileStream, final String contentType, final Class<T> fileType, final String name)
 		throws FrameworkException, IOException {
 
 		final byte[] data = IOUtils.toByteArray(fileStream);
@@ -149,7 +147,7 @@ public class FileHelper {
 	 * @throws FrameworkException
 	 * @throws IOException
 	 */
-	public static <T extends org.structr.web.entity.FileBase> T createFile(final SecurityContext securityContext, final byte[] fileData, final String contentType, final Class<T> t, final String name)
+	public static <T extends org.structr.web.entity.File> T createFile(final SecurityContext securityContext, final byte[] fileData, final String contentType, final Class<T> t, final String name)
 		throws FrameworkException, IOException {
 
 		PropertyMap props = new PropertyMap();
@@ -178,7 +176,7 @@ public class FileHelper {
 	 * @throws FrameworkException
 	 * @throws IOException
 	 */
-	public static <T extends org.structr.web.entity.FileBase> T createFile(final SecurityContext securityContext, final byte[] fileData, final String contentType, final Class<T> t)
+	public static <T extends org.structr.web.entity.File> T createFile(final SecurityContext securityContext, final byte[] fileData, final String contentType, final Class<T> t)
 		throws FrameworkException, IOException {
 
 		return createFile(securityContext, fileData, contentType, t, null);
@@ -194,7 +192,7 @@ public class FileHelper {
 	 * @throws FrameworkException
 	 * @throws IOException
 	 */
-	public static void decodeAndSetFileData(final org.structr.dynamic.File file, final String rawData) throws FrameworkException, IOException {
+	public static void decodeAndSetFileData(final org.structr.web.entity.File file, final String rawData) throws FrameworkException, IOException {
 
 		Base64URIData uriData = new Base64URIData(rawData);
 		setFileData(file, uriData.getBinaryData(), uriData.getContentType());
@@ -209,16 +207,16 @@ public class FileHelper {
 	 * @throws FrameworkException
 	 * @throws IOException
 	 */
-	public static void setFileData(final FileBase file, final byte[] fileData, final String contentType) throws FrameworkException, IOException {
+	public static void setFileData(final File file, final byte[] fileData, final String contentType) throws FrameworkException, IOException {
 
 		FileHelper.writeToFile(file, fileData);
 
 		final PropertyMap map = new PropertyMap();
 
-		map.put(FileBase.contentType, contentType != null ? contentType : getContentMimeType(file));
-		map.put(FileBase.checksum, FileHelper.getChecksum(file));
-		map.put(FileBase.size, FileHelper.getSize(file));
-		map.put(FileBase.version, 1);
+		map.put(File.contentType, contentType != null ? contentType : getContentMimeType(file));
+		map.put(File.checksum, FileHelper.getChecksum(file));
+		map.put(File.size, FileHelper.getSize(file));
+		map.put(File.version, 1);
 
 		file.setProperties(file.getSecurityContext(), map);
 	}
@@ -230,25 +228,26 @@ public class FileHelper {
 	 * @param map  additional properties
 	 * @throws FrameworkException
 	 */
-	public static void updateMetadata(final FileBase file, final PropertyMap map) throws FrameworkException {
+	public static void updateMetadata(final File file, final PropertyMap map) throws FrameworkException {
 
 		// Don't overwrite existing MIME type
 		if (StringUtils.isBlank(file.getContentType())) {
 
 			try {
 
-				map.put(FileBase.contentType, getContentMimeType(file));
+				map.put(File.contentType, getContentMimeType(file));
 
 			} catch (IOException ex) {
 				logger.debug("Unable to detect content MIME type", ex);
 			}
 		}
 
-		map.put(FileBase.checksum, FileHelper.getChecksum(file));
+		map.put(File.checksum, FileHelper.getChecksum(file));
 
 		long fileSize = FileHelper.getSize(file);
 		if (fileSize > 0) {
-			map.put(size, fileSize);
+
+			map.put(File.size, fileSize);
 		}
 
 		file.unlockSystemPropertiesOnce();
@@ -261,13 +260,13 @@ public class FileHelper {
 	 * @param file the file
 	 * @throws FrameworkException
 	 */
-	public static void updateMetadata(final FileBase file) throws FrameworkException {
+	public static void updateMetadata(final File file) throws FrameworkException {
 
 		updateMetadata(file, new PropertyMap());
 	}
 
 	//~--- get methods ----------------------------------------------------
-	public static String getBase64String(final FileBase file) {
+	public static String getBase64String(final File file) {
 
 		try {
 
@@ -340,10 +339,8 @@ public class FileHelper {
 	 * @throws FrameworkException
 	 * @throws IOException
 	 */
-	public static void writeToFile(final org.structr.dynamic.File fileNode, final InputStream inStream) throws FrameworkException, IOException {
-
+	public static void writeToFile(final File fileNode, final InputStream inStream) throws FrameworkException, IOException {
 		writeToFile(fileNode, IOUtils.toByteArray(inStream));
-
 	}
 
 	/**
@@ -356,7 +353,7 @@ public class FileHelper {
 	 * @throws IOException
 	 * @return the file on disk
 	 */
-	public static File writeToFile(final FileBase fileNode, final byte[] data) throws FrameworkException, IOException {
+	public static java.io.File writeToFile(final File fileNode, final byte[] data) throws FrameworkException, IOException {
 
 		final PropertyMap properties = new PropertyMap();
 
@@ -370,7 +367,7 @@ public class FileHelper {
 			properties.put(GraphObject.id, newUuid);
 		}
 
-		properties.put(FileBase.relativeFilePath, FileBase.getDirectoryPath(id) + "/" + id);
+		properties.put(File.relativeFilePath, File.getDirectoryPath(id) + "/" + id);
 
 		fileNode.unlockSystemPropertiesOnce();
 		fileNode.setProperties(fileNode.getSecurityContext(), properties);
@@ -386,13 +383,11 @@ public class FileHelper {
 
 	}
 
-	//~--- get methods ----------------------------------------------------
-
-	public static File getFile(final FileBase file) {
+	public static java.io.File getFile(final File file) {
 		return new java.io.File(getFilePath(file.getRelativeFilePath()));
 	}
 
-	public static Path getPath(final FileBase file) {
+	public static Path getPath(final File file) {
 		return Paths.get(getFilePath(file.getRelativeFilePath()));
 	}
 
@@ -403,7 +398,7 @@ public class FileHelper {
 	 * @return content type
 	 * @throws java.io.IOException
 	 */
-	public static String getContentMimeType(final FileBase file) throws IOException {
+	public static String getContentMimeType(final File file) throws IOException {
 		return getContentMimeType(file.getFileOnDisk(), file.getProperty(AbstractNode.name));
 	}
 
@@ -464,7 +459,7 @@ public class FileHelper {
 	 * @param file
 	 * @return checksum
 	 */
-	public static Long getChecksum(final FileBase file) {
+	public static Long getChecksum(final File file) {
 
 		String relativeFilePath = file.getRelativeFilePath();
 
@@ -495,7 +490,7 @@ public class FileHelper {
 	 * @param file
 	 * @return size
 	 */
-	public static long getSize(final FileBase file) {
+	public static long getSize(final File file) {
 
 		String path = file.getRelativeFilePath();
 

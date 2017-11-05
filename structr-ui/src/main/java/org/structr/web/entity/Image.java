@@ -22,26 +22,19 @@ import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
-import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.AbstractRelationship;
-import org.structr.core.graph.ModificationQueue;
 import org.structr.core.property.BooleanProperty;
 import org.structr.core.property.ConstantBooleanProperty;
 import org.structr.core.property.IntProperty;
 import org.structr.core.property.Property;
-import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.core.property.StringProperty;
-import org.structr.dynamic.File;
-import org.structr.schema.SchemaService;
 import org.structr.web.common.FileHelper;
 import org.structr.web.common.ImageHelper;
 import org.structr.web.common.ImageHelper.Thumbnail;
@@ -49,23 +42,11 @@ import org.structr.web.entity.relation.Thumbnails;
 import org.structr.web.property.ImageDataProperty;
 import org.structr.web.property.ThumbnailProperty;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
  * An image whose binary data will be stored on disk.
- *
- *
- *
  */
-public class Image extends org.structr.dynamic.File {
+public interface Image extends org.structr.web.entity.File {
 
-	// register this type as an overridden builtin type
-	static {
-
-		SchemaService.registerBuiltinTypeOverride("Image", Image.class.getName());
-	}
-
-	private static final Logger logger                            = LoggerFactory.getLogger(Image.class.getName());
 
 	public static final Property<Integer> height                  = new IntProperty("height").cmis().indexed();
 	public static final Property<Integer> width                   = new IntProperty("width").cmis().indexed();
@@ -88,8 +69,9 @@ public class Image extends org.structr.dynamic.File {
 	public static final org.structr.common.View uiView            = new org.structr.common.View(Image.class, PropertyView.Ui, type, name, contentType, size, relativeFilePath, width, height, orientation, exifIFD0Data, exifSubIFDData, gpsData, tnSmall, tnMid, isThumbnail, owner, parent, path, isImage);
 	public static final org.structr.common.View publicView        = new org.structr.common.View(Image.class, PropertyView.Public, type, name, width, height, orientation, exifIFD0Data, exifSubIFDData, gpsData, tnSmall, tnMid, isThumbnail, owner, parent, path, isImage);
 
+	/*
 	@Override
-	public Object setProperty(final PropertyKey key, final Object value) throws FrameworkException {
+	default Object setProperty(final PropertyKey key, final Object value) throws FrameworkException {
 
 		// Copy visibility properties and owner to all thumbnails
 		if (visibleToPublicUsers.equals(key) ||
@@ -187,22 +169,17 @@ public class Image extends org.structr.dynamic.File {
 
 		return false;
 	}
+	*/
 
-	//~--- get methods ----------------------------------------------------
-
-	public Integer getWidth() {
-
+	default Integer getWidth() {
 		return getProperty(Image.width);
-
 	}
 
-	public Integer getHeight() {
-
+	default Integer getHeight() {
 		return getProperty(Image.height);
-
 	}
 
-	public List<Image> getThumbnails() {
+	default List<Image> getThumbnails() {
 
 		final List<Image> thumbnails = new LinkedList<>();
 
@@ -212,7 +189,6 @@ public class Image extends org.structr.dynamic.File {
 		}
 
 		return thumbnails;
-
 	}
 
 	/**
@@ -220,9 +196,8 @@ public class Image extends org.structr.dynamic.File {
 	 *
 	 * @return thumbnails
 	 */
-	public Iterable<Thumbnails> getThumbnailRelationships() {
+	default Iterable<Thumbnails> getThumbnailRelationships() {
 		return getOutgoingRelationships(Thumbnails.class);
-
 	}
 
 	/**
@@ -235,22 +210,16 @@ public class Image extends org.structr.dynamic.File {
 	 *
 	 * @return scaled image
 	 */
-	public Image getScaledImage(final String maxWidthString, final String maxHeightString) {
-
+	default Image getScaledImage(final String maxWidthString, final String maxHeightString) {
 		return getScaledImage(Integer.parseInt(maxWidthString), Integer.parseInt(maxHeightString), false);
-
 	}
 
-	public Image getScaledImage(final String maxWidthString, final String maxHeightString, final boolean cropToFit) {
-
+	default Image getScaledImage(final String maxWidthString, final String maxHeightString, final boolean cropToFit) {
 		return getScaledImage(Integer.parseInt(maxWidthString), Integer.parseInt(maxHeightString), cropToFit);
-
 	}
 
-	public Image getScaledImage(final int maxWidth, final int maxHeight) {
-
+	default Image getScaledImage(final int maxWidth, final int maxHeight) {
 		return getScaledImage(maxWidth, maxHeight, false);
-
 	}
 
 	/**
@@ -266,7 +235,7 @@ public class Image extends org.structr.dynamic.File {
 	 *
 	 * @return scaled image
 	 */
-	public Image getScaledImage(final int maxWidth, final int maxHeight, final boolean cropToFit) {
+	default Image getScaledImage(final int maxWidth, final int maxHeight, final boolean cropToFit) {
 
 		final Iterable<Thumbnails> thumbnailRelationships = getThumbnailRelationships();
 		final List<Image> oldThumbnails                   = new LinkedList<>();
@@ -275,12 +244,13 @@ public class Image extends org.structr.dynamic.File {
 		final Integer origWidth                           = originalImage.getWidth();
 		final Integer origHeight                          = originalImage.getHeight();
 		final Long currentChecksum                        = originalImage.getProperty(Image.checksum);
+		final SecurityContext securityContext             = getSecurityContext();
 		final Long newChecksum;
 
 		if (currentChecksum == null || currentChecksum == 0) {
 
 			newChecksum = FileHelper.getChecksum(originalImage);
-			
+
 			if (newChecksum == null || newChecksum == 0) {
 
 				logger.debug("Unable to create scaled image, file {} is not ready.", originalImage.getName());
@@ -294,7 +264,7 @@ public class Image extends org.structr.dynamic.File {
 
 		// Read Exif and GPS data from image and update properties
 		ImageHelper.getExifData(originalImage);
-		
+
 		// Return self if SVG image
 		final String _contentType = getProperty(Image.contentType);
 		if (_contentType != null && (_contentType.startsWith("image/svg") || (_contentType.startsWith("image/") && _contentType.endsWith("icon")))) {
@@ -433,7 +403,7 @@ public class Image extends org.structr.dynamic.File {
 	 *
 	 * @return true if is thumbnail
 	 */
-	public boolean isThumbnail() {
+	default boolean isThumbnail() {
 
 		return getProperty(Image.isThumbnail) || getIncomingRelationship(Thumbnails.class) != null;
 	}
@@ -441,7 +411,7 @@ public class Image extends org.structr.dynamic.File {
 	/**
 	 * @return the name of the original image
 	 */
-	public String getOriginalImageName() {
+	default String getOriginalImageName() {
 
 		final Integer tnWidth =  getWidth();
 		final Integer tnHeight = getHeight();

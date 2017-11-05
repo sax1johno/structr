@@ -23,5 +23,5 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Blockquote extends DOMElement {
+public interface Blockquote extends DOMElement {
 }

@@ -23,22 +23,13 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Ruby extends DOMElement {
-//
-//	static {
-//
-//		StructrApp.getConfiguration().registerPropertySet(Ruby.class, PropertyView.All, HtmlElement.UiKey.values());
-//		StructrApp.getConfiguration().registerPropertySet(Ruby.class, PropertyView.Public, HtmlElement.UiKey.values());
-//		StructrApp.getConfiguration().registerPropertySet(Ruby.class, PropertyView.Html, PropertyView.Html, htmlAttributes);
-//
-//	}
+public interface Ruby extends DOMElement {
 
-	//~--- methods --------------------------------------------------------
-
-	@Override
+	/*@Override
 	public boolean avoidWhitespace() {
 
 		return true;
 
 	}
+	*/
 }

@@ -31,8 +31,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.structr.common.PropertyView;
 import org.structr.common.View;
 import org.structr.common.error.FrameworkException;
@@ -44,9 +42,7 @@ import org.structr.core.property.StringProperty;
 import org.structr.web.common.FileHelper;
 import org.structr.web.entity.relation.MinificationSource;
 
-public class MinifiedJavaScriptFile extends AbstractMinifiedFile {
-
-	private static final Logger logger = LoggerFactory.getLogger(MinifiedJavaScriptFile.class.getName());
+public interface MinifiedJavaScriptFile extends AbstractMinifiedFile {
 
 	public static final Property<CompilationLevel> optimizationLevel = new EnumProperty<>("optimizationLevel", CompilationLevel.class, CompilationLevel.WHITESPACE_ONLY);
 	public static final Property<String> warnings                    = new StringProperty("warnings");
@@ -56,14 +52,12 @@ public class MinifiedJavaScriptFile extends AbstractMinifiedFile {
 	public static final View uiView      = new View(MinifiedJavaScriptFile.class, PropertyView.Ui, minificationSources, optimizationLevel, warnings, errors);
 
 	@Override
-	public boolean shouldModificationTriggerMinifcation(ModificationEvent modState) {
-
+	default public boolean shouldModificationTriggerMinifcation(ModificationEvent modState) {
 		return modState.getModifiedProperties().containsKey(MinifiedJavaScriptFile.optimizationLevel);
-
 	}
 
 	@Override
-	public void minify() throws FrameworkException, IOException {
+	default public void minify() throws FrameworkException, IOException {
 
 		logger.info("Running minify: {}", this.getUuid());
 
@@ -100,24 +94,24 @@ public class MinifiedJavaScriptFile extends AbstractMinifiedFile {
 		final PropertyMap changedProperties = new PropertyMap();
 		changedProperties.put(warnings, StringUtils.join(compiler.getWarnings(), System.lineSeparator()));
 		changedProperties.put(errors, StringUtils.join(compiler.getErrors(), System.lineSeparator()));
-		setProperties(securityContext, changedProperties);
+		setProperties(getSecurityContext(), changedProperties);
 
 	}
 
-	private ArrayList<SourceFile> getSourceFileList() throws FrameworkException, IOException {
+	default ArrayList<SourceFile> getSourceFileList() throws FrameworkException, IOException {
 
 		ArrayList<SourceFile> sourceList = new ArrayList();
 
 		int cnt = 0;
 		for (MinificationSource rel : getSortedRelationships()) {
 
-			final FileBase src = rel.getTargetNode();
+			final File src = rel.getTargetNode();
 
-			sourceList.add(SourceFile.fromCode(src.getProperty(FileBase.name), FileUtils.readFileToString(src.getFileOnDisk())));
+			sourceList.add(SourceFile.fromCode(src.getProperty(File.name), FileUtils.readFileToString(src.getFileOnDisk())));
 
 			// compact the relationships (if necessary)
 			if (rel.getProperty(MinificationSource.position) != cnt) {
-				rel.setProperties(securityContext, new PropertyMap(MinificationSource.position, cnt));
+				rel.setProperties(getSecurityContext(), new PropertyMap(MinificationSource.position, cnt));
 			}
 			cnt++;
 		}

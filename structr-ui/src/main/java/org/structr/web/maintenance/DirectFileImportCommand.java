@@ -52,7 +52,7 @@ import org.structr.rest.resource.MaintenanceParameterResource;
 import org.structr.schema.SchemaHelper;
 import org.structr.web.common.FileHelper;
 import org.structr.web.entity.AbstractFile;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Folder;
 
 /**
@@ -256,7 +256,7 @@ public class DirectFileImportCommand extends NodeServiceCommand implements Maint
 
 				final Folder newFolder = app.create(Folder.class,
 						new NodeAttribute(Folder.name, name),
-						new NodeAttribute(FileBase.parent, FileHelper.createFolderPath(securityContext, parentPath))
+						new NodeAttribute(File.parent, FileHelper.createFolderPath(securityContext, parentPath))
 				);
 
 				folderCount++;
@@ -265,7 +265,7 @@ public class DirectFileImportCommand extends NodeServiceCommand implements Maint
 
 			} else if (attrs.isRegularFile()) {
 
-				final FileBase existingFile = app.nodeQuery(FileBase.class).and(AbstractFile.path, parentPath + name).getFirst();
+				final File existingFile = app.nodeQuery(File.class).and(AbstractFile.path, parentPath + name).getFirst();
 				if (existingFile != null) {
 
 					switch (existing) {
@@ -288,7 +288,7 @@ public class DirectFileImportCommand extends NodeServiceCommand implements Maint
 				}
 
 				final String contentType = FileHelper.getContentMimeType(file.toFile(), file.getFileName().toString());
-				
+
 				boolean isImage = (contentType != null && contentType.startsWith("image"));
 				boolean isVideo = (contentType != null && contentType.startsWith("video"));
 
@@ -296,7 +296,7 @@ public class DirectFileImportCommand extends NodeServiceCommand implements Maint
 
 				if (isImage) {
 
-					cls = org.structr.dynamic.Image.class;
+					cls = org.structr.web.entity.Image.class;
 
 				} else if (isVideo) {
 
@@ -308,20 +308,20 @@ public class DirectFileImportCommand extends NodeServiceCommand implements Maint
 
 				} else {
 
-					cls = org.structr.dynamic.File.class;
+					cls = org.structr.web.entity.File.class;
 				}
 
-				final FileBase newFile = (FileBase) app.create(cls,
-						new NodeAttribute(FileBase.name, name),
-						new NodeAttribute(FileBase.parent, FileHelper.createFolderPath(securityContext, parentPath)),
+				final File newFile = (File) app.create(cls,
+						new NodeAttribute(File.name, name),
+						new NodeAttribute(File.parent, FileHelper.createFolderPath(securityContext, parentPath)),
 						new NodeAttribute(AbstractNode.type, cls.getSimpleName())
 				);
 
 				final String uuid             = newFile.getUuid();
-				final String relativeFilePath = FileBase.getDirectoryPath(uuid) + "/" + uuid;
+				final String relativeFilePath = File.getDirectoryPath(uuid) + "/" + uuid;
 				final Path fullFolderPath     = Paths.get(filesPath + "/" + relativeFilePath);
 
-				newFile.setProperty(FileBase.relativeFilePath, relativeFilePath);
+				newFile.setProperty(File.relativeFilePath, relativeFilePath);
 
 				Files.createDirectories(fullFolderPath.getParent());
 

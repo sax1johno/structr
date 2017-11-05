@@ -28,9 +28,9 @@ import org.structr.core.GraphObject;
 import org.structr.core.Transformation;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractRelationship;
-import org.structr.core.entity.Principal;
 import org.structr.core.entity.Relation;
 import org.structr.core.property.PropertyMap;
+import org.structr.core.entity.Principal;
 
 //~--- classes ----------------------------------------------------------------
 

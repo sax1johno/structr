@@ -16,9 +16,10 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with Structr.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.structr.web.entity.dom;
+package org.structr.web.entity.html;
 
 import java.util.LinkedHashMap;
+import org.structr.web.entity.dom.Page;
 import org.structr.web.entity.html.Object;
 import org.w3c.dom.DOMException;
 import org.w3c.dom.Document;

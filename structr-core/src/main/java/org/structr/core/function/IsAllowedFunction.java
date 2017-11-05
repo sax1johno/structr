@@ -24,9 +24,9 @@ import org.structr.common.Permissions;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.Principal;
 import org.structr.schema.action.ActionContext;
 import org.structr.schema.action.Function;
+import org.structr.core.entity.Principal;
 
 /**
  *

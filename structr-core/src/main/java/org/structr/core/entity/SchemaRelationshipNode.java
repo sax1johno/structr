@@ -20,6 +20,7 @@ package org.structr.core.entity;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -483,7 +484,7 @@ public class SchemaRelationshipNode extends AbstractSchemaNode {
 
 		src.append("package org.structr.dynamic;\n\n");
 
-		SchemaHelper.formatImportStatements(this, src, baseType);
+		SchemaHelper.formatImportStatements(this, src, baseType, Collections.emptyList());
 
 		src.append("public class ").append(_className).append(" extends ").append(getBaseType());
 
@@ -603,7 +604,7 @@ public class SchemaRelationshipNode extends AbstractSchemaNode {
 
 		src.append("package org.structr.dynamic;\n\n");
 
-		SchemaHelper.formatImportStatements(this, src, baseType);
+		SchemaHelper.formatImportStatements(this, src, baseType, Collections.emptyList());
 
 		src.append("public class _").append(_className).append("Helper {\n\n");
 
@@ -879,21 +880,6 @@ public class SchemaRelationshipNode extends AbstractSchemaNode {
 		}
 
 		return cascade;
-	}
-
-	// ----- interface Syncable -----
-	@Override
-	public List<GraphObject> getSyncData() throws FrameworkException {
-
-		final List<GraphObject> syncables = super.getSyncData();
-
-		syncables.add(getSourceNode());
-		syncables.add(getTargetNode());
-
-		syncables.add(getIncomingRelationship(SchemaRelationshipSourceNode.class));
-		syncables.add(getOutgoingRelationship(SchemaRelationshipTargetNode.class));
-
-		return syncables;
 	}
 
 	// ----- private methods -----

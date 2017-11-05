@@ -31,13 +31,9 @@ import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
  * Websocket command to retrieve nodes which are in use on more than
  * one page.
- *
- *
  */
 public class ListComponentsCommand extends AbstractCommand {
 

@@ -18,9 +18,6 @@
  */
 package org.structr.web.entity;
 
-import java.util.List;
-import org.structr.common.error.FrameworkException;
-import org.structr.core.GraphObject;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.notion.PropertyNotion;
 import org.structr.core.property.EndNode;
@@ -31,26 +28,9 @@ import org.structr.web.entity.html.relation.ResourceLink;
 
 /**
  * This class represents elements which can have an outgoing link to a resource.
- *
- *
  */
-public class LinkSource extends DOMElement {
+public interface LinkSource extends DOMElement {
 
 	public static final Property<Linkable> linkable = new EndNode<>("linkable", ResourceLink.class, new PropertyNotion(AbstractNode.name));
 	public static final Property<String> linkableId = new EntityIdProperty("linkableId", linkable);
-
-	// ----- interface Syncable -----
-	@Override
-	public List<GraphObject> getSyncData() throws FrameworkException {
-
-		final List<GraphObject> data = super.getSyncData();
-
-		data.add(getProperty(linkable));
-
-		for (final ResourceLink link : getRelationships(ResourceLink.class)) {
-			data.add(link);
-		}
-
-		return data;
-	}
 }

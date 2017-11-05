@@ -33,7 +33,6 @@ import org.structr.core.property.ConstantBooleanProperty;
 import org.structr.core.property.EndNodes;
 import org.structr.core.property.Property;
 import org.structr.core.property.StringProperty;
-import org.structr.schema.SchemaService;
 import org.structr.web.entity.dom.DOMNode;
 import org.structr.web.entity.dom.Page;
 import org.structr.web.entity.relation.ImageWidget;
@@ -64,11 +63,6 @@ public class Widget extends AbstractNode {
 		type, name, source, description, configuration, pictures, treePath, isWidget
 	);
 
-	// register this type as an overridden builtin type
-	static {
-		SchemaService.registerBuiltinTypeOverride("Widget", Widget.class.getName());
-	}
-
 	public static void expandWidget(SecurityContext securityContext, Page page, DOMNode parent, String baseUrl, Map<String, Object> parameters, final boolean processDeploymentInfo) throws FrameworkException {
 
 		String _source          = (String)parameters.get("source");
@@ -76,7 +70,7 @@ public class Widget extends AbstractNode {
 
 		if (_source == null) {
 
-			errorBuffer.add(new EmptyPropertyToken(Widget.class.getSimpleName(), source));
+			errorBuffer.add(new EmptyPropertyToken(Widget.class.getSimpleName(), source, ""));
 
 		} else {
 

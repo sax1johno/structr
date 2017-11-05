@@ -64,6 +64,7 @@ import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.AbstractRelationship;
 import org.structr.core.entity.GenericNode;
 import org.structr.core.entity.Relation;
+import org.structr.core.graph.Mixin;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.RelationshipInterface;
 import org.structr.core.property.GenericProperty;
@@ -548,6 +549,11 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 			relationshipEntityClassCache.put(simpleName, type);
 			relationshipPackages.add(fqcn.substring(0, fqcn.lastIndexOf(".")));
 			globalPropertyViewMap.remove(fqcn);
+		}
+
+		// interface that extends NodeInterface, must be stored
+		if (type.isInterface()) {
+			reverseInterfaceMap.put(type.getSimpleName(), type);
 		}
 
 		for (final Class interfaceClass : type.getInterfaces()) {
@@ -1042,7 +1048,7 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 				final int modifiers = clazz.getModifiers();
 
 				// register node entity classes
-				if (NodeInterface.class.isAssignableFrom(clazz)) {
+				if (NodeInterface.class.isAssignableFrom(clazz) && !Mixin.class.isAssignableFrom(clazz)) {
 
 					registerEntityType(clazz);
 				}

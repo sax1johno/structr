@@ -74,11 +74,10 @@ import org.structr.core.auth.Authenticator;
 import org.structr.core.auth.exception.AuthenticationException;
 import org.structr.core.converter.PropertyConverter;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.Principal;
+import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.Tx;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
-import org.structr.dynamic.File;
 import org.structr.rest.auth.AuthHelper;
 import org.structr.rest.service.HttpServiceServlet;
 import org.structr.rest.service.StructrHttpServiceConfig;
@@ -90,12 +89,13 @@ import org.structr.web.common.RenderContext;
 import org.structr.web.common.RenderContext.EditMode;
 import org.structr.web.common.StringRenderBuffer;
 import org.structr.web.entity.AbstractFile;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Linkable;
 import org.structr.web.entity.Site;
 import org.structr.web.entity.User;
 import org.structr.web.entity.dom.DOMNode;
 import org.structr.web.entity.dom.Page;
+import org.structr.core.entity.Principal;
 
 //~--- classes ----------------------------------------------------------------
 /**
@@ -273,7 +273,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 					final String queryString = request.getQueryString();
 
 					// Look for a file, first include the query string
-					FileBase file = findFile(securityContext, request, path + (queryString != null ? "?" + queryString : ""));
+					File file = findFile(securityContext, request, path + (queryString != null ? "?" + queryString : ""));
 
 					// If no file with query string in the file name found, try without query string
 					if (file == null) {
@@ -354,9 +354,9 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 								securityContext = authResult.getSecurityContext();
 								renderContext.pushSecurityContext(securityContext);
 
-							} else if (result instanceof FileBase) {
+							} else if (result instanceof File) {
 
-								streamFile(authResult.getSecurityContext(), (FileBase)result, request, response, EditMode.NONE);
+								streamFile(authResult.getSecurityContext(), (File)result, request, response, EditMode.NONE);
 								tx.success();
 								return;
 
@@ -668,7 +668,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 				if (rootElement == null) { // No page found
 
 					// Look for a file
-					FileBase file = findFile(securityContext, request, path);
+					File file = findFile(securityContext, request, path);
 					if (file != null) {
 
 						//streamFile(securityContext, file, request, response, edit);
@@ -741,7 +741,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 								rootElement = (DOMNode)result;
 								renderContext.pushSecurityContext(authResult.getSecurityContext());
 
-							} else if (result instanceof FileBase) {
+							} else if (result instanceof File) {
 
 								//streamFile(authResult.getSecurityContext(), (File)result, request, response, EditMode.NONE);
 								tx.success();
@@ -989,7 +989,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 	 * @return file
 	 * @throws FrameworkException
 	 */
-	private FileBase findFile(final SecurityContext securityContext, final HttpServletRequest request, final String path) throws FrameworkException {
+	private File findFile(final SecurityContext securityContext, final HttpServletRequest request, final String path) throws FrameworkException {
 
 		List<Linkable> entryPoints = findPossibleEntryPoints(securityContext, request, path);
 
@@ -1004,8 +1004,8 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 
 		for (Linkable node : entryPoints) {
 
-			if (node instanceof FileBase && (path.equals(node.getPath()) || node.getUuid().equals(PathHelper.getName(path)))) {
-				return (FileBase) node;
+			if (node instanceof File && (path.equals(node.getPath()) || node.getUuid().equals(PathHelper.getName(path)))) {
+				return (File) node;
 			}
 		}
 
@@ -1340,7 +1340,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 		}
 	}
 
-	private static boolean notModifiedSince(final HttpServletRequest request, HttpServletResponse response, final AbstractNode node, final boolean dontCache) {
+	private static boolean notModifiedSince(final HttpServletRequest request, HttpServletResponse response, final NodeInterface node, final boolean dontCache) {
 
 		boolean notModified = false;
 		final Date lastModified = node.getLastModifiedDate();
@@ -1403,7 +1403,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 		return notModified;
 	}
 
-	private void streamFile(SecurityContext securityContext, final FileBase file, HttpServletRequest request, HttpServletResponse response, final EditMode edit) throws IOException {
+	private void streamFile(SecurityContext securityContext, final File file, HttpServletRequest request, HttpServletResponse response, final EditMode edit) throws IOException {
 
 		if (!securityContext.isVisible(file)) {
 

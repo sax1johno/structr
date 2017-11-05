@@ -29,27 +29,13 @@ import org.structr.web.common.HtmlProperty;
 import org.structr.web.common.RenderContext;
 import org.structr.web.entity.dom.DOMElement;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
  *
  */
-public class Html extends DOMElement {
+public interface Html extends DOMElement {
 
-	public static final Property<String> _manifest = new HtmlProperty("manifest");
-
-	/** If set, the custom opening tag is rendered instead of just <html> to allow things like IE conditional comments:
-	 *
-	 * <!--[if lt IE 7]>      <html class="no-js ie8 ie7 ie6"> <![endif]-->
-	 * <!--[if IE 7]>         <html class="no-js ie8 ie7"> <![endif]-->
-	 * <!--[if IE 8]>         <html class="no-js ie8"> <![endif]-->
-	 * <!--[if gt IE 8]><!--> <html class="no-js ie9"> <!--<![endif]-->
-	 *
-	*/
+	public static final Property<String> _manifest         = new HtmlProperty("manifest");
 	public static final Property<String> _customOpeningTag = new StringProperty("customOpeningTag");
-
-	//public static final Property<Head> head = new EndNode<>("head", HtmlHead.class);
-	//public static final Property<Body> body = new EndNode<>("body", HtmlBody.class);
 
 	public static final View htmlView = new View(Html.class, PropertyView.Html,
 		_manifest
@@ -60,28 +46,21 @@ public class Html extends DOMElement {
 	);
 
 	@Override
-	public void openingTag(final AsyncBuffer out, final String tag, final RenderContext.EditMode editMode, final RenderContext renderContext, final int depth) throws FrameworkException {
+	default void openingTag(final AsyncBuffer out, final String tag, final RenderContext.EditMode editMode, final RenderContext renderContext, final int depth) throws FrameworkException {
 
 		String custTag = getProperty(_customOpeningTag);
-
 		if (custTag != null) {
 
 			out.append(custTag);
 
 		} else {
 
-			super.openingTag(out, tag, editMode, renderContext, depth);
-
+			DOMElement.super.openingTag(out, tag, editMode, renderContext, depth);
 		}
-
 	}
 
-	//~--- get methods ----------------------------------------------------
-
 	@Override
-	public Property[] getHtmlAttributes() {
-
-		return (Property[]) ArrayUtils.addAll(super.getHtmlAttributes(), htmlView.properties());
-
+	default Property[] getHtmlAttributes() {
+		return (Property[]) ArrayUtils.addAll(DOMElement.super.getHtmlAttributes(), htmlView.properties());
 	}
 }

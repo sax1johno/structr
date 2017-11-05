@@ -41,6 +41,7 @@ import org.structr.core.Value;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.graph.NodeFactory;
+import org.structr.core.graph.NodeInterface;
 import org.structr.core.property.PropertyKey;
 import org.structr.rest.ResourceProvider;
 import org.structr.rest.exception.IllegalPathException;
@@ -60,12 +61,12 @@ import org.structr.web.entity.dom.DOMNode;
  * encapsulated and re-used here
  *
  */
-public class RestDataSource implements GraphDataSource<Iterable<GraphObject>> {
+public class RestDataSource implements GraphDataSource {
 
 	private static final Logger logger = LoggerFactory.getLogger(RestDataSource.class.getName());
 
 	@Override
-	public Iterable<GraphObject> getData(final RenderContext renderContext, AbstractNode referenceNode) throws FrameworkException {
+	public Iterable<GraphObject> getData(final RenderContext renderContext, NodeInterface referenceNode) throws FrameworkException {
 
 		final String restQuery = ((DOMNode) referenceNode).getPropertyWithVariableReplacement(renderContext, DOMNode.restQuery);
 		if (restQuery == null || restQuery.isEmpty()) {

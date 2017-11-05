@@ -23,22 +23,14 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Area extends DOMElement {
+public interface Area extends DOMElement {
 
-//	static {
-//
-//		StructrApp.getConfiguration().registerPropertySet(Area.class, PropertyView.All, HtmlElement.UiKey.values());
-//		StructrApp.getConfiguration().registerPropertySet(Area.class, PropertyView.Public, HtmlElement.UiKey.values());
-//		StructrApp.getConfiguration().registerPropertySet(Area.class, PropertyView.Html, PropertyView.Html, htmlAttributes);
-//
-//	}
-//
-	//~--- get methods ----------------------------------------------------
-
+	/*
 	@Override
 	public boolean isVoidElement() {
 
 		return true;
 
 	}
+	*/
 }

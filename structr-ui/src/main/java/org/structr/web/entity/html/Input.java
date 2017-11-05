@@ -18,19 +18,16 @@
  */
 package org.structr.web.entity.html;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.structr.common.PropertyView;
 import org.structr.common.View;
 import org.structr.core.property.Property;
 import org.structr.web.common.HtmlProperty;
 import org.structr.web.entity.dom.DOMElement;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
  *
  */
-public class Input extends DOMElement {
+public interface Input extends DOMElement {
 
 	public static final Property<String> _accept         = new HtmlProperty("accept");
 	public static final Property<String> _alt            = new HtmlProperty("alt");
@@ -64,28 +61,22 @@ public class Input extends DOMElement {
 	public static final Property<String> _value          = new HtmlProperty("value");
 	public static final Property<String> _width          = new HtmlProperty("width");
 
-	//public static final Property<List<Form>> forms       = new StartNodes<>("forms", FormInput.class);
-	
 	public static final View htmlView = new View(Input.class, PropertyView.Html,
-	    
+
 		_accept, _alt, _autocomplete, _autofocus, _checked, _dirname, _disabled, _form, _formaction, _formenctype, _formmethod,
 		_formnovalidate, _formtarget, _height, _list, _max, _maxlength, _min, _multiple, _name, _pattern, _placeholder,
 		_readonly, _required, _size, _src, _step, _type, _value, _width
 	 );
 
-	//~--- get methods ----------------------------------------------------
-
+	/*
 	@Override
 	public boolean isVoidElement() {
-
 		return true;
-
 	}
 
 	@Override
 	public Property[] getHtmlAttributes() {
-
 		return (Property[]) ArrayUtils.addAll(super.getHtmlAttributes(), htmlView.properties());
-
 	}
+	*/
 }

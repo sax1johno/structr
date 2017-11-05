@@ -23,6 +23,7 @@
 
 package org.structr.schema;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -49,6 +50,7 @@ import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.SchemaNode;
 import org.structr.core.entity.SchemaRelationshipNode;
+import org.structr.core.graph.NodeAttribute;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.Tx;
 import org.structr.core.graph.search.SearchCommand;
@@ -61,10 +63,10 @@ import org.structr.schema.compiler.NodeExtender;
  */
 public class SchemaService implements Service {
 
-	private static final Logger logger                            = LoggerFactory.getLogger(SchemaService.class.getName());
-	private static final AtomicBoolean compiling                  = new AtomicBoolean(false);
-	private static final AtomicBoolean updating                   = new AtomicBoolean(false);
-	private static final Map<String, String> builtinTypeMap       = new LinkedHashMap<>();
+	private static final Logger logger                      = LoggerFactory.getLogger(SchemaService.class.getName());
+	private static final AtomicBoolean compiling            = new AtomicBoolean(false);
+	private static final AtomicBoolean updating             = new AtomicBoolean(false);
+	private static final Map<String, MixinStorage> mixinMap = new LinkedHashMap<>();
 
 	@Override
 	public void injectArguments(final Command command) {
@@ -84,8 +86,8 @@ public class SchemaService implements Service {
 		return true;
 	}
 
-	public static void registerBuiltinTypeOverride(final String type, final String fqcn) {
-		builtinTypeMap.put(type, fqcn);
+	public static void registerMixinType(final String type, final Class<? extends AbstractNode> baseClass, final Class... interfaces) {
+		mixinMap.put(type, new MixinStorage(type, baseClass, interfaces));
 	}
 
 	public static boolean reloadSchema(final ErrorBuffer errorBuffer, final String initiatedBySessionId) {
@@ -99,9 +101,8 @@ public class SchemaService implements Service {
 			try {
 
 				final Map<String, Map<String, PropertyKey>> removedClasses = new HashMap<>(StructrApp.getConfiguration().getTypeAndPropertyMapping());
+				final NodeExtender nodeExtender                            = new NodeExtender(initiatedBySessionId);
 				final Set<String> dynamicViews                             = new LinkedHashSet<>();
-				final NodeExtender nodeExtender                            = new NodeExtender();
-				nodeExtender.setInitiatedBySessionId(initiatedBySessionId);
 
 				try (final Tx tx = StructrApp.getInstance().tx()) {
 
@@ -235,21 +236,27 @@ public class SchemaService implements Service {
 
 		final App app = StructrApp.getInstance();
 
-		for (final Entry<String, String> entry : builtinTypeMap.entrySet()) {
+		for (final Entry<String, MixinStorage> entry : mixinMap.entrySet()) {
 
-			final String type = entry.getKey();
-			final String fqcn = entry.getValue();
+			final String type        = entry.getKey();
+			final MixinStorage mixin = entry.getValue();
 
 			SchemaNode schemaNode = app.nodeQuery(SchemaNode.class).andName(type).getFirst();
 			if (schemaNode == null) {
 
-				schemaNode = app.create(SchemaNode.class, type);
+				schemaNode = app.create(SchemaNode.class,
+					new NodeAttribute<>(SchemaNode.name, type),
+					new NodeAttribute<>(SchemaNode.implementsInterfaces, StringUtils.join(mixin.interfaces.stream().map(i -> i.getSimpleName()).iterator(), ", "))
+				);
 			}
 
 			// creation can fail
 			if (schemaNode != null) {
 
-				schemaNode.setProperty(SchemaNode.extendsClass, fqcn);
+				if (mixin.baseClass != null) {
+					schemaNode.setProperty(SchemaNode.extendsClass, mixin.baseClass.getName());
+				}
+
 				schemaNode.unlockSystemPropertiesOnce();
 				schemaNode.setProperty(SchemaNode.isBuiltinType, true);
 			}
@@ -458,5 +465,21 @@ public class SchemaService implements Service {
 
 		// fallback: use dynamic class from simple name
 		return StructrApp.getConfiguration().getNodeEntityClass(StringUtils.substringAfterLast(name, "."));
+	}
+
+	// ----- nested classes -----
+	private static class MixinStorage {
+
+		public Set<Class> interfaces = new LinkedHashSet<>();
+		public String name           = null;
+		public Class baseClass       = null;
+
+		public MixinStorage(final String name, final Class baseClass, final Class... interfaces) {
+
+			this.interfaces.addAll(Arrays.asList(interfaces));
+
+			this.baseClass = baseClass;
+			this.name      = name;
+		}
 	}
 }

@@ -23,5 +23,5 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Nav extends DOMElement {
+public interface Nav extends DOMElement {
 }

@@ -18,6 +18,7 @@
  */
 package org.structr.web.entity.dom;
 
+import org.structr.web.entity.html.Html5DocumentType;
 import java.io.FileInputStream;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -26,22 +27,16 @@ import java.util.List;
 import java.util.Set;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.structr.api.Predicate;
 import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
-import org.structr.common.ValidationHelper;
-import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.Export;
-import org.structr.core.GraphObject;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.graph.CreateNodeCommand;
 import org.structr.core.graph.NodeAttribute;
-import static org.structr.core.graph.NodeInterface.owner;
 import org.structr.core.graph.Tx;
 import org.structr.core.property.BooleanProperty;
 import org.structr.core.property.ConstantBooleanProperty;
@@ -52,16 +47,12 @@ import org.structr.core.property.RelationProperty;
 import org.structr.core.property.StartNode;
 import org.structr.core.property.StartNodes;
 import org.structr.core.property.StringProperty;
-import org.structr.schema.SchemaService;
 import org.structr.web.common.RenderContext;
 import org.structr.web.common.StringRenderBuffer;
 import org.structr.web.diff.InvertibleModificationOperation;
 import org.structr.web.entity.Linkable;
-import static org.structr.web.entity.Linkable.linkingElements;
 import org.structr.web.entity.Site;
-import static org.structr.web.entity.dom.DOMNode.children;
 import org.structr.web.entity.html.Html;
-import org.structr.web.entity.html.relation.ResourceLink;
 import org.structr.web.entity.relation.PageLink;
 import org.structr.web.entity.relation.Pages;
 import org.structr.web.importer.Importer;
@@ -83,17 +74,12 @@ import org.w3c.dom.NodeList;
 import org.w3c.dom.ProcessingInstruction;
 import org.w3c.dom.Text;
 
-//~--- classes ----------------------------------------------------------------
 /**
- * Represents a page resource
- *
- *
- *
+ * Represents a page resource.
  */
-public class Page extends DOMNode implements Linkable, Document, DOMImplementation {
+public interface Page extends DOMNode, Linkable, Document, DOMImplementation {
 
 	public static final Set<String> nonBodyTags = new HashSet<>(Arrays.asList(new String[] { "html", "head", "body", "meta", "link" } ));
-	private static final Logger logger          = LoggerFactory.getLogger(Page.class.getName());
 
 	public static final Property<Integer> version = new IntProperty("version").indexed().readOnly();
 	public static final Property<Integer> position = new IntProperty("position").indexed();
@@ -123,44 +109,6 @@ public class Page extends DOMNode implements Linkable, Document, DOMImplementati
 	public static final org.structr.common.View categoryView = new org.structr.common.View(Page.class, "category",
 		category
 	);
-
-	private Html5DocumentType docTypeNode               = null;
-
-	// register this type as an overridden builtin type
-	static {
-		SchemaService.registerBuiltinTypeOverride("Page", Page.class.getName());
-	}
-
-	public Page() {
-
-		docTypeNode = new Html5DocumentType(this);
-	}
-
-	@Override
-	public boolean contentEquals(DOMNode otherNode) {
-		return false;
-	}
-
-	@Override
-	public String getContextName() {
-		return getProperty(Page.name);
-	}
-
-	@Override
-	public void updateFromNode(final DOMNode newNode) throws FrameworkException {
-		// do nothing
-	}
-
-	@Override
-	public boolean isValid(ErrorBuffer errorBuffer) {
-
-		boolean valid = super.isValid(errorBuffer);
-
-		valid &= nonEmpty(AbstractNode.name, errorBuffer);
-		valid &= ValidationHelper.isValidStringMatchingRegex(this, name, "[_\\p{L}0-9\\s\\-\\.]+", errorBuffer);
-
-		return valid;
-	}
 
 	/**
 	 * Creates a new Page entity with the given name in the database.
@@ -262,7 +210,32 @@ public class Page extends DOMNode implements Linkable, Document, DOMImplementati
 	}
 
 	@Override
-	protected void checkHierarchy(Node otherNode) throws DOMException {
+	default boolean contentEquals(DOMNode otherNode) {
+		return false;
+	}
+
+	@Override
+	default String getContextName() {
+		return getProperty(Page.name);
+	}
+
+	@Override
+	default void updateFromNode(final DOMNode newNode) throws FrameworkException {
+		// do nothing
+	}
+
+	@Override
+	default Object getFeature(final String version, final String feature) {
+		return null;
+	}
+
+	@Override
+	default boolean hasFeature(final String version, final String feature){
+		return false;
+	}
+
+	@Override
+	default void checkHierarchy(Node otherNode) throws DOMException {
 
 		// verify that this document has only one document element
 		if (getDocumentElement() != null) {
@@ -274,58 +247,50 @@ public class Page extends DOMNode implements Linkable, Document, DOMImplementati
 			throw new DOMException(DOMException.HIERARCHY_REQUEST_ERR, HIERARCHY_REQUEST_ERR_MESSAGE_ELEMENT);
 		}
 
-		super.checkHierarchy(otherNode);
+		DOMNode.super.checkHierarchy(otherNode);
 	}
 
 	@Override
-	public boolean hasChildNodes() {
+	default boolean hasChildNodes() {
 		return true;
 	}
 
 	@Override
-	public NodeList getChildNodes() {
+	default NodeList getChildNodes() {
 
 		DOMNodeList _children = new DOMNodeList();
 
-		_children.add(docTypeNode);
-		_children.addAll(super.getChildNodes());
+		_children.add(getFirstChild());
+		_children.addAll(DOMNode.super.getChildNodes());
 
 		return _children;
 	}
 
-	@Override
-	public Node getFirstChild() {
-		return docTypeNode;
-	}
-
-	public void increaseVersion() throws FrameworkException {
+	default void increaseVersion() throws FrameworkException {
 
 		final Integer _version = getProperty(Page.version);
 
 		unlockReadOnlyPropertiesOnce();
 		if (_version == null) {
 
-			setProperties(securityContext, new PropertyMap(Page.version, 1));
+			setProperties(getSecurityContext(), new PropertyMap(Page.version, 1));
 
 		} else {
 
-			setProperties(securityContext, new PropertyMap(Page.version, _version + 1));
+			setProperties(getSecurityContext(), new PropertyMap(Page.version, _version + 1));
 		}
 	}
 
 	@Override
-	public Element createElement(final String tag) throws DOMException {
-
+	default Element createElement(final String tag) throws DOMException {
 		return createElement(tag, false);
-
 	}
 
-	public Element createElement (final String tag, final boolean suppressException) {
+	default Element createElement (final String tag, final boolean suppressException) {
 
 		final String elementType = StringUtils.capitalize(tag);
-		final App app = StructrApp.getInstance(securityContext);
-
-		String c = Content.class.getSimpleName();
+		final App app            = StructrApp.getInstance(getSecurityContext());
+		String c                 = Content.class.getSimpleName();
 
 		// Avoid creating an (invalid) 'Content' DOMElement
 		if (elementType == null || c.equals(elementType)) {
@@ -367,13 +332,13 @@ public class Page extends DOMNode implements Linkable, Document, DOMImplementati
 	}
 
 	@Override
-	protected void handleNewChild(Node newChild) {
+	default void handleNewChild(Node newChild) {
 
 		for (final DOMNode child : getAllChildNodes()) {
 
 			try {
 
-				child.setProperties(securityContext, new PropertyMap(ownerDocument, this));
+				child.setProperties(getSecurityContext(), new PropertyMap(ownerDocument, this));
 
 			} catch (FrameworkException ex) {
 				logger.warn("", ex);
@@ -384,9 +349,10 @@ public class Page extends DOMNode implements Linkable, Document, DOMImplementati
 	}
 
 	@Override
-	public DocumentFragment createDocumentFragment() {
+	default DocumentFragment createDocumentFragment() {
 
-		final App app = StructrApp.getInstance(securityContext);
+		final SecurityContext securityContext = getSecurityContext();
+		final App app                         = StructrApp.getInstance(securityContext);
 
 		try {
 
@@ -410,7 +376,9 @@ public class Page extends DOMNode implements Linkable, Document, DOMImplementati
 	}
 
 	@Override
-	public Text createTextNode(final String text) {
+	default Text createTextNode(final String text) {
+
+		final SecurityContext securityContext = getSecurityContext();
 
 		try {
 
@@ -438,7 +406,9 @@ public class Page extends DOMNode implements Linkable, Document, DOMImplementati
 	}
 
 	@Override
-	public Comment createComment(String comment) {
+	default Comment createComment(String comment) {
+
+		final SecurityContext securityContext = getSecurityContext();
 
 		try {
 
@@ -464,7 +434,9 @@ public class Page extends DOMNode implements Linkable, Document, DOMImplementati
 	}
 
 	@Override
-	public CDATASection createCDATASection(String string) throws DOMException {
+	default CDATASection createCDATASection(String string) throws DOMException {
+
+		final SecurityContext securityContext = getSecurityContext();
 
 		try {
 
@@ -489,45 +461,41 @@ public class Page extends DOMNode implements Linkable, Document, DOMImplementati
 	}
 
 	@Override
-	public ProcessingInstruction createProcessingInstruction(String string, String string1) throws DOMException {
-
+	default ProcessingInstruction createProcessingInstruction(String string, String string1) throws DOMException {
 		throw new UnsupportedOperationException("Not supported yet.");
-
 	}
 
 	@Override
-	public Attr createAttribute(String name) throws DOMException {
+	default Attr createAttribute(String name) throws DOMException {
 		return new DOMAttribute(this, null, name, null);
 	}
 
 	@Override
-	public EntityReference createEntityReference(String string) throws DOMException {
-
+	default EntityReference createEntityReference(String string) throws DOMException {
 		throw new UnsupportedOperationException("Not supported yet.");
-
 	}
 
 	@Override
-	public Element createElementNS(String string, String string1) throws DOMException {
+	default Element createElementNS(String string, String string1) throws DOMException {
 		throw new UnsupportedOperationException("Namespaces not supported");
 	}
 
 	@Override
-	public Attr createAttributeNS(String string, String string1) throws DOMException {
+	default Attr createAttributeNS(String string, String string1) throws DOMException {
 		throw new UnsupportedOperationException("Namespaces not supported");
 	}
 
 	@Override
-	public Node importNode(final Node node, final boolean deep) throws DOMException {
+	default Node importNode(final Node node, final boolean deep) throws DOMException {
 		return importNode(node, deep, true);
 	}
 
 	@Override
-	public Node adoptNode(Node node) throws DOMException {
+	default Node adoptNode(Node node) throws DOMException {
 		return adoptNode(node, true);
 	}
 
-	private Node adoptNode(final Node node, final boolean removeParentFromSourceNode) throws DOMException {
+	default Node adoptNode(final Node node, final boolean removeParentFromSourceNode) throws DOMException {
 
 		if (node instanceof DOMNode) {
 
@@ -571,22 +539,22 @@ public class Page extends DOMNode implements Linkable, Document, DOMImplementati
 	}
 
 	@Override
-	public void normalizeDocument() {
+	default void normalizeDocument() {
 		normalize();
 	}
 
 	@Override
-	public Node renameNode(Node node, String string, String string1) throws DOMException {
+	default Node renameNode(Node node, String string, String string1) throws DOMException {
 		throw new DOMException(DOMException.NOT_SUPPORTED_ERR, NOT_SUPPORTED_ERR_MESSAGE_RENAME);
 	}
 
 	@Override
-	public DocumentType createDocumentType(String string, String string1, String string2) throws DOMException {
+	default DocumentType createDocumentType(String string, String string1, String string2) throws DOMException {
 		throw new UnsupportedOperationException("Not supported yet.");
 	}
 
 	@Override
-	public Document createDocument(String string, String string1, DocumentType dt) throws DOMException {
+	default Document createDocument(String string, String string1, DocumentType dt) throws DOMException {
 		throw new UnsupportedOperationException("Not supported yet.");
 	}
 
@@ -597,10 +565,11 @@ public class Page extends DOMNode implements Linkable, Document, DOMImplementati
 	 * @return content
 	 * @throws FrameworkException
 	 */
-	public String getContent(final RenderContext.EditMode editMode) throws FrameworkException {
+	default String getContent(final RenderContext.EditMode editMode) throws FrameworkException {
 
-		final RenderContext ctx = new RenderContext(securityContext, null, null, editMode);
+		final RenderContext ctx         = new RenderContext(getSecurityContext(), null, null, editMode);
 		final StringRenderBuffer buffer = new StringRenderBuffer();
+
 		ctx.setBuffer(buffer);
 		render(ctx, 0);
 
@@ -610,21 +579,21 @@ public class Page extends DOMNode implements Linkable, Document, DOMImplementati
 	}
 
 	@Override
-	public short getNodeType() {
+	default short getNodeType() {
 
 		return Element.DOCUMENT_NODE;
 	}
 
 	@Override
-	public DOMImplementation getImplementation() {
+	default DOMImplementation getImplementation() {
 
 		return this;
 	}
 
 	@Override
-	public Element getDocumentElement() {
+	default Element getDocumentElement() {
 
-		Node node = super.getFirstChild();
+		Node node = DOMNode.super.getFirstChild();
 
 		if (node instanceof Element) {
 
@@ -637,7 +606,7 @@ public class Page extends DOMNode implements Linkable, Document, DOMImplementati
 	}
 
 	@Override
-	public Element getElementById(final String id) {
+	default Element getElementById(final String id) {
 
 		DOMNodeList results = new DOMNodeList();
 
@@ -669,47 +638,47 @@ public class Page extends DOMNode implements Linkable, Document, DOMImplementati
 	}
 
 	@Override
-	public String getInputEncoding() {
+	default String getInputEncoding() {
 		return null;
 	}
 
 	@Override
-	public String getXmlEncoding() {
+	default String getXmlEncoding() {
 		return "UTF-8";
 	}
 
 	@Override
-	public boolean getXmlStandalone() {
+	default boolean getXmlStandalone() {
 		return true;
 	}
 
 	@Override
-	public String getXmlVersion() {
+	default String getXmlVersion() {
 		return "1.0";
 	}
 
 	@Override
-	public boolean getStrictErrorChecking() {
+	default boolean getStrictErrorChecking() {
 		return true;
 	}
 
 	@Override
-	public String getDocumentURI() {
+	default String getDocumentURI() {
 		return null;
 	}
 
 	@Override
-	public DOMConfiguration getDomConfig() {
+	default DOMConfiguration getDomConfig() {
 		return null;
 	}
 
 	@Override
-	public DocumentType getDoctype() {
+	default DocumentType getDoctype() {
 		return new Html5DocumentType(this);
 	}
 
 	@Override
-	public void render(RenderContext renderContext, int depth) throws FrameworkException {
+	default void render(RenderContext renderContext, int depth) throws FrameworkException {
 
 		renderContext.setPage(this);
 
@@ -718,7 +687,7 @@ public class Page extends DOMNode implements Linkable, Document, DOMImplementati
 
 		if (subNode == null) {
 
-			subNode = (DOMNode) super.getFirstChild();
+			subNode = (DOMNode) DOMNode.super.getFirstChild();
 
 
 		} else {
@@ -729,7 +698,7 @@ public class Page extends DOMNode implements Linkable, Document, DOMImplementati
 
 		while (subNode != null) {
 
-			if (subNode.isNotDeleted() && securityContext.isVisible(subNode)) {
+			if (subNode.isNotDeleted() && getSecurityContext().isVisible(subNode)) {
 
 				subNode.render(renderContext, depth);
 			}
@@ -741,67 +710,62 @@ public class Page extends DOMNode implements Linkable, Document, DOMImplementati
 	}
 
 	@Override
-	public void renderContent(final RenderContext renderContext, final int depth) throws FrameworkException {
+	default void renderContent(final RenderContext renderContext, final int depth) throws FrameworkException {
 	}
 
 	@Override
-	public boolean hasFeature(String string, String string1) {
+	default boolean isSynced() {
 		return false;
 	}
 
 	@Override
-	public boolean isSynced() {
-		return false;
+	default void setXmlStandalone(boolean bln) throws DOMException {
 	}
 
 	@Override
-	public void setXmlStandalone(boolean bln) throws DOMException {
+	default void setXmlVersion(String string) throws DOMException {
 	}
 
 	@Override
-	public void setXmlVersion(String string) throws DOMException {
+	default void setStrictErrorChecking(boolean bln) {
 	}
 
 	@Override
-	public void setStrictErrorChecking(boolean bln) {
-	}
-
-	@Override
-	public void setDocumentURI(String string) {
+	default void setDocumentURI(String string) {
 	}
 
 	// ----- interface org.w3c.dom.Node -----
 	@Override
-	public String getLocalName() {
+	default String getLocalName() {
 		return null;
 	}
 
 	@Override
-	public String getNodeName() {
+	default String getNodeName() {
 		return "#document";
 	}
 
 	@Override
-	public String getNodeValue() throws DOMException {
+	default String getNodeValue() throws DOMException {
 		return null;
 	}
 
 	@Override
-	public void setNodeValue(String string) throws DOMException {
+	default void setNodeValue(String string) throws DOMException {
 	}
 
 	@Override
-	public NamedNodeMap getAttributes() {
+	default NamedNodeMap getAttributes() {
 		return null;
 	}
 
 	@Override
-	public boolean hasAttributes() {
+	default boolean hasAttributes() {
 		return false;
 	}
 
 	@Override
-	public NodeList getElementsByTagName(final String tagName) {
+	default NodeList getElementsByTagName(final String tagName) {
 
 		DOMNodeList results = new DOMNodeList();
 
@@ -828,37 +792,38 @@ public class Page extends DOMNode implements Linkable, Document, DOMImplementati
 	}
 
 	@Override
-	public NodeList getElementsByTagNameNS(String string, String tagName) {
+	default NodeList getElementsByTagNameNS(String string, String tagName) {
 		throw new UnsupportedOperationException("Namespaces not supported.");
 	}
 
 	// ----- interface DOMAdoptable -----
 	@Override
-	public Node doAdopt(Page page) throws DOMException {
+	default Node doAdopt(Page page) throws DOMException {
 		throw new DOMException(DOMException.NOT_SUPPORTED_ERR, NOT_SUPPORTED_ERR_MESSAGE_ADOPT_DOC);
 	}
 
 	// ----- interface DOMImportable -----
 	@Override
-	public Node doImport(Page newPage) throws DOMException {
+	default Node doImport(Page newPage) throws DOMException {
 		throw new DOMException(DOMException.NOT_SUPPORTED_ERR, NOT_SUPPORTED_ERR_MESSAGE_IMPORT_DOC);
 	}
 
 	@Override
-	public String getPath() {
+	default String getPath() {
 		return getProperty(path);
 	}
 
 	// ----- diff methods -----
 	@Export
-	public void diff(final String file) throws FrameworkException {
+	default void diff(final String file) throws FrameworkException {
 
-		final App app = StructrApp.getInstance(securityContext);
+		final SecurityContext securityContext = getSecurityContext();
+		final App app                         = StructrApp.getInstance(securityContext);
 
 		try (final Tx tx = app.tx()) {
 
 			final FileInputStream fis                             = new FileInputStream(file);
-			final String source                                   = IOUtils.toString(fis);
+			final String source                                   = IOUtils.toString(fis, "utf-8");
 			final Page diffPage                                   = Importer.parsePageFromSource(securityContext, source, this.getProperty(Page.name) + "diff");
 			final List<InvertibleModificationOperation> changeSet = new LinkedList<>();
 
@@ -890,23 +855,8 @@ public class Page extends DOMNode implements Linkable, Document, DOMImplementati
 		}
 	}
 
-	// ----- interface Syncable -----
-	@Override
-	public List<GraphObject> getSyncData() throws FrameworkException {
-
-		final List<GraphObject> data = super.getSyncData();
-
-		data.addAll(getProperty(Linkable.linkingElements));
-
-		for (final ResourceLink link : getRelationships(ResourceLink.class)) {
-			data.add(link);
-		}
-
-		return data;
-	}
-
 	// ----- private methods -----
-	private Node importNode(final Node node, final boolean deep, final boolean removeParentFromSourceNode) throws DOMException {
+	default Node importNode(final Node node, final boolean deep, final boolean removeParentFromSourceNode) throws DOMException {
 
 		if (node instanceof DOMNode) {
 

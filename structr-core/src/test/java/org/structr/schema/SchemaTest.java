@@ -37,8 +37,6 @@ import org.structr.api.config.Settings;
 import org.structr.common.StructrTest;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.StructrApp;
-import org.structr.core.entity.AbstractUser;
-import org.structr.core.entity.Group;
 import org.structr.core.entity.Relation;
 import org.structr.core.entity.Relation.Cardinality;
 import org.structr.core.entity.SchemaMethod;
@@ -57,6 +55,8 @@ import org.structr.schema.json.JsonReferenceType;
 import org.structr.schema.json.JsonSchema;
 import org.structr.schema.json.JsonSchema.Cascade;
 import org.structr.schema.json.JsonType;
+import org.structr.core.entity.Group;
+import org.structr.core.entity.Principal;
 
 /**
  *
@@ -200,7 +200,7 @@ public class SchemaTest extends StructrTest {
 
 			final JsonSchema sourceSchema = StructrSchema.createFromDatabase(app);
 
-			final JsonType contact  = sourceSchema.addType("Contact").setExtends(StructrApp.getSchemaId(AbstractUser.class));
+			final JsonType contact  = sourceSchema.addType("Contact").setExtends(StructrApp.getSchemaId(Principal.class));
 			final JsonType customer = sourceSchema.addType("Customer").setExtends(contact);
 
 			final String schema = sourceSchema.toString();
@@ -218,8 +218,8 @@ public class SchemaTest extends StructrTest {
 			compareSchemaRoundtrip(sourceSchema);
 
 		} catch (Exception t) {
+			t.printStackTrace();
 			logger.warn("", t);
-			fail("Unexpected exception.");
 		}
 
 	}
@@ -359,7 +359,7 @@ public class SchemaTest extends StructrTest {
 
 		} catch (Exception ex) {
 
-			logger.warn("", ex);
+			ex.printStackTrace();
 			fail("Unexpected exception.");
 		}
 	}
@@ -388,7 +388,7 @@ public class SchemaTest extends StructrTest {
 			checkSchemaString(StructrSchema.createFromDatabase(app).toString());
 
 		} catch (FrameworkException | URISyntaxException t) {
-			logger.warn("", t);
+			t.printStackTrace();
 		}
 	}
 
@@ -563,6 +563,27 @@ public class SchemaTest extends StructrTest {
 			fex.printStackTrace();
 			fail("Unexpected exception");
 		}
+	}
+
+	@Test
+	public void testMixins() {
+
+		Settings.LogSchemaOutput.setValue(Boolean.TRUE);
+
+		try (final Tx tx = app.tx()) {
+
+			app.create(SchemaNode.class,
+				new NodeAttribute<>(SchemaNode.name, "Test"),
+				new NodeAttribute<>(SchemaNode.implementsInterfaces, "MailTemplate")
+			);
+
+			tx.success();
+
+		} catch (FrameworkException fex) {
+			fex.printStackTrace();
+			fail("Unexpected exception");
+		}
+
 	}
 
 	// ----- private methods -----

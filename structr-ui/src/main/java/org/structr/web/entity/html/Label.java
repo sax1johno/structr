@@ -27,11 +27,11 @@ import org.structr.web.entity.dom.DOMElement;
 /**
  *
  */
-public class Label extends DOMElement {
+public interface Label extends DOMElement {
 
 	public static final Property<String>            _for   = new HtmlProperty("for");
 	public static final Property<String>            _form  = new HtmlProperty("form");
-	
+
 	public static final View htmlView = new View(Label.class, PropertyView.Html,
 		_for, _form
 	);

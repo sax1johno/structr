@@ -34,11 +34,8 @@ import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
 
-
 /**
  * Fix 'lost' components
- *
- *
  */
 public class FixComponentsCommand extends AbstractCommand {
 
@@ -52,8 +49,6 @@ public class FixComponentsCommand extends AbstractCommand {
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
-		final SecurityContext securityContext = getWebSocket().getSecurityContext();
-
 		try {
 			fixLostComponents();
 
@@ -61,16 +56,12 @@ public class FixComponentsCommand extends AbstractCommand {
 
 			// send DOM exception
 			getWebSocket().send(MessageBuilder.status().code(422).message(ex.getMessage()).build(), true);
-
 		}
-
 	}
 
 	@Override
 	public String getCommand() {
-
 		return "FIX_LOST_COMPONENTS";
-
 	}
 
 	/**
@@ -109,13 +100,8 @@ public class FixComponentsCommand extends AbstractCommand {
 				} catch (Exception ex) {
 
 					logger.error("Could not fix component " + node, ex);
-
 				}
-
 			}
-
 		}
-
 	}
-
 }

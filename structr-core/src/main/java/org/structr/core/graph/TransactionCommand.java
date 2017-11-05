@@ -35,8 +35,8 @@ import org.structr.common.error.FrameworkException;
 import org.structr.core.StructrTransactionListener;
 import org.structr.core.TransactionSource;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.Principal;
 import org.structr.core.property.PropertyKey;
+import org.structr.core.entity.Principal;
 
 /**
  * Graph service command for database operations that need to be wrapped in

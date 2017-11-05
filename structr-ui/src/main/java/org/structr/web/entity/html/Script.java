@@ -18,28 +18,16 @@
  */
 package org.structr.web.entity.html;
 
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang3.ArrayUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.structr.common.PropertyView;
-import org.structr.common.SecurityContext;
 import org.structr.common.View;
-import org.structr.common.error.ErrorBuffer;
-import org.structr.common.error.FrameworkException;
 import org.structr.core.property.Property;
-import org.structr.core.property.PropertyMap;
 import org.structr.web.common.HtmlProperty;
 import org.structr.web.entity.LinkSource;
-import org.structr.web.entity.dom.Content;
-import org.w3c.dom.Node;
 
 /**
  *
  */
-public class Script extends LinkSource {
-
-	private static final Logger logger = LoggerFactory.getLogger(Script.class.getName());
+public interface Script extends LinkSource {
 
 	public static final Property<String> _src     = new HtmlProperty("src");
 	public static final Property<String> _async   = new HtmlProperty("async");
@@ -55,6 +43,7 @@ public class Script extends LinkSource {
 		_src, _async, _defer, _type, _charset
 	);
 
+	/*
 	@Override
 	public boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
 
@@ -95,5 +84,5 @@ public class Script extends LinkSource {
 			}
 		}
 	}
-
+	*/
 }

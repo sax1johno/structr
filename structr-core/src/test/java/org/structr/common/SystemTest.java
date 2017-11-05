@@ -397,6 +397,7 @@ public class SystemTest extends StructrTest {
 			tx.success();
 
 		} catch (FrameworkException ex) {
+			ex.printStackTrace();
 			fail("Error creating schema node");
 		}
 

@@ -18,8 +18,8 @@
  */
 package org.structr.core.graph.attribute;
 
-import org.structr.core.entity.Principal;
 import org.structr.core.graph.NodeAttribute;
+import org.structr.core.entity.Principal;
 
 /**
  *

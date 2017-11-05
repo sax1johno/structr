@@ -37,18 +37,18 @@ import org.structr.core.Services;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.auth.Authenticator;
-import org.structr.core.entity.Principal;
 import org.structr.core.graph.Tx;
 import org.structr.rest.auth.AuthHelper;
 import org.structr.rest.auth.SessionHelper;
 import org.structr.rest.service.HttpService;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.User;
 import org.structr.websocket.command.AbstractCommand;
 import org.structr.websocket.command.FileUploadHandler;
 import org.structr.websocket.command.LoginCommand;
 import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
+import org.structr.core.entity.Principal;
 
 //~--- classes ----------------------------------------------------------------
 /**
@@ -331,7 +331,7 @@ public class StructrWebSocket implements WebSocketListener {
 	}
 
 	// ----- file handling -----
-	public void createFileUploadHandler(FileBase file) {
+	public void createFileUploadHandler(File file) {
 
 		final String uuid = file.getProperty(GraphObject.id);
 
@@ -351,7 +351,7 @@ public class StructrWebSocket implements WebSocketListener {
 
 		try {
 
-			FileBase file = (FileBase) StructrApp.getInstance(securityContext).getNodeById(uuid);
+			File file = (File) StructrApp.getInstance(securityContext).getNodeById(uuid);
 
 			if (file != null) {
 

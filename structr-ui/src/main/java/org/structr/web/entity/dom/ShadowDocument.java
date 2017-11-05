@@ -18,11 +18,7 @@
  */
 package org.structr.web.entity.dom;
 
-import java.util.List;
 import org.structr.common.PropertyView;
-import org.structr.common.error.FrameworkException;
-import org.structr.core.GraphObject;
-import org.structr.web.entity.relation.PageLink;
 
 /**
  * Shadow document.
@@ -32,10 +28,11 @@ import org.structr.web.entity.relation.PageLink;
  *
  *
  */
-public class ShadowDocument extends Page {
+public interface ShadowDocument extends Page {
 
 	public static final org.structr.common.View publicView = new org.structr.common.View(ShadowDocument.class, PropertyView.Public, type, name, id);
 
+	/*
 	public ShadowDocument() { }
 
 	// ----- interface Syncable -----
@@ -52,4 +49,5 @@ public class ShadowDocument extends Page {
 
 		return data;
 	}
+	*/
 }

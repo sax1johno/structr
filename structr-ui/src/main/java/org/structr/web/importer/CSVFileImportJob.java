@@ -34,19 +34,19 @@ import org.structr.common.error.FrameworkException;
 import org.structr.core.JsonInput;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
-import org.structr.core.entity.Principal;
 import org.structr.core.graph.Tx;
 import org.structr.core.property.PropertyMap;
 import org.structr.module.StructrModule;
 import org.structr.module.api.APIBuilder;
 import org.structr.rest.common.CsvHelper;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
+import org.structr.core.entity.Principal;
 
 public class CSVFileImportJob extends ImportJob {
 
 	private static final Logger logger = LoggerFactory.getLogger(CSVFileImportJob.class.getName());
 
-	public CSVFileImportJob(FileBase file, Principal user, Map<String, Object> configuration) throws FrameworkException {
+	public CSVFileImportJob(File file, Principal user, Map<String, Object> configuration) throws FrameworkException {
 		super(file, user, configuration);
 	}
 

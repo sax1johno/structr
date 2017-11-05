@@ -20,7 +20,7 @@ package org.structr.core;
 
 import java.util.Date;
 import java.util.Iterator;
-import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -40,7 +40,6 @@ import org.structr.core.entity.AbstractRelationship;
 import org.structr.core.graph.CreationContainer;
 import org.structr.core.graph.ModificationQueue;
 import org.structr.core.graph.NodeInterface;
-import org.structr.core.graph.RelationshipInterface;
 import org.structr.core.graph.TransactionCommand;
 import org.structr.core.property.BooleanProperty;
 import org.structr.core.property.ISO8601DateProperty;
@@ -121,13 +120,37 @@ public interface GraphObject {
 	 */
 	public PropertyContainer getPropertyContainer();
 
+
 	/**
 	 * Returns the property set for the given view as an Iterable.
 	 *
 	 * @param propertyView
 	 * @return the property set for the given view
 	 */
-	public Set<PropertyKey> getPropertyKeys(String propertyView);
+	default Set<PropertyKey> getPropertyKeys(final String propertyView) {
+
+		final SecurityContext securityContext = getSecurityContext();
+		final Class entityType                = getEntityType();
+
+		// check for custom view in content-type field
+		if (securityContext != null && securityContext.hasCustomView()) {
+
+			final Set<PropertyKey> keys = new LinkedHashSet<>(StructrApp.getConfiguration().getPropertySet(entityType, propertyView));
+			final Set<String> customView = securityContext.getCustomView();
+
+			for (Iterator<PropertyKey> it = keys.iterator(); it.hasNext();) {
+				if (!customView.contains(it.next().jsonName())) {
+
+					it.remove();
+				}
+			}
+
+			return keys;
+		}
+
+		// this is the default if no application/json; properties=[...] content-type header is present on the request
+		return StructrApp.getConfiguration().getPropertySet(entityType, propertyView);
+	}
 
 	/**
 	 * Sets the property with the given key to the given value.
@@ -450,21 +473,8 @@ public interface GraphObject {
 
 	Class getEntityType();
 
-	// ----- Cloud synchronization and replication -----
-	/**
-	 * Returns a list of objects that are part of this GraphObject's synchronization set.
-	 * Caution: most implementations of this method may add null objects to the list.
-	 *
-	 * @return
-	 * @throws FrameworkException
-	 */
-	public List<GraphObject> getSyncData() throws FrameworkException;
-
 	public boolean isNode();
 	public boolean isRelationship();
-
-	public NodeInterface getSyncNode();
-	public RelationshipInterface getSyncRelationship();
 
 	// ----- CMIS support -----
 	/**

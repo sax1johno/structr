@@ -26,15 +26,12 @@ import org.structr.core.property.StringProperty;
 import org.structr.web.entity.dom.DOMNode;
 import org.structr.web.entity.dom.Page;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
- *
  *
  */
 public class PageLink extends ManyToOne<DOMNode, Page> {
 
-	public static final Property<String> linkType     = new StringProperty("linkType");
+	public static final Property<String> linkType = new StringProperty("linkType");
 
 	public static final View uiView = new View(PageLink.class, PropertyView.Ui,
 		 linkType
