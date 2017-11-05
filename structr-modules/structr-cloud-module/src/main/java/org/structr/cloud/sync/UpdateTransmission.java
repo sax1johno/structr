@@ -37,7 +37,7 @@ import org.structr.core.graph.NodeFactory;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.RelationshipFactory;
 import org.structr.core.graph.RelationshipInterface;
-import org.structr.dynamic.File;
+import org.structr.web.entity.File;
 
 /**
  *

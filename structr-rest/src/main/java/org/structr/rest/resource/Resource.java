@@ -42,6 +42,7 @@ import org.structr.core.app.Query;
 import org.structr.core.app.StructrApp;
 import org.structr.core.graph.BulkDeleteCommand;
 import org.structr.core.graph.NodeFactory;
+import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.Tx;
 import org.structr.core.graph.search.SearchCommand;
 import org.structr.core.property.PropertyKey;
@@ -139,7 +140,7 @@ public abstract class Resource {
 
 			for (final GraphObject obj : results) {
 
-				if (obj.isNode() && !obj.getSyncNode().isGranted(Permission.write, securityContext)) {
+				if (obj.isNode() && !((NodeInterface)obj).isGranted(Permission.write, securityContext)) {
 					throw new FrameworkException(403, "Modification not permitted.");
 				}
 

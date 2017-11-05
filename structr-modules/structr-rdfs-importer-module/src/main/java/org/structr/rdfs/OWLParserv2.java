@@ -64,7 +64,6 @@ import org.structr.schema.json.JsonSchema;
 import org.structr.schema.json.JsonType;
 import org.structr.web.common.FileHelper;
 import org.structr.web.common.ImageHelper;
-import org.structr.web.entity.FileBase;
 import org.structr.web.entity.Image;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -593,7 +592,7 @@ public class OWLParserv2 {
 
 											System.out.println("                ##########: found SchemaNode " + schemaNode.getUuid() + " (" + schemaNode.getName() + ")");
 
-											final SchemaNode fileSchemaNode = app.nodeQuery(SchemaNode.class).andName(org.structr.dynamic.File.class.getSimpleName()).getFirst();
+											final SchemaNode fileSchemaNode = app.nodeQuery(SchemaNode.class).andName(org.structr.web.entity.File.class.getSimpleName()).getFirst();
 											if (fileSchemaNode != null) {
 
 												final String capitalJsonName = StringUtils.capitalize(key.jsonName());
@@ -694,7 +693,7 @@ public class OWLParserv2 {
 												try (final InputStream is = new FileInputStream(file.toFile())) {
 
 													// import file..
-													final Class fileType = ImageHelper.isImageType(name) ? Image.class : org.structr.dynamic.File.class;
+													final Class fileType = ImageHelper.isImageType(name) ? Image.class : org.structr.web.entity.File.class;
 
 													if (isMultiple) {
 
@@ -712,8 +711,8 @@ public class OWLParserv2 {
 
 														logger.println("        Importing " + name + " => " + actualName);
 
-														final FileBase importedFile = FileHelper.createFile(superUserSecurityContext, is, null, fileType, actualName);
-														final List<FileBase> fileList = (List<FileBase>)node.getProperty(fileRelationshipKey);
+														final org.structr.web.entity.File importedFile = FileHelper.createFile(superUserSecurityContext, is, null, fileType, actualName);
+														final List<org.structr.web.entity.File> fileList = (List<org.structr.web.entity.File>)node.getProperty(fileRelationshipKey);
 														fileList.add(importedFile);
 
 														node.setProperty(fileRelationshipKey, fileList);
@@ -729,7 +728,7 @@ public class OWLParserv2 {
 
 														logger.println("        Importing " + name + " => " + actualName);
 
-														final FileBase importedFile = FileHelper.createFile(superUserSecurityContext, is, null, fileType, actualName);
+														final org.structr.web.entity.File importedFile = FileHelper.createFile(superUserSecurityContext, is, null, fileType, actualName);
 														node.setProperty(fileRelationshipKey, importedFile);
 													}
 
@@ -759,7 +758,7 @@ public class OWLParserv2 {
 									try (final InputStream is = new FileInputStream(file.toFile())) {
 
 										// import file..
-										final Class fileType = ImageHelper.isImageType(name) ? Image.class : org.structr.dynamic.File.class;
+										final Class fileType = ImageHelper.isImageType(name) ? Image.class : org.structr.web.entity.File.class;
 										FileHelper.createFile(superUserSecurityContext, is, null, fileType, name);
 
 									} catch (Throwable t) {

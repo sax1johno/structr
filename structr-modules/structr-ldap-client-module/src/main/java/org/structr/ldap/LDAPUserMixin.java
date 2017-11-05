@@ -18,48 +18,18 @@
  */
 package org.structr.ldap;
 
-import org.apache.directory.api.ldap.model.entry.Attribute;
-import org.apache.directory.api.ldap.model.entry.Entry;
-import org.apache.directory.api.ldap.model.exception.LdapInvalidAttributeValueException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.structr.common.PropertyView;
-import org.structr.common.error.FrameworkException;
 import org.structr.core.Export;
 import org.structr.core.Services;
-import org.structr.core.property.Property;
-import org.structr.core.property.StringProperty;
-import org.structr.web.entity.User;
+import org.structr.core.entity.AbstractNode;
 
 /**
  *
  */
-public class LDAPUser extends User {
+public class LDAPUserMixin extends AbstractNode implements LDAPUser {
 
-	private static final Logger logger = LoggerFactory.getLogger(LDAPUser.class);
-	
-	public static final Property<String> distinguishedName = new StringProperty("distinguishedName").unique().indexed();
-	public static final Property<String> description       = new StringProperty("description").indexed();
-	public static final Property<String> commonName        = new StringProperty("commonName").indexed();
-	public static final Property<String> entryUuid         = new StringProperty("entryUuid").unique().indexed();
-
-
-	public static final org.structr.common.View uiView = new org.structr.common.View(LDAPUser.class, PropertyView.Ui,
-		distinguishedName, entryUuid, commonName, description
-	);
-
-	public static final org.structr.common.View publicView = new org.structr.common.View(LDAPUser.class, PropertyView.Public,
-		distinguishedName, entryUuid, commonName, description
-	);
-
-	public void initializeFrom(final Entry entry) throws FrameworkException, LdapInvalidAttributeValueException {
-
-		setProperty(LDAPUser.description, getString(entry, "description"));
-		setProperty(LDAPUser.entryUuid,   getString(entry, "entryUUID"));
-		setProperty(LDAPUser.name,        getString(entry, "uid"));
-		setProperty(LDAPUser.commonName,  getString(entry, "cn"));
-		setProperty(LDAPUser.eMail,       getString(entry, "mail"));
-	}
+	private static final Logger logger = LoggerFactory.getLogger(LDAPUserMixin.class);
 
 	@Override
 	public boolean isValidPassword(final String password) {
@@ -93,19 +63,5 @@ public class LDAPUser extends User {
 
 			logger.warn("Unable to reach LDAP server for user information of {}", dn);
 		}
-	}
-
-
-
-	// ----- private methods -----
-	private String getString(final Entry entry, final String key) throws LdapInvalidAttributeValueException {
-
-		final Attribute attribute = entry.get(key);
-		if (attribute != null) {
-
-			return attribute.getString();
-		}
-
-		return null;
 	}
 }

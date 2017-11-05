@@ -41,13 +41,13 @@ import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.Group;
-import org.structr.core.entity.Principal;
 import org.structr.core.graph.Tx;
 import org.structr.web.entity.AbstractFile;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Folder;
 import org.structr.web.entity.User;
+import org.structr.core.entity.Principal;
+import org.structr.core.entity.Group;
 
 /**
  *
@@ -184,7 +184,7 @@ public class StructrFileAttributes implements PosixFileAttributes, DosFileAttrib
 		boolean isRegularFile = false;
 
 		try (Tx tx = StructrApp.getInstance(securityContext).tx()) {
-			isRegularFile = file.getProperty(FileBase.isFile);
+			isRegularFile = file.getProperty(File.isFile);
 			tx.success();
 		} catch (FrameworkException fex) {
 			logger.error("", fex);
@@ -234,7 +234,7 @@ public class StructrFileAttributes implements PosixFileAttributes, DosFileAttrib
 
 		try (Tx tx = StructrApp.getInstance(securityContext).tx()) {
 
-			final Number s = file.getProperty(FileBase.size);
+			final Number s = file.getProperty(File.size);
 			if (s != null) {
 
 				size = s.longValue();

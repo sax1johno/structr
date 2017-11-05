@@ -18,34 +18,15 @@
  */
 package org.structr.xmpp;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import org.jivesoftware.smack.packet.IQ;
-import org.jivesoftware.smack.packet.Message;
-import org.jivesoftware.smack.packet.Presence.Mode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
-import org.structr.common.View;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.Export;
-import org.structr.core.app.App;
-import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.graph.ModificationQueue;
-import org.structr.core.graph.NodeAttribute;
-import org.structr.core.graph.Tx;
-import org.structr.core.property.BooleanProperty;
-import org.structr.core.property.EndNodes;
-import org.structr.core.property.EnumProperty;
-import org.structr.core.property.FunctionProperty;
-import org.structr.core.property.IntProperty;
-import org.structr.core.property.Property;
 import org.structr.core.property.PropertyMap;
-import org.structr.core.property.StringProperty;
 import org.structr.rest.RestMethodResult;
 import org.structr.schema.SchemaService;
 
@@ -53,33 +34,14 @@ import org.structr.schema.SchemaService;
  *
  *
  */
-public class XMPPClient extends AbstractNode implements XMPPInfo {
+public class XMPPClientMixin extends AbstractNode implements XMPPClient {
 
-	private static final Logger logger = LoggerFactory.getLogger(XMPPClient.class.getName());
-
-	public static final Property<List<XMPPRequest>> pendingRequests = new EndNodes<>("pendingRequests", XMPPClientRequest.class);
-	public static final Property<String>            xmppHandle      = new FunctionProperty("xmppHandle").format("concat(this.xmppUsername, '@', this.xmppHost)").indexed();
-	public static final Property<String>            xmppUsername    = new StringProperty("xmppUsername").indexed();
-	public static final Property<String>            xmppPassword    = new StringProperty("xmppPassword");
-	public static final Property<String>            xmppService     = new StringProperty("xmppService");
-	public static final Property<String>            xmppHost        = new StringProperty("xmppHost");
-	public static final Property<Integer>           xmppPort        = new IntProperty("xmppPort");
-	public static final Property<Mode>              presenceMode    = new EnumProperty("presenceMode", Mode.class, Mode.available);
-	public static final Property<Boolean>           isEnabled       = new BooleanProperty("isEnabled");
-	public static final Property<Boolean>           isConnected     = new BooleanProperty("isConnected");
+	private static final Logger logger = LoggerFactory.getLogger(XMPPClientMixin.class.getName());
 
 	static {
 
-		SchemaService.registerBuiltinTypeOverride("XMPPClient", XMPPClient.class.getName());
+		SchemaService.registerMixinType("XMPPClient", AbstractNode.class, XMPPClientMixin.class);
 	}
-
-	public static final View publicView = new View(XMPPClient.class, PropertyView.Public,
-		xmppHandle, xmppUsername, xmppPassword, xmppService, xmppHost, xmppPort, presenceMode, isEnabled, isConnected, pendingRequests
-	);
-
-	public static final View uiView = new View(XMPPClient.class, PropertyView.Ui,
-		xmppHandle, xmppUsername, xmppPassword, xmppService, xmppHost, xmppPort, presenceMode, isEnabled, isConnected, pendingRequests
-	);
 
 	@Override
 	public boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
@@ -299,56 +261,5 @@ public class XMPPClient extends AbstractNode implements XMPPInfo {
 		}
 
 		return new RestMethodResult(200);
-	}
-
-	// ----- static methods -----
-	public static void onMessage(final String uuid, final Message message) {
-
-		final App app = StructrApp.getInstance();
-		try (final Tx tx = app.tx()) {
-
-			final XMPPClient client = StructrApp.getInstance().get(XMPPClient.class, uuid);
-			if (client != null) {
-
-				final String callbackName            = "onXMPP" + message.getClass().getSimpleName();
-				final Map<String, Object> properties = new HashMap<>();
-
-				properties.put("sender", message.getFrom());
-				properties.put("message", message.getBody());
-
-				client.invokeMethod(callbackName, properties, false);
-			}
-
-			tx.success();
-
-		} catch (FrameworkException fex) {
-
-			logger.warn("", fex);
-		}
-	}
-
-	public static void onRequest(final String uuid, final IQ request) {
-
-		final App app = StructrApp.getInstance();
-		try (final Tx tx = app.tx()) {
-
-			final XMPPClient client = StructrApp.getInstance().get(XMPPClient.class, uuid);
-			if (client != null) {
-
-				app.create(XMPPRequest.class,
-					new NodeAttribute(XMPPRequest.client, client),
-					new NodeAttribute(XMPPRequest.sender, request.getFrom()),
-					new NodeAttribute(XMPPRequest.owner, client.getProperty(XMPPClient.owner)),
-					new NodeAttribute(XMPPRequest.content, request.toXML().toString()),
-					new NodeAttribute(XMPPRequest.requestType, request.getType())
-				);
-			}
-
-			tx.success();
-
-		} catch (FrameworkException fex) {
-
-			logger.warn("", fex);
-		}
 	}
 }

@@ -27,12 +27,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.error.FrameworkException;
 import org.structr.console.Console.ConsoleMode;
-import org.structr.core.entity.Principal;
 import org.structr.core.graph.Tx;
 import org.structr.core.property.PropertyMap;
 import org.structr.web.StructrUiTest;
 import org.structr.web.entity.Folder;
 import org.structr.web.entity.User;
+import org.structr.core.entity.Principal;
 
 public class ConsoleTest extends StructrUiTest {
 

@@ -18,17 +18,8 @@
  */
 package org.structr.mqtt.entity;
 
-import java.util.HashMap;
-import java.util.Map;
-import org.apache.cxf.common.util.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.structr.common.PropertyView;
-import org.structr.common.SecurityContext;
 import org.structr.common.View;
-import org.structr.common.error.ErrorBuffer;
-import org.structr.common.error.FrameworkException;
-import org.structr.core.Export;
 import static org.structr.core.GraphObject.createdBy;
 import static org.structr.core.GraphObject.createdDate;
 import static org.structr.core.GraphObject.id;
@@ -38,8 +29,7 @@ import static org.structr.core.GraphObject.visibilityEndDate;
 import static org.structr.core.GraphObject.visibilityStartDate;
 import static org.structr.core.GraphObject.visibleToAuthenticatedUsers;
 import static org.structr.core.GraphObject.visibleToPublicUsers;
-import org.structr.core.entity.AbstractNode;
-import org.structr.core.graph.ModificationQueue;
+import org.structr.core.graph.NodeInterface;
 import static org.structr.core.graph.NodeInterface.deleted;
 import static org.structr.core.graph.NodeInterface.hidden;
 import static org.structr.core.graph.NodeInterface.name;
@@ -47,15 +37,9 @@ import static org.structr.core.graph.NodeInterface.owner;
 import org.structr.core.property.Property;
 import org.structr.core.property.StartNode;
 import org.structr.core.property.StringProperty;
-import org.structr.core.script.Scripting;
 import org.structr.mqtt.entity.relation.MQTTClientHAS_SUBSCRIBERMQTTSubscriber;
-import org.structr.rest.RestMethodResult;
-import org.structr.schema.SchemaService;
-import org.structr.schema.action.ActionContext;
 
-public class MQTTSubscriber extends AbstractNode {
-
-	private static final Logger logger = LoggerFactory.getLogger(MQTTSubscriber.class.getName());
+public interface MQTTSubscriber extends NodeInterface {
 
 	public static final Property<MQTTClient>		client			= new StartNode<>("client", MQTTClientHAS_SUBSCRIBERMQTTSubscriber.class);
 	public static final Property<String>			topic			= new StringProperty("topic");
@@ -67,57 +51,4 @@ public class MQTTSubscriber extends AbstractNode {
 		id, name, owner, type, createdBy, deleted, hidden, createdDate, lastModifiedDate, visibleToPublicUsers, visibleToAuthenticatedUsers, visibilityStartDate, visibilityEndDate,
         client, topic, source
 	);
-
-	static {
-
-		SchemaService.registerBuiltinTypeOverride("MQTTSubscriber", MQTTSubscriber.class.getName());
-	}
-
-	@Override
-	public boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
-
-		if(!StringUtils.isEmpty(getProperty(topic)) && (getProperty(client) != null) && getProperty(client).getProperty(MQTTClient.isConnected)) {
-			Map<String,Object> params = new HashMap<>();
-			params.put("topic", getProperty(topic));
-			getProperty(client).invokeMethod("subscribeTopic", params, false);
-		}
-
-		return super.onCreation(securityContext, errorBuffer);
-	}
-
-	@Override
-	public boolean onModification(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
-
-		if(!StringUtils.isEmpty(getProperty(topic)) && (getProperty(client) != null) && getProperty(client).getProperty(MQTTClient.isConnected)) {
-
-			if(modificationQueue.isPropertyModified(this,topic)){
-
-				Map<String,Object> params = new HashMap<>();
-				params.put("topic", getProperty(topic));
-				getProperty(client).invokeMethod("subscribeTopic", params, false);
-			}
-		}
-
-
-		return super.onModification(securityContext, errorBuffer, modificationQueue);
-	}
-
-	@Export
-	public RestMethodResult onMessage(final String topic, final String message) throws FrameworkException {
-
-		if (!StringUtils.isEmpty(getProperty(source))) {
-
-			String script = "${" + getProperty(source) + "}";
-
-			Map<String, Object> params = new HashMap<>();
-			params.put("topic", topic);
-			params.put("message", message);
-
-			ActionContext ac = new ActionContext(securityContext, params);
-			Scripting.replaceVariables(ac, this, script);
-		}
-
-		return new RestMethodResult(200);
-	}
-
 }

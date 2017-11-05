@@ -30,12 +30,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.StructrApp;
-import org.structr.core.entity.Group;
 import org.structr.core.graph.Tx;
 import org.structr.web.entity.AbstractFile;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Folder;
 import org.structr.web.entity.User;
+import org.structr.core.entity.Group;
 
 /**
  *
@@ -133,7 +133,7 @@ public class StructrPosixFileAttributes implements PosixFileAttributes {
 		boolean isRegularFile = false;
 
 		try (Tx tx = StructrApp.getInstance().tx()) {
-			isRegularFile = file.getProperty(FileBase.isFile);
+			isRegularFile = file.getProperty(File.isFile);
 			tx.success();
 		} catch (FrameworkException fex) {
 			logger.error("", fex);
@@ -174,7 +174,7 @@ public class StructrPosixFileAttributes implements PosixFileAttributes {
 		long size = 0;
 
 		try (Tx tx = StructrApp.getInstance().tx()) {
-			size = file.getProperty(FileBase.size);
+			size = file.getProperty(File.size);
 			tx.success();
 		} catch (FrameworkException fex) {
 			logger.error("", fex);

@@ -39,7 +39,7 @@ import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.graph.Tx;
 import org.structr.web.entity.AbstractFile;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Folder;
 
 /**
@@ -147,7 +147,7 @@ public class StructrSSHFile implements Path {
 					}
 				}
 
-				for (final FileBase file : getFiles()) {
+				for (final File file : getFiles()) {
 
 					final String fileName = file.getName();
 					if (localPart.equals(fileName)) {
@@ -192,7 +192,7 @@ public class StructrSSHFile implements Path {
 		}
 	}
 
-	protected List<FileBase> getFiles() throws FrameworkException {
+	protected List<File> getFiles() throws FrameworkException {
 
 		if (actualFile != null && parent != null) {
 
@@ -200,7 +200,7 @@ public class StructrSSHFile implements Path {
 
 		} else {
 
-			return StructrApp.getInstance(getSecurityContext()).nodeQuery(FileBase.class).and(AbstractFile.parent, null).getAsList();
+			return StructrApp.getInstance(getSecurityContext()).nodeQuery(File.class).and(AbstractFile.parent, null).getAsList();
 		}
 	}
 

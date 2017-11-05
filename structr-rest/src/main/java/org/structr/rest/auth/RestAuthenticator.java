@@ -36,9 +36,9 @@ import org.structr.core.auth.Authenticator;
 import org.structr.core.auth.exception.AuthenticationException;
 import org.structr.core.auth.exception.UnauthorizedException;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.Principal;
 import org.structr.core.entity.ResourceAccess;
 import org.structr.core.entity.SuperUser;
+import org.structr.core.entity.Principal;
 
 //~--- classes ----------------------------------------------------------------
 

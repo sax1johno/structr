@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
 import org.structr.cloud.CloudConnection;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.graph.SyncCommand;
-import org.structr.dynamic.File;
+import org.structr.web.entity.File;
 
 /**
  * Transport data container for file nodes

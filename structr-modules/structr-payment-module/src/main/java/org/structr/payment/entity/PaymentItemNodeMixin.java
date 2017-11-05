@@ -18,40 +18,18 @@
  */
 package org.structr.payment.entity;
 
-import org.structr.common.PropertyView;
-import org.structr.common.View;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.property.IntProperty;
-import org.structr.core.property.Property;
-import org.structr.core.property.StartNode;
-import org.structr.core.property.StringProperty;
-import org.structr.payment.api.PaymentItem;
 import org.structr.schema.SchemaService;
 
 /**
  *
  */
-public class PaymentItemNode extends AbstractNode implements PaymentItem {
+public class PaymentItemNodeMixin extends AbstractNode implements PaymentItemNode {
 
 	static {
 
-		SchemaService.registerBuiltinTypeOverride("PaymentItemNode", PaymentItemNode.class.getName());
+		SchemaService.registerMixinType("PaymentItemNode", AbstractNode.class, PaymentItemNodeMixin.class);
 	}
-
-	public static final Property<PaymentNode> payment           = new StartNode<>("payment", PaymentItems.class);
-	public static final Property<Integer>     amount            = new IntProperty("amount").indexed();
-	public static final Property<Integer>     quantity          = new IntProperty("quantity").indexed();
-	public static final Property<String>      description       = new StringProperty("description");
-	public static final Property<String>      number            = new StringProperty("number");
-	public static final Property<String>      url               = new StringProperty("url");
-
-	public static final View defaultView = new View(PaymentItemNode.class, PropertyView.Public,
-		name, amount, quantity, description, number, url
-	);
-
-	public static final View uiView = new View(PaymentItemNode.class, PropertyView.Ui,
-		name, amount, quantity, description, number, url
-	);
 
 	@Override
 	public int getAmount() {

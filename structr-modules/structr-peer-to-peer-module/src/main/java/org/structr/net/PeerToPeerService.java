@@ -40,7 +40,6 @@ import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
-import org.structr.core.entity.Principal;
 import org.structr.core.graph.NodeAttribute;
 import org.structr.core.graph.NodeServiceCommand;
 import org.structr.core.graph.Tx;
@@ -54,6 +53,7 @@ import org.structr.net.repository.ExternalChangeListener;
 import org.structr.net.repository.ObjectListener;
 import org.structr.net.repository.RepositoryObject;
 import org.structr.schema.ConfigurationProvider;
+import org.structr.core.entity.Principal;
 
 /**
  *

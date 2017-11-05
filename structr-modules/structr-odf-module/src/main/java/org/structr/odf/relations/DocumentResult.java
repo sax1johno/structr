@@ -20,12 +20,12 @@ package org.structr.odf.relations;
 
 import org.structr.core.entity.OneToOne;
 import org.structr.odf.entity.ODFExporter;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 
 /**
  *
  */
-public class DocumentResult extends OneToOne<ODFExporter, FileBase> {
+public class DocumentResult extends OneToOne<ODFExporter, File> {
 
     @Override
     public Class<ODFExporter> getSourceType() {
@@ -34,9 +34,9 @@ public class DocumentResult extends OneToOne<ODFExporter, FileBase> {
     }
 
     @Override
-    public Class<FileBase> getTargetType() {
+    public Class<File> getTargetType() {
 
-            return FileBase.class;
+            return File.class;
     }
 
     @Override

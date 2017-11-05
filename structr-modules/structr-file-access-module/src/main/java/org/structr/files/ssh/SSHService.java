@@ -60,10 +60,10 @@ import org.structr.console.Console.ConsoleMode;
 import org.structr.core.app.StructrApp;
 import org.structr.core.auth.exception.AuthenticationException;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.Principal;
 import org.structr.core.graph.Tx;
 import org.structr.files.ssh.filesystem.StructrFilesystem;
 import org.structr.rest.auth.AuthHelper;
+import org.structr.core.entity.Principal;
 
 /**
  *

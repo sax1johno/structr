@@ -28,7 +28,7 @@ import org.structr.cloud.transmission.PushTransmission;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.SyncCommand;
-import org.structr.dynamic.File;
+import org.structr.web.entity.File;
 
 /**
  * Encapsulates a pull request for a node

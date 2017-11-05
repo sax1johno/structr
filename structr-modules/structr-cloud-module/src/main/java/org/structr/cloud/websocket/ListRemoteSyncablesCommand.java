@@ -36,7 +36,7 @@ import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.Tx;
 import org.structr.core.property.BooleanProperty;
 import org.structr.core.property.Property;
-import org.structr.dynamic.File;
+import org.structr.web.entity.File;
 import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.command.AbstractCommand;
 import org.structr.websocket.message.MessageBuilder;

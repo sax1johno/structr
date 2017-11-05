@@ -287,15 +287,15 @@ public class LogResource extends Resource {
 				final ErrorBuffer errorBuffer = new ErrorBuffer();
 
 				if (StringUtils.isEmpty(subjectId)) {
-					errorBuffer.add(new EmptyPropertyToken("LogFile", subjectProperty));
+					errorBuffer.add(new EmptyPropertyToken("LogFile", subjectProperty, ""));
 				}
 
 				if (StringUtils.isEmpty(objectId)) {
-					errorBuffer.add(new EmptyPropertyToken("LogFile", objectProperty));
+					errorBuffer.add(new EmptyPropertyToken("LogFile", objectProperty, ""));
 				}
 
 				if (StringUtils.isEmpty(action)) {
-					errorBuffer.add(new EmptyPropertyToken("LogFile", actionProperty));
+					errorBuffer.add(new EmptyPropertyToken("LogFile", actionProperty, ""));
 				}
 
 				throw new FrameworkException(422, "Log entry must consist of at least subjectId, objectId and action", errorBuffer);

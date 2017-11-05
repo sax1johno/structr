@@ -25,6 +25,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.odftoolkit.simple.TextDocument;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.Export;
 import org.structr.core.GraphObject;
@@ -33,9 +35,14 @@ import org.structr.core.Result;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
+import static org.structr.odf.entity.ODFExporter.resultDocument;
+import static org.structr.odf.entity.ODFExporter.transformationProvider;
+import static org.structr.odf.entity.ODTExporter.ODT_FIELD_ATTRIBUTE_NAME;
+import static org.structr.odf.entity.ODTExporter.ODT_FIELD_ATTRIBUTE_VALUE;
+import static org.structr.odf.entity.ODTExporter.ODT_FIELD_TAG_NAME;
 import org.structr.schema.SchemaService;
 import org.structr.transform.VirtualType;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -44,16 +51,19 @@ import org.w3c.dom.NodeList;
  * Reads a nodes attributes and tries to replace matching attributes in the
  * given ODT-File template.
  */
-public class ODTExporter extends ODFExporter {
+public class ODTExporterMixin extends ODFExporterMixin implements ODSExporter {
 
-	private final String ODT_FIELD_TAG_NAME        = "text:user-field-decl";
-	private final String ODT_FIELD_ATTRIBUTE_NAME  = "text:name";
-	private final String ODT_FIELD_ATTRIBUTE_VALUE = "office:string-value";
+	static {
+		SchemaService.registerMixinType("ODTExporter", AbstractNode.class, ODTExporterMixin.class);
+	}
+
+	private static final Logger logger = LoggerFactory.getLogger(ODTExporterMixin.class);
 
 	@Export
+	@Override
 	public void exportAttributes(String uuid) throws FrameworkException {
 
-		FileBase output = getProperty(resultDocument);
+		File output = getProperty(resultDocument);
 		VirtualType transformation = getProperty(transformationProvider);
 
 		try {
@@ -117,9 +127,5 @@ public class ODTExporter extends ODFExporter {
 		} catch (Exception e) {
 			logger.error("Error while exporting to ODT", e);
 		}
-	}
-
-	static {
-		SchemaService.registerBuiltinTypeOverride("ODTExporter", ODTExporter.class.getName());
 	}
 }

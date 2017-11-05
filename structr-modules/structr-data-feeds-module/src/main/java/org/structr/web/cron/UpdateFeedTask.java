@@ -28,8 +28,8 @@ import org.slf4j.LoggerFactory;
 import org.structr.agent.Task;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.StructrApp;
-import org.structr.core.entity.Principal;
 import org.structr.web.entity.feed.DataFeed;
+import org.structr.core.entity.Principal;
 
 
 

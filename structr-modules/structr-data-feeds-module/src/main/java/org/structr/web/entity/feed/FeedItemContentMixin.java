@@ -19,43 +19,31 @@
 package org.structr.web.entity.feed;
 
 import java.io.InputStream;
+import java.nio.charset.Charset;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
-import org.structr.common.View;
 import org.structr.common.error.FrameworkException;
 import org.structr.common.fulltext.FulltextIndexer;
-import org.structr.common.fulltext.Indexable;
+import static org.structr.common.fulltext.Indexable.extractedContent;
 import org.structr.core.Export;
 import org.structr.core.GraphObject;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.property.Property;
-import org.structr.core.property.StartNode;
-import org.structr.core.property.StringProperty;
 import org.structr.schema.SchemaService;
-import org.structr.web.entity.relation.FeedItemContents;
 
 /**
  * Represents a content element of a feed item
  *
  */
-public class FeedItemContent extends AbstractNode implements Indexable {
+public class FeedItemContentMixin extends AbstractNode implements FeedItemContent {
 
-	private static final Logger logger = LoggerFactory.getLogger(FeedItemContent.class.getName());
+        static {
+            SchemaService.registerMixinType("FeedItemContent", AbstractNode.class, FeedItemContentMixin.class);
+        }
 
-	public static final Property<String> mode                    = new StringProperty("mode");
-	public static final Property<String> itemType                = new StringProperty("itemType");
-	public static final Property<String> value                   = new StringProperty("value");
-	public static final Property<FeedItem> item                  = new StartNode<>("item", FeedItemContents.class);
-
-	public static final View publicView = new View(FeedItemContent.class, PropertyView.Public, type, contentType, owner,
-		mode, itemType, value);
-
-	public static final View uiView     = new View(FeedItemContent.class, PropertyView.Ui, type, contentType, owner, extractedContent, indexedWords,
-		mode, itemType, value, item);
+	private static final Logger logger = LoggerFactory.getLogger(FeedItemContentMixin.class.getName());
 
 	@Override
 	public void afterCreation(SecurityContext securityContext) {
@@ -87,13 +75,6 @@ public class FeedItemContent extends AbstractNode implements Indexable {
 	@Override
 	public InputStream getInputStream() {
 
-		return IOUtils.toInputStream(getProperty(value));
+		return IOUtils.toInputStream(getProperty(value), Charset.forName("utf-8"));
 	}
-
-	// ----- private methods -----
-
-
-        static{
-            SchemaService.registerBuiltinTypeOverride("FeedItemContent", FeedItemContent.class.getName());
-        }
 }

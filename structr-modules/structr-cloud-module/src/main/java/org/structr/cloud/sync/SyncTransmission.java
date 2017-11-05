@@ -40,7 +40,7 @@ import org.structr.core.app.StructrApp;
 import org.structr.core.graph.ModificationEvent;
 import org.structr.core.graph.Tx;
 import org.structr.core.property.PropertyKey;
-import org.structr.dynamic.File;
+import org.structr.web.entity.File;
 
 /**
  *

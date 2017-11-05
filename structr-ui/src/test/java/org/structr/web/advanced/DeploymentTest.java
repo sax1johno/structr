@@ -44,8 +44,6 @@ import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.Localization;
-import org.structr.core.entity.MailTemplate;
-import org.structr.core.entity.Principal;
 import org.structr.core.entity.SchemaMethod;
 import org.structr.core.entity.SchemaNode;
 import org.structr.core.entity.Security;
@@ -57,13 +55,12 @@ import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.core.property.StartNode;
 import org.structr.core.property.StringProperty;
-import org.structr.dynamic.File;
 import org.structr.schema.export.StructrSchema;
 import org.structr.schema.json.JsonSchema;
 import org.structr.schema.json.JsonType;
 import org.structr.web.StructrUiTest;
 import org.structr.web.common.FileHelper;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Folder;
 import org.structr.web.entity.User;
 import org.structr.web.entity.Widget;
@@ -95,6 +92,8 @@ import org.structr.web.maintenance.deploy.DeploymentCommentHandler;
 import org.structr.websocket.command.CloneComponentCommand;
 import org.structr.websocket.command.CreateComponentCommand;
 import org.w3c.dom.Node;
+import org.structr.core.entity.Principal;
+import org.structr.core.entity.MailTemplate;
 
 public class DeploymentTest extends StructrUiTest {
 
@@ -580,7 +579,7 @@ public class DeploymentTest extends StructrUiTest {
 		try (final Tx tx = app.tx()) {
 
 			final Folder folder     = FileHelper.createFolderPath(securityContext, folderPath);
-			final FileBase file     = FileHelper.createFile(securityContext, "test".getBytes("utf-8"), "text/plain", File.class, fileName);
+			final File file     = FileHelper.createFile(securityContext, "test".getBytes("utf-8"), "text/plain", File.class, fileName);
 			final Folder rootFolder = getRootFolder(folder);
 
 			Assert.assertNotNull("Root folder should not be null", rootFolder);
@@ -611,7 +610,7 @@ public class DeploymentTest extends StructrUiTest {
 
 			Assert.assertNotNull("Invalid deployment result", folder);
 
-			final FileBase file     = app.nodeQuery(File.class).and(File.parent, folder).and(File.name, fileName).getFirst();
+			final File file     = app.nodeQuery(File.class).and(File.parent, folder).and(File.name, fileName).getFirst();
 
 			Assert.assertNotNull("Invalid deployment result", file);
 
@@ -639,7 +638,7 @@ public class DeploymentTest extends StructrUiTest {
 		try (final Tx tx = app.tx()) {
 
 			final Folder folder     = FileHelper.createFolderPath(securityContext, folderPath);
-			final FileBase file     = FileHelper.createFile(securityContext, "test".getBytes("utf-8"), "text/plain", File.class, fileName);
+			final File file     = FileHelper.createFile(securityContext, "test".getBytes("utf-8"), "text/plain", File.class, fileName);
 			final Folder rootFolder = getRootFolder(folder);
 
 			Assert.assertNotNull("Root folder should not be null", rootFolder);
@@ -669,7 +668,7 @@ public class DeploymentTest extends StructrUiTest {
 
 				try (final Tx tx = app.tx()) {
 
-					final FileBase file = app.nodeQuery(File.class).and(File.name, fileName).getFirst();
+					final File file = app.nodeQuery(File.class).and(File.name, fileName).getFirst();
 					file.setProperty(File.visibleToPublicUsers, false);
 					file.setProperty(File.visibleToAuthenticatedUsers, false);
 					file.setProperty(File.enableBasicAuth, false);
@@ -692,7 +691,7 @@ public class DeploymentTest extends StructrUiTest {
 
 			Assert.assertNotNull("Invalid deployment result", folder);
 
-			final FileBase file     = app.nodeQuery(File.class).and(File.parent, folder).and(File.name, fileName).getFirst();
+			final File file     = app.nodeQuery(File.class).and(File.parent, folder).and(File.name, fileName).getFirst();
 
 			Assert.assertNotNull("Invalid deployment result", file);
 
@@ -1046,11 +1045,11 @@ public class DeploymentTest extends StructrUiTest {
 			// create some files and folders
 			final Folder folder1  = app.create(Folder.class, new NodeAttribute<>(Folder.name, "Folder1"), new NodeAttribute<>(Folder.includeInFrontendExport, true));
 			final Folder folder2  = app.create(Folder.class, new NodeAttribute<>(Folder.name, "Folder2"), new NodeAttribute<>(Folder.parent, folder1));
-			final FileBase file1  = FileHelper.createFile(securityContext, "test".getBytes(), "text/plain", File.class, "test1.txt");
-			final FileBase file2  = FileHelper.createFile(securityContext, "test".getBytes(), "text/plain", File.class, "test2.txt");
+			final File file1  = FileHelper.createFile(securityContext, "test".getBytes(), "text/plain", File.class, "test1.txt");
+			final File file2  = FileHelper.createFile(securityContext, "test".getBytes(), "text/plain", File.class, "test2.txt");
 
-			file1.setProperty(FileBase.parent, folder2);
-			file2.setProperty(FileBase.parent, folder2);
+			file1.setProperty(File.parent, folder2);
+			file2.setProperty(File.parent, folder2);
 
 			folder1.setProperty(Folder.owner, user1);
 			folder1.grant(Permission.read, user2);
@@ -1220,8 +1219,8 @@ public class DeploymentTest extends StructrUiTest {
 		// setup
 		try (final Tx tx = app.tx()) {
 
-			final FileBase file1 = FileHelper.createFile(securityContext, "test".getBytes("utf-8"), "text/plain", File.class, fileName1);
-			final FileBase file2 = FileHelper.createFile(securityContext, "test".getBytes("utf-8"), "text/plain", File.class, fileName2);
+			final File file1 = FileHelper.createFile(securityContext, "test".getBytes("utf-8"), "text/plain", File.class, fileName1);
+			final File file2 = FileHelper.createFile(securityContext, "test".getBytes("utf-8"), "text/plain", File.class, fileName2);
 
 			file1.setProperty(File.visibleToPublicUsers, true);
 			file1.setProperty(File.visibleToAuthenticatedUsers, true);
@@ -1246,8 +1245,8 @@ public class DeploymentTest extends StructrUiTest {
 		// check
 		try (final Tx tx = app.tx()) {
 
-			final FileBase file1 = app.nodeQuery(File.class).and(File.name, fileName1).getFirst();
-			final FileBase file2 = app.nodeQuery(File.class).and(File.name, fileName2).getFirst();
+			final File file1 = app.nodeQuery(File.class).and(File.name, fileName1).getFirst();
+			final File file2 = app.nodeQuery(File.class).and(File.name, fileName2).getFirst();
 
 			Assert.assertNotNull("Invalid deployment result", file1);
 			Assert.assertNotNull("Invalid deployment result", file2);
@@ -1833,7 +1832,8 @@ public class DeploymentTest extends StructrUiTest {
 
 		try (final Tx tx = app.tx()) {
 
-			final AbstractNode node = FileHelper.createFile(securityContext, "test".getBytes("utf-8"), "text/plain", type, "test.txt");
+			final NodeInterface node = FileHelper.createFile(securityContext, "test".getBytes("utf-8"), "text/plain", type, "test.txt");
+
 			node.setProperty(File.includeInFrontendExport, true);
 			node.setProperty(test, "test");
 
@@ -1950,7 +1950,7 @@ public class DeploymentTest extends StructrUiTest {
 				}
 			}
 
-			for (final FileBase file : app.nodeQuery(File.class).sort(AbstractNode.name).getAsList()) {
+			for (final File file : app.nodeQuery(File.class).sort(AbstractNode.name).getAsList()) {
 
 				if (DeployCommand.okToExport(file) && file.includeInFrontendExport()) {
 
@@ -1969,7 +1969,7 @@ public class DeploymentTest extends StructrUiTest {
 		return buf.toString();//DigestUtils.md5Hex(buf.toString());
 	}
 
-	private void calculateHash(final AbstractNode start, final StringBuilder buf, final int depth) {
+	private void calculateHash(final NodeInterface start, final StringBuilder buf, final int depth) {
 
 		buf.append(start.getType()).append("{");
 
@@ -2004,7 +2004,7 @@ public class DeploymentTest extends StructrUiTest {
 		buf.append("}");
 	}
 
-	private void hash(final AbstractNode node, final StringBuilder buf) {
+	private void hash(final NodeInterface node, final StringBuilder buf) {
 
 		// AbstractNode
 		buf.append(valueOrEmpty(node, AbstractNode.type));
@@ -2060,7 +2060,7 @@ public class DeploymentTest extends StructrUiTest {
 		buf.append(valueOrEmpty(node, DOMElement._fieldName));
 		buf.append(valueOrEmpty(node, DOMElement._hide));
 		buf.append(valueOrEmpty(node, DOMElement._rawValue));
-	
+
 		// Content
 		buf.append(valueOrEmpty(node, Content.contentType));
 		buf.append(valueOrEmpty(node, Content.content));

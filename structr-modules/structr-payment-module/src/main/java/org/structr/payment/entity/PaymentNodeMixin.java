@@ -25,23 +25,17 @@ package org.structr.payment.entity;
 
 import java.util.LinkedList;
 import java.util.List;
-import org.structr.common.View;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.Export;
 import org.structr.core.GraphObject;
 import org.structr.core.GraphObjectMap;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.property.EndNodes;
-import org.structr.core.property.EnumProperty;
-import org.structr.core.property.Property;
-import org.structr.core.property.StringProperty;
 import org.structr.payment.api.APIError;
 import org.structr.payment.api.APIResponse;
 import org.structr.payment.api.BeginCheckoutResponse;
 import org.structr.payment.api.CheckoutState;
 import org.structr.payment.api.ConfirmCheckoutResponse;
-import org.structr.payment.api.Payment;
 import org.structr.payment.api.PaymentItem;
 import org.structr.payment.api.PaymentProvider;
 import org.structr.payment.api.PaymentState;
@@ -53,47 +47,12 @@ import org.structr.schema.SchemaService;
 /**
  *
  */
-public class PaymentNode extends AbstractNode implements Payment {
+public class PaymentNodeMixin extends AbstractNode implements PaymentNode {
 
 	static {
 
-		SchemaService.registerBuiltinTypeOverride("PaymentNode", PaymentNode.class.getName());
+		SchemaService.registerMixinType("PaymentNode", AbstractNode.class, PaymentNodeMixin.class);
 	}
-
-	public static final Property<List<PaymentItemNode>> items                   = new EndNodes<>("items", PaymentItems.class);
-	public static final Property<PaymentState>          stateProperty           = new EnumProperty("state", PaymentState.class).indexed();
-	public static final Property<String>                descriptionProperty     = new StringProperty("description").indexed();
-	public static final Property<String>                currencyProperty        = new StringProperty("currency").indexed();
-	public static final Property<String>                tokenProperty           = new StringProperty("token").indexed();
-	public static final Property<String>                billingAgreementId      = new StringProperty("billingAgreementId");
-	public static final Property<String>                note                    = new StringProperty("note");
-	public static final Property<String>                billingAddressName      = new StringProperty("billingAddressName");
-	public static final Property<String>                billingAddressStreet1   = new StringProperty("billingAddressStreet1");
-	public static final Property<String>                billingAddressStreet2   = new StringProperty("billingAddressStreet2");
-	public static final Property<String>                billingAddressZip       = new StringProperty("billingAddressZip");
-	public static final Property<String>                billingAddressCity      = new StringProperty("billingAddressCity");
-	public static final Property<String>                billingAddressCountry   = new StringProperty("billingAddressCountry");
-	public static final Property<String>                invoiceId               = new StringProperty("invoiceId");
-	public static final Property<String>                payerAddressName        = new StringProperty("payerAddressName");
-	public static final Property<String>                payerAddressStreet1     = new StringProperty("payerAddressStreet1");
-	public static final Property<String>                payerAddressStreet2     = new StringProperty("payerAddressStreet2");
-	public static final Property<String>                payerAddressZip         = new StringProperty("payerAddressZip");
-	public static final Property<String>                payerAddressCity        = new StringProperty("payerAddressCity");
-	public static final Property<String>                payerAddressCountry     = new StringProperty("payerAddressCountry");
-	public static final Property<String>                payer                   = new StringProperty("payer");
-	public static final Property<String>                payerBusiness           = new StringProperty("payerBusiness");
-
-	public static final View publicView = new View(PaymentNode.class, "public",
-		descriptionProperty, items, currencyProperty, tokenProperty, stateProperty, billingAgreementId, note, billingAddressName,
-		billingAddressStreet1, billingAddressStreet2, billingAddressZip, billingAddressCity, billingAddressCountry, invoiceId,
-		payerAddressName, payerAddressStreet1, payerAddressStreet2, payerAddressZip, payerAddressCity, payerAddressCountry, payer, payerBusiness
-	);
-
-	public static final View uiView = new View(PaymentNode.class, "ui",
-		descriptionProperty, items, currencyProperty, tokenProperty, stateProperty, billingAgreementId, note, billingAddressName,
-		billingAddressStreet1, billingAddressStreet2, billingAddressZip, billingAddressCity, billingAddressCountry, invoiceId,
-		payerAddressName, payerAddressStreet1, payerAddressStreet2, payerAddressZip, payerAddressCity, payerAddressCountry, payer, payerBusiness
-	);
 
 	@Export
 	public GraphObject beginCheckout(final String providerName, final String successUrl, final String cancelUrl) throws FrameworkException {
@@ -216,7 +175,7 @@ public class PaymentNode extends AbstractNode implements Payment {
 
 		for (final APIError error : response.getErrors()) {
 
-			errorBuffer.add(new PayPalErrorToken(PaymentNode.class.getSimpleName(), AbstractNode.base, error.getErrorCode(), error.getLongMessage()));
+			errorBuffer.add(new PayPalErrorToken(PaymentNodeMixin.class.getSimpleName(), AbstractNode.base, error.getErrorCode(), error.getLongMessage()));
 		}
 
 		throw new FrameworkException(422, cause, errorBuffer);
@@ -249,166 +208,166 @@ public class PaymentNode extends AbstractNode implements Payment {
 
 	@Override
 	public void setBillingAddressName(final String billingAddressName) throws FrameworkException {
-		setProperty(PaymentNode.billingAddressName, billingAddressName);
+		setProperty(PaymentNodeMixin.billingAddressName, billingAddressName);
 	}
 
 	@Override
 	public String getBillingAddressStreet1() {
-		return getProperty(PaymentNode.billingAddressStreet1);
+		return getProperty(PaymentNodeMixin.billingAddressStreet1);
 	}
 
 	@Override
 	public void setBillingAddressStreet1(final String billingAddressStreet1) throws FrameworkException {
-		setProperty(PaymentNode.billingAddressStreet1, billingAddressStreet1);
+		setProperty(PaymentNodeMixin.billingAddressStreet1, billingAddressStreet1);
 	}
 
 	@Override
 	public String getBillingAddressStreet2() {
-		return getProperty(PaymentNode.billingAddressStreet2);
+		return getProperty(PaymentNodeMixin.billingAddressStreet2);
 	}
 
 	@Override
 	public void setBillingAddressStreet2(final String billingAddressStreet2) throws FrameworkException {
-			setProperty(PaymentNode.billingAddressStreet2, billingAddressStreet2);
+			setProperty(PaymentNodeMixin.billingAddressStreet2, billingAddressStreet2);
 	}
 
 	@Override
 	public String getBillingAddressZip() {
-		return getProperty(PaymentNode.billingAddressZip);
+		return getProperty(PaymentNodeMixin.billingAddressZip);
 	}
 
 	@Override
 	public void setBillingAddressZip(final String billingAddressZip) throws FrameworkException {
-		setProperty(PaymentNode.billingAddressZip, billingAddressZip);
+		setProperty(PaymentNodeMixin.billingAddressZip, billingAddressZip);
 	}
 
 	@Override
 	public String getBillingAddressCity() {
-		return getProperty(PaymentNode.billingAddressCity);
+		return getProperty(PaymentNodeMixin.billingAddressCity);
 	}
 
 	@Override
 	public void setBillingAddressCity(final String billingAddressCity) throws FrameworkException {
-		setProperty(PaymentNode.billingAddressCity, billingAddressCity);
+		setProperty(PaymentNodeMixin.billingAddressCity, billingAddressCity);
 	}
 
 	@Override
 	public String getBillingAddressCountry() {
-		return getProperty(PaymentNode.billingAddressCountry);
+		return getProperty(PaymentNodeMixin.billingAddressCountry);
 	}
 
 	@Override
 	public void setBillingAddressCountry(final String billingAddressCountry) throws FrameworkException {
-		setProperty(PaymentNode.billingAddressCountry, billingAddressCountry);
+		setProperty(PaymentNodeMixin.billingAddressCountry, billingAddressCountry);
 	}
 
 	@Override
 	public String getPayer() {
-		return getProperty(PaymentNode.payer);
+		return getProperty(PaymentNodeMixin.payer);
 	}
 
 	@Override
 	public void setPayer(final String payer) throws FrameworkException {
-			setProperty(PaymentNode.payer, payer);
+			setProperty(PaymentNodeMixin.payer, payer);
 	}
 
 	@Override
 	public String getPayerBusiness() {
-		return getProperty(PaymentNode.payerBusiness);
+		return getProperty(PaymentNodeMixin.payerBusiness);
 	}
 
 	@Override
 	public void setPayerBusiness(final String payerBusiness) throws FrameworkException {
-		setProperty(PaymentNode.payerBusiness, payerBusiness);
+		setProperty(PaymentNodeMixin.payerBusiness, payerBusiness);
 	}
 
 	@Override
 	public String getPayerAddressName() {
-		return getProperty(PaymentNode.payerAddressName);
+		return getProperty(PaymentNodeMixin.payerAddressName);
 	}
 
 	@Override
 	public void setPayerAddressName(final String payerAddressName) throws FrameworkException {
-			setProperty(PaymentNode.payerAddressName, payerAddressName);
+			setProperty(PaymentNodeMixin.payerAddressName, payerAddressName);
 	}
 
 	@Override
 	public String getPayerAddressStreet1() {
-		return getProperty(PaymentNode.payerAddressStreet1);
+		return getProperty(PaymentNodeMixin.payerAddressStreet1);
 	}
 
 	@Override
 	public void setPayerAddressStreet1(final String payerAddressStreet1) throws FrameworkException {
-			setProperty(PaymentNode.payerAddressStreet1, payerAddressStreet1);
+			setProperty(PaymentNodeMixin.payerAddressStreet1, payerAddressStreet1);
 	}
 
 	@Override
 	public String getPayerAddressStreet2() {
-		return getProperty(PaymentNode.payerAddressStreet2);
+		return getProperty(PaymentNodeMixin.payerAddressStreet2);
 	}
 
 	@Override
 	public void setPayerAddressStreet2(final String payerAddressStreet2) throws FrameworkException {
-			setProperty(PaymentNode.payerAddressStreet2, payerAddressStreet2);
+			setProperty(PaymentNodeMixin.payerAddressStreet2, payerAddressStreet2);
 	}
 
 	@Override
 	public String getPayerAddressZip() {
-		return getProperty(PaymentNode.payerAddressZip);
+		return getProperty(PaymentNodeMixin.payerAddressZip);
 	}
 
 	@Override
 	public void setPayerAddressZip(final String payerAddressZip) throws FrameworkException {
-			setProperty(PaymentNode.payerAddressZip, payerAddressZip);
+			setProperty(PaymentNodeMixin.payerAddressZip, payerAddressZip);
 	}
 
 	@Override
 	public String getPayerAddressCity() {
-		return getProperty(PaymentNode.payerAddressCity);
+		return getProperty(PaymentNodeMixin.payerAddressCity);
 	}
 
 	@Override
 	public void setPayerAddressCity(final String payerAddressCity) throws FrameworkException {
-			setProperty(PaymentNode.payerAddressCity, payerAddressCity);
+			setProperty(PaymentNodeMixin.payerAddressCity, payerAddressCity);
 	}
 
 	@Override
 	public String getPayerAddressCountry() {
-		return getProperty(PaymentNode.payerAddressCountry);
+		return getProperty(PaymentNodeMixin.payerAddressCountry);
 	}
 
 	@Override
 	public void setPayerAddressCountry(final String payerAddressCountry) throws FrameworkException {
-		setProperty(PaymentNode.payerAddressCountry, payerAddressCountry);
+		setProperty(PaymentNodeMixin.payerAddressCountry, payerAddressCountry);
 	}
 
 	@Override
 	public String getBillingAgreementId() {
-		return getProperty(PaymentNode.billingAgreementId);
+		return getProperty(PaymentNodeMixin.billingAgreementId);
 	}
 
 	@Override
 	public void setBillingAgreementId(final String billingAgreementId) throws FrameworkException {
-		setProperty(PaymentNode.billingAgreementId, billingAgreementId);
+		setProperty(PaymentNodeMixin.billingAgreementId, billingAgreementId);
 	}
 
 	@Override
 	public String getNote() {
-		return getProperty(PaymentNode.note);
+		return getProperty(PaymentNodeMixin.note);
 	}
 
 	@Override
 	public void setNote(final String note) throws FrameworkException {
-		setProperty(PaymentNode.note, note);
+		setProperty(PaymentNodeMixin.note, note);
 	}
 
 	@Override
 	public String getInvoiceId() {
-		return getProperty(PaymentNode.invoiceId);
+		return getProperty(PaymentNodeMixin.invoiceId);
 	}
 
 	@Override
 	public void setInvoiceId(final String invoiceId) throws FrameworkException {
-		setProperty(PaymentNode.invoiceId, invoiceId);
+		setProperty(PaymentNodeMixin.invoiceId, invoiceId);
 	}
 }

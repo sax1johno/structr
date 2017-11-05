@@ -31,8 +31,8 @@ import org.structr.core.Services;
 import org.structr.core.app.App;
 import org.structr.core.app.Query;
 import org.structr.core.app.StructrApp;
-import org.structr.core.entity.Principal;
 import org.structr.rest.service.HttpService;
+import org.structr.core.entity.Principal;
 
 /**
  * Utility class for session handling

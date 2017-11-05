@@ -37,13 +37,13 @@ import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.converter.PropertyConverter;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.Principal;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.property.*;
 import org.structr.core.script.Scripting;
 import org.structr.rest.common.HttpHelper;
 import org.structr.schema.ConfigurationProvider;
 import org.structr.schema.action.ActionContext;
+import org.structr.core.entity.Principal;
 
 public class SourcePattern extends AbstractNode {
 	

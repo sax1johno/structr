@@ -36,52 +36,24 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.GraphObjectComparator;
-import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
-import org.structr.common.View;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.Export;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.property.EndNodes;
-import org.structr.core.property.ISO8601DateProperty;
-import org.structr.core.property.IntProperty;
-import org.structr.core.property.LongProperty;
-import org.structr.core.property.Property;
 import org.structr.core.property.PropertyMap;
-import org.structr.core.property.StringProperty;
 import org.structr.schema.SchemaService;
-import org.structr.web.entity.relation.FeedItems;
 
-
-
-public class DataFeed extends AbstractNode {
-
-	private static final Logger logger = LoggerFactory.getLogger(DataFeed.class.getName());
-
-	public static final Property<List<FeedItem>> items          = new EndNodes<>("items", FeedItems.class);
-	public static final Property<String>         url            = new StringProperty("url").indexed();
-	public static final Property<String>         feedType       = new StringProperty("feedType").indexed();
-	public static final Property<String>         description    = new StringProperty("description").indexed();
-	public static final Property<Long>           updateInterval = new LongProperty("updateInterval"); // update interval in milliseconds
-	public static final Property<Date>           lastUpdated    = new ISO8601DateProperty("lastUpdated");
-	public static final Property<Long>           maxAge         = new LongProperty("maxAge"); // maximum age of the oldest feed entry in milliseconds
-	public static final Property<Integer>        maxItems       = new IntProperty("maxItems"); // maximum number of feed entries to retain
-
-	public static final View defaultView = new View(DataFeed.class, PropertyView.Public, id, type, url, items, feedType, description);
-
-	public static final View uiView = new View(DataFeed.class, PropertyView.Ui,
-		id, name, owner, type, createdBy, deleted, hidden, createdDate, lastModifiedDate, visibleToPublicUsers, visibleToAuthenticatedUsers, visibilityStartDate, visibilityEndDate,
-                url, items, feedType, description, lastUpdated, maxAge, maxItems, updateInterval
-	);
+public class DataFeedMixin extends AbstractNode implements DataFeed {
 
         static {
 
-            SchemaService.registerBuiltinTypeOverride("DataFeed", DataFeed.class.getName());
+            SchemaService.registerMixinType("DataFeed", AbstractNode.class, DataFeedMixin.class);
         }
 
+	private static final Logger logger = LoggerFactory.getLogger(DataFeedMixin.class.getName());
 
 	@Override
 	public boolean onCreation(SecurityContext securityContext, ErrorBuffer errorBuffer) throws FrameworkException {
@@ -133,6 +105,7 @@ public class DataFeed extends AbstractNode {
 	 * Update the feed only if it was last updated before the update interval.
 	 */
 	@Export
+	@Override
 	public void updateIfDue() {
 
 		final Date lastUpdate = getProperty(lastUpdated);

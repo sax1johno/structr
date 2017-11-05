@@ -37,8 +37,6 @@ import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.Group;
-import org.structr.core.entity.Principal;
 import org.structr.core.entity.SchemaNode;
 import org.structr.core.entity.SchemaRelationshipNode;
 import org.structr.core.function.GetFunction;
@@ -59,6 +57,8 @@ import org.structr.web.entity.dom.DOMElement;
 import org.structr.web.entity.dom.DOMNode;
 import org.structr.web.entity.dom.Page;
 import org.w3c.dom.NodeList;
+import org.structr.core.entity.Principal;
+import org.structr.core.entity.Group;
 
 
 

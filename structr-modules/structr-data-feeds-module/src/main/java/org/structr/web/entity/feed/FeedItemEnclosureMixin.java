@@ -19,47 +19,31 @@
 package org.structr.web.entity.feed;
 
 import java.io.InputStream;
+import java.nio.charset.Charset;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
-import org.structr.common.View;
 import org.structr.common.error.FrameworkException;
 import org.structr.common.fulltext.FulltextIndexer;
-import org.structr.common.fulltext.Indexable;
-import static org.structr.common.fulltext.Indexable.contentType;
-import static org.structr.common.fulltext.Indexable.extractedContent;
-import static org.structr.common.fulltext.Indexable.indexedWords;
 import org.structr.core.Export;
 import org.structr.core.GraphObject;
-import static org.structr.core.GraphObject.type;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
-import static org.structr.core.graph.NodeInterface.owner;
-import org.structr.core.property.LongProperty;
-import org.structr.core.property.Property;
-import org.structr.core.property.StartNode;
-import org.structr.core.property.StringProperty;
 import org.structr.schema.SchemaService;
-import org.structr.web.entity.relation.FeedItemContents;
 
 /**
  * Represents feed enclosures
  */
-public class FeedItemEnclosure extends AbstractNode implements Indexable {
+public class FeedItemEnclosureMixin extends AbstractNode implements FeedItemEnclosure {
 
-    private static final Logger logger = LoggerFactory.getLogger(FeedItemContent.class.getName());
+        static {
+            SchemaService.registerMixinType("FeedItemEnclosure", AbstractNode.class, FeedItemEnclosure.class);
+        }
 
-    public static final Property<String> url                     = new StringProperty("url");
-    public static final Property<Long> enclosureLength                  = new LongProperty("enclosureLength");
-    public static final Property<String> enclosureType             = new StringProperty("enclosureType");
-    public static final Property<FeedItem> item                 = new StartNode<>("item", FeedItemContents.class);
+	// ----- BEGIN Structr Mixin -----
 
-    public static final View publicView = new View(FeedItemContent.class, PropertyView.Public, type, contentType, owner,
-            url, enclosureLength, enclosureType, item);
-    public static final View uiView     = new View(FeedItemContent.class, PropertyView.Ui, type, contentType, owner, extractedContent, indexedWords,
-            url, enclosureLength, enclosureType, item);
+ 	private static final Logger logger = LoggerFactory.getLogger(FeedItemContent.class.getName());
 
 	@Override
 	public void afterCreation(SecurityContext securityContext) {
@@ -90,12 +74,8 @@ public class FeedItemEnclosure extends AbstractNode implements Indexable {
 
 	@Override
 	public InputStream getInputStream() {
-
-		return IOUtils.toInputStream(getProperty(url));
+		return IOUtils.toInputStream(getProperty(url), Charset.forName("utf-8"));
 	}
 
-
-        static {
-            SchemaService.registerBuiltinTypeOverride("FeedItemEnclosure", FeedItemEnclosure.class.getName());
-        }
+	// ----- END Structr Mixin -----
 }

@@ -110,7 +110,7 @@ public class AVConv implements VideoHelper {
 
 		try {
 
-			return service.submit(new GetVideoInfoProcess(securityContext, inputVideo.getDiskFilePath(securityContext))).get();
+			return service.submit(new GetVideoInfoProcess(securityContext, inputVideo.getFileOnDisk().getAbsolutePath())).get();
 
 		} catch (InterruptedException | ExecutionException ex) {
 			logger.warn("", ex);

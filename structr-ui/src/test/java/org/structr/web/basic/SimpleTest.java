@@ -53,9 +53,8 @@ import org.structr.core.graph.NodeAttribute;
 import org.structr.core.graph.StructrTransaction;
 import org.structr.core.graph.Tx;
 import org.structr.core.property.PropertyMap;
-import org.structr.dynamic.File;
 import org.structr.schema.importer.GraphGistImporter;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Site;
 import org.structr.web.entity.User;
 import org.structr.web.entity.dom.DOMElement;
@@ -847,7 +846,7 @@ public class SimpleTest extends StructrUiTest {
 		try {
 
 			// create some test nodes
-			FileBase test1 = null;
+			File test1 = null;
 
 			// check initial sort order
 			try (final Tx tx = app.tx()) {
@@ -865,7 +864,7 @@ public class SimpleTest extends StructrUiTest {
 			// check initial sort order
 			try (final Tx tx = app.tx()) {
 
-				final List<FileBase> files = app.nodeQuery(FileBase.class).sort(File.path).getAsList();
+				final List<File> files = app.nodeQuery(File.class).sort(File.path).getAsList();
 
 				assertEquals("Invalid indexing sort result", "aaaaa", files.get(0).getName());
 				assertEquals("Invalid indexing sort result", "bbbbb", files.get(1).getName());
@@ -889,7 +888,7 @@ public class SimpleTest extends StructrUiTest {
 			// check final sort order
 			try (final Tx tx = app.tx()) {
 
-				final List<FileBase> files = app.nodeQuery(FileBase.class).sort(File.path).getAsList();
+				final List<File> files = app.nodeQuery(File.class).sort(File.path).getAsList();
 
 				assertEquals("Invalid indexing sort result", "bbbbb", files.get(0).getName());
 				assertEquals("Invalid indexing sort result", "ccccc", files.get(1).getName());

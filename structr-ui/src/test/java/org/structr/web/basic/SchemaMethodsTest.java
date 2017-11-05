@@ -29,8 +29,7 @@ import org.structr.core.entity.SchemaMethod;
 import org.structr.core.entity.SchemaNode;
 import org.structr.core.graph.Tx;
 import org.structr.core.property.PropertyMap;
-import org.structr.dynamic.File;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.User;
 
 
@@ -198,7 +197,7 @@ public class SchemaMethodsTest extends FrontendTest {
 			logger.error("", ex);
 		}
 
-		FileBase testFile = null;
+		File testFile = null;
 		try (final Tx tx = app.tx()) {
 
 			// Create File instance

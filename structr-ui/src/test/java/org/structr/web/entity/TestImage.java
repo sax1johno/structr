@@ -28,7 +28,7 @@ import org.structr.web.property.ThumbnailProperty;
  *
  *
  */
-public class TestImage extends Image {
+public class TestImage extends ImageMixin {
 
 	public static final Property<Image> thumbnail = new ThumbnailProperty("thumbnail").format("200, 100, false");
 }

@@ -29,7 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.SecurityContext;
 import org.structr.core.app.StructrApp;
-import org.structr.core.entity.AbstractUser;
+import org.structr.core.entity.Principal;
 import org.structr.core.graph.Tx;
 import org.structr.web.entity.Folder;
 
@@ -146,7 +146,7 @@ public class StructrFtpUser implements User {
 		return null;
 	}
 
-	public AbstractUser getStructrUser() {
+	public Principal getStructrUser() {
 		return structrUser;
 	}
 

@@ -58,7 +58,7 @@ public class SetMetadataProcess extends AbstractProcess<Void> {
 
 		super(securityContext);
 
-		this.outputFileName = inputVideo.getDiskFilePath(securityContext);
+		this.outputFileName = inputVideo.getFileOnDisk().getAbsolutePath();
 		this.inputVideo     = inputVideo;
 
 		this.metadata.putAll(values);
@@ -84,7 +84,7 @@ public class SetMetadataProcess extends AbstractProcess<Void> {
 		}
 
 		final StringBuilder commandLine = new StringBuilder("avconv -y -i ");
-		final String diskFilePath       = inputVideo.getDiskFilePath(securityContext);
+		final String diskFilePath       = inputVideo.getFileOnDisk().getName();
 
 		// build command line from builder options
 		commandLine.append(diskFilePath);

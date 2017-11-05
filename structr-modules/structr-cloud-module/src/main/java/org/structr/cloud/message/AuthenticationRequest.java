@@ -27,8 +27,8 @@ import org.slf4j.LoggerFactory;
 import org.structr.cloud.CloudConnection;
 import org.structr.cloud.CloudService;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.entity.Principal;
 import org.structr.core.graph.SyncCommand;
+import org.structr.core.entity.Principal;
 
 
 

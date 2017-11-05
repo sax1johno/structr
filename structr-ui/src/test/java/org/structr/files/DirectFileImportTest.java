@@ -38,10 +38,9 @@ import static org.junit.Assert.fail;
 import org.junit.Test;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.graph.Tx;
-import org.structr.dynamic.File;
 import org.structr.web.StructrUiTest;
 import org.structr.web.common.FileHelper;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Folder;
 import org.structr.web.maintenance.DirectFileImportCommand;
 
@@ -153,9 +152,9 @@ public class DirectFileImportTest extends StructrUiTest {
 
 			assertNotNull("Folder should have been created by import", app.nodeQuery(Folder.class).and(File.path, "/" + testDir.getFileName().toString()).getFirst());
 
-			final FileBase file1 = app.nodeQuery(File.class).and(File.path, "/" + testDir.getFileName().toString() + "/test1.txt").getFirst();
-			final FileBase file2 = app.nodeQuery(File.class).and(File.path, "/" + testDir.getFileName().toString() + "/test2.txt").getFirst();
-			final FileBase file3 = app.nodeQuery(File.class).and(File.path, "/" + testDir.getFileName().toString() + "/test3.txt").getFirst();
+			final File file1 = app.nodeQuery(File.class).and(File.path, "/" + testDir.getFileName().toString() + "/test1.txt").getFirst();
+			final File file2 = app.nodeQuery(File.class).and(File.path, "/" + testDir.getFileName().toString() + "/test2.txt").getFirst();
+			final File file3 = app.nodeQuery(File.class).and(File.path, "/" + testDir.getFileName().toString() + "/test3.txt").getFirst();
 
 			assertNotNull("Test file should have been created by import", file1);
 			assertNotNull("Test file should have been created by import", file2);
@@ -215,9 +214,9 @@ public class DirectFileImportTest extends StructrUiTest {
 
 			assertNotNull("Folder should have been created by import", app.nodeQuery(Folder.class).and(File.path, "/" + testDir.getFileName().toString()).getFirst());
 
-			final FileBase file1 = app.nodeQuery(File.class).and(File.path, "/" +  testDir.getFileName().toString() + "/test1.txt").getFirst();
-			final FileBase file2 = app.nodeQuery(File.class).and(File.path, "/" +  testDir.getFileName().toString() + "/test2.txt").getFirst();
-			final FileBase file3 = app.nodeQuery(File.class).and(File.path, "/" +  testDir.getFileName().toString() + "/test3.txt").getFirst();
+			final File file1 = app.nodeQuery(File.class).and(File.path, "/" +  testDir.getFileName().toString() + "/test1.txt").getFirst();
+			final File file2 = app.nodeQuery(File.class).and(File.path, "/" +  testDir.getFileName().toString() + "/test2.txt").getFirst();
+			final File file3 = app.nodeQuery(File.class).and(File.path, "/" +  testDir.getFileName().toString() + "/test3.txt").getFirst();
 
 			assertNotNull("Test file should have been created by import", file1);
 			assertNotNull("Test file should have been created by import", file2);
@@ -283,16 +282,16 @@ public class DirectFileImportTest extends StructrUiTest {
 		// verify successful file import
 		try (final Tx tx = app.tx()) {
 
-			final List<FileBase> files = app.nodeQuery(FileBase.class).getAsList();
+			final List<File> files = app.nodeQuery(File.class).getAsList();
 
 			// import mode SKIP => no change, no additional file
 			assertEquals("Only one file should exist after import", 1, files.size());
 
-			final FileBase file = files.get(0);
+			final File file = files.get(0);
 
 			assertNotNull("Test file should exist", file);
 			assertEquals("Test file name should be test.txt", "test.txt", file.getName());
-			assertNull("Test file should NOT have a parent folder", file.getProperty(FileBase.parent));
+			assertNull("Test file should NOT have a parent folder", file.getProperty(File.parent));
 			assertEquals("Test file content should not be modified by import", "initial content", getContent(file));
 
 			tx.success();
@@ -337,16 +336,16 @@ public class DirectFileImportTest extends StructrUiTest {
 		// verify successful file import
 		try (final Tx tx = app.tx()) {
 
-			final List<FileBase> files = app.nodeQuery(FileBase.class).getAsList();
+			final List<File> files = app.nodeQuery(File.class).getAsList();
 
 			// import mode SKIP => no change, no additional file
 			assertEquals("Only one file should exist after import", 1, files.size());
 
-			final FileBase file = files.get(0);
+			final File file = files.get(0);
 
 			assertNotNull("Test file should have been created by import", file);
 			assertEquals("Test file name should be test.txt", "test.txt", file.getName());
-			assertNull("Test file should NOT have a parent folder", file.getProperty(FileBase.parent));
+			assertNull("Test file should NOT have a parent folder", file.getProperty(File.parent));
 			assertEquals("Test file content does not match source", "test file content 1", getContent(file));
 
 			tx.success();
@@ -408,16 +407,16 @@ public class DirectFileImportTest extends StructrUiTest {
 		// verify successful file import
 		try (final Tx tx = app.tx()) {
 
-			final List<FileBase> files = app.nodeQuery(FileBase.class).getAsList();
+			final List<File> files = app.nodeQuery(File.class).getAsList();
 
 			// import mode SKIP => no change, no additional file
 			assertEquals("Only one file should exist after import", 1, files.size());
 
-			final FileBase file = files.get(0);
+			final File file = files.get(0);
 
 			assertNotNull("Test file should have been created by import", file);
 			assertEquals("Test file name should be test.txt", "test.txt", file.getName());
-			assertNull("Test file should NOT have a parent folder", file.getProperty(FileBase.parent));
+			assertNull("Test file should NOT have a parent folder", file.getProperty(File.parent));
 			assertEquals("Test file content does not match source", "test file content 1", getContent(file));
 
 			tx.success();
@@ -467,16 +466,16 @@ public class DirectFileImportTest extends StructrUiTest {
 		// verify successful file import
 		try (final Tx tx = app.tx()) {
 
-			final List<FileBase> files = app.nodeQuery(FileBase.class).getAsList();
+			final List<File> files = app.nodeQuery(File.class).getAsList();
 
 			// import mode SKIP => no change, no additional file
 			assertEquals("Only one file should exist after import", 1, files.size());
 
-			final FileBase file = files.get(0);
+			final File file = files.get(0);
 
 			assertNotNull("Test file should have been created by import", file);
 			assertEquals("Test file name should be test.txt", "test.txt", file.getName());
-			assertNull("Test file should NOT have a parent folder", file.getProperty(FileBase.parent));
+			assertNull("Test file should NOT have a parent folder", file.getProperty(File.parent));
 			assertEquals("Test file content does not match source", "test file content 1", getContent(file));
 
 			tx.success();
@@ -538,23 +537,23 @@ public class DirectFileImportTest extends StructrUiTest {
 		// verify successful file import
 		try (final Tx tx = app.tx()) {
 
-			final List<FileBase> files = app.nodeQuery(FileBase.class).getAsList();
+			final List<File> files = app.nodeQuery(File.class).getAsList();
 			final SimpleDateFormat df  = new SimpleDateFormat("yyyy-MM-dd-HHmmss");
 
 			// import mode SKIP => no change, no additional file
 			assertEquals("Two files should exist after import", 2, files.size());
 
-			final FileBase file1 = files.get(0);
-			final FileBase file2 = files.get(1);
+			final File file1 = files.get(0);
+			final File file2 = files.get(1);
 
 			assertNotNull("Test file should have been created by import", file1);
 			assertEquals("Test file name should be test.txt", "test.txt", file1.getName());
-			assertNull("Test file should NOT have a parent folder", file1.getProperty(FileBase.parent));
+			assertNull("Test file should NOT have a parent folder", file1.getProperty(File.parent));
 			assertEquals("Test file content does not match source", "test file content 1", getContent(file1));
 
 			assertNotNull("Test file should have been created by import", file2);
 			assertEquals("Existing file should be renamed", "test.txt_" + df.format(System.currentTimeMillis()), file2.getName());
-			assertNull("Test file should NOT have a parent folder", file2.getProperty(FileBase.parent));
+			assertNull("Test file should NOT have a parent folder", file2.getProperty(File.parent));
 			assertEquals("Test file content does not match source", "initial content", getContent(file2));
 
 			tx.success();
@@ -599,16 +598,16 @@ public class DirectFileImportTest extends StructrUiTest {
 		// verify successful file import
 		try (final Tx tx = app.tx()) {
 
-			final List<FileBase> files = app.nodeQuery(FileBase.class).getAsList();
+			final List<File> files = app.nodeQuery(File.class).getAsList();
 
 			// import mode SKIP => no change, no additional file
 			assertEquals("Two files should exist after import", 1, files.size());
 
-			final FileBase file1 = files.get(0);
+			final File file1 = files.get(0);
 
 			assertNotNull("Test file should have been created by import", file1);
 			assertEquals("Test file name should be test.txt", "test.txt", file1.getName());
-			assertNull("Test file should NOT have a parent folder", file1.getProperty(FileBase.parent));
+			assertNull("Test file should NOT have a parent folder", file1.getProperty(File.parent));
 			assertEquals("Test file content does not match source", "test file content 1", getContent(file1));
 
 			tx.success();
@@ -670,16 +669,16 @@ public class DirectFileImportTest extends StructrUiTest {
 		// verify successful file import
 		try (final Tx tx = app.tx()) {
 
-			final List<FileBase> files = app.nodeQuery(FileBase.class).getAsList();
+			final List<File> files = app.nodeQuery(File.class).getAsList();
 
 			// import mode SKIP => no change, no additional file
 			assertEquals("Only one file should exist after import", 1, files.size());
 
-			final FileBase file = files.get(0);
+			final File file = files.get(0);
 
 			assertNotNull("Test file should exist", file);
 			assertEquals("Test file name should be test.txt", "test.txt", file.getName());
-			assertNull("Test file should NOT have a parent folder", file.getProperty(FileBase.parent));
+			assertNull("Test file should NOT have a parent folder", file.getProperty(File.parent));
 			assertEquals("Test file content should not be modified by import", "initial content", getContent(file));
 
 			tx.success();
@@ -724,16 +723,16 @@ public class DirectFileImportTest extends StructrUiTest {
 		// verify successful file import
 		try (final Tx tx = app.tx()) {
 
-			final List<FileBase> files = app.nodeQuery(FileBase.class).getAsList();
+			final List<File> files = app.nodeQuery(File.class).getAsList();
 
 			// import mode SKIP => no change, no additional file
 			assertEquals("Only one file should exist after import", 1, files.size());
 
-			final FileBase file = files.get(0);
+			final File file = files.get(0);
 
 			assertNotNull("Test file should have been created by import", file);
 			assertEquals("Test file name should be test.txt", "test.txt", file.getName());
-			assertNull("Test file should NOT have a parent folder", file.getProperty(FileBase.parent));
+			assertNull("Test file should NOT have a parent folder", file.getProperty(File.parent));
 			assertEquals("Test file content does not match source", "test file content 1", getContent(file));
 
 			tx.success();
@@ -795,16 +794,16 @@ public class DirectFileImportTest extends StructrUiTest {
 		// verify successful file import
 		try (final Tx tx = app.tx()) {
 
-			final List<FileBase> files = app.nodeQuery(FileBase.class).getAsList();
+			final List<File> files = app.nodeQuery(File.class).getAsList();
 
 			// import mode SKIP => no change, no additional file
 			assertEquals("Only one file should exist after import", 1, files.size());
 
-			final FileBase file = files.get(0);
+			final File file = files.get(0);
 
 			assertNotNull("Test file should have been created by import", file);
 			assertEquals("Test file name should be test.txt", "test.txt", file.getName());
-			assertNull("Test file should NOT have a parent folder", file.getProperty(FileBase.parent));
+			assertNull("Test file should NOT have a parent folder", file.getProperty(File.parent));
 			assertEquals("Test file content does not match source", "test file content 1", getContent(file));
 
 			tx.success();
@@ -854,16 +853,16 @@ public class DirectFileImportTest extends StructrUiTest {
 		// verify successful file import
 		try (final Tx tx = app.tx()) {
 
-			final List<FileBase> files = app.nodeQuery(FileBase.class).getAsList();
+			final List<File> files = app.nodeQuery(File.class).getAsList();
 
 			// import mode SKIP => no change, no additional file
 			assertEquals("Only one file should exist after import", 1, files.size());
 
-			final FileBase file = files.get(0);
+			final File file = files.get(0);
 
 			assertNotNull("Test file should have been created by import", file);
 			assertEquals("Test file name should be test.txt", "test.txt", file.getName());
-			assertNull("Test file should NOT have a parent folder", file.getProperty(FileBase.parent));
+			assertNull("Test file should NOT have a parent folder", file.getProperty(File.parent));
 			assertEquals("Test file content does not match source", "test file content 1", getContent(file));
 
 			tx.success();
@@ -925,23 +924,23 @@ public class DirectFileImportTest extends StructrUiTest {
 		// verify successful file import
 		try (final Tx tx = app.tx()) {
 
-			final List<FileBase> files = app.nodeQuery(FileBase.class).getAsList();
+			final List<File> files = app.nodeQuery(File.class).getAsList();
 			final SimpleDateFormat df  = new SimpleDateFormat("yyyy-MM-dd-HHmmss");
 
 			// import mode SKIP => no change, no additional file
 			assertEquals("Two files should exist after import", 2, files.size());
 
-			final FileBase file1 = files.get(0);
-			final FileBase file2 = files.get(1);
+			final File file1 = files.get(0);
+			final File file2 = files.get(1);
 
 			assertNotNull("Test file should have been created by import", file1);
 			assertEquals("Test file name should be test.txt", "test.txt", file1.getName());
-			assertNull("Test file should NOT have a parent folder", file1.getProperty(FileBase.parent));
+			assertNull("Test file should NOT have a parent folder", file1.getProperty(File.parent));
 			assertEquals("Test file content does not match source", "test file content 1", getContent(file1));
 
 			assertNotNull("Test file should have been created by import", file2);
 			assertEquals("Existing file should be renamed", "test.txt_" + df.format(System.currentTimeMillis()), file2.getName());
-			assertNull("Test file should NOT have a parent folder", file2.getProperty(FileBase.parent));
+			assertNull("Test file should NOT have a parent folder", file2.getProperty(File.parent));
 			assertEquals("Test file content does not match source", "initial content", getContent(file2));
 
 			tx.success();
@@ -986,16 +985,16 @@ public class DirectFileImportTest extends StructrUiTest {
 		// verify successful file import
 		try (final Tx tx = app.tx()) {
 
-			final List<FileBase> files = app.nodeQuery(FileBase.class).getAsList();
+			final List<File> files = app.nodeQuery(File.class).getAsList();
 
 			// import mode SKIP => no change, no additional file
 			assertEquals("Two files should exist after import", 1, files.size());
 
-			final FileBase file1 = files.get(0);
+			final File file1 = files.get(0);
 
 			assertNotNull("Test file should have been created by import", file1);
 			assertEquals("Test file name should be test.txt", "test.txt", file1.getName());
-			assertNull("Test file should NOT have a parent folder", file1.getProperty(FileBase.parent));
+			assertNull("Test file should NOT have a parent folder", file1.getProperty(File.parent));
 			assertEquals("Test file content does not match source", "test file content 1", getContent(file1));
 
 			tx.success();
@@ -1104,7 +1103,7 @@ public class DirectFileImportTest extends StructrUiTest {
 		return attributes;
 	}
 
-	private String getContent(final FileBase file) {
+	private String getContent(final File file) {
 
 		try (final InputStream is = file.getInputStream()) {
 

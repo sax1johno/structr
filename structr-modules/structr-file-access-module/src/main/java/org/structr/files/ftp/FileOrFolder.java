@@ -34,10 +34,9 @@ import org.structr.core.entity.AbstractNode;
 import org.structr.core.graph.CreateNodeCommand;
 import org.structr.core.graph.NodeAttribute;
 import org.structr.core.graph.Tx;
-import org.structr.dynamic.File;
 import org.structr.web.common.FileHelper;
 import org.structr.web.entity.AbstractFile;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Folder;
 
 /**
@@ -73,7 +72,7 @@ public class FileOrFolder extends AbstractStructrFtpFile {
 		logger.error("getSize()");
 		throw new UnsupportedOperationException("Not supported yet.");
 	}
-	
+
 	@Override
 	public InputStream createInputStream(long l) throws IOException {
 		logger.error("createInputStream()");
@@ -159,7 +158,7 @@ public class FileOrFolder extends AbstractStructrFtpFile {
 
 			tx.success();
 
-			return ((FileBase) structrFile).getOutputStream();
+			return ((File) structrFile).getOutputStream();
 
 		} catch (FrameworkException fex) {
 			logger.error(null, fex);

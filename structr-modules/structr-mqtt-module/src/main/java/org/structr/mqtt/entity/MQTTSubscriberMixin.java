@@ -23,54 +23,24 @@ import java.util.Map;
 import org.apache.cxf.common.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
-import org.structr.common.View;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.Export;
-import static org.structr.core.GraphObject.createdBy;
-import static org.structr.core.GraphObject.createdDate;
-import static org.structr.core.GraphObject.id;
-import static org.structr.core.GraphObject.lastModifiedDate;
-import static org.structr.core.GraphObject.type;
-import static org.structr.core.GraphObject.visibilityEndDate;
-import static org.structr.core.GraphObject.visibilityStartDate;
-import static org.structr.core.GraphObject.visibleToAuthenticatedUsers;
-import static org.structr.core.GraphObject.visibleToPublicUsers;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.graph.ModificationQueue;
-import static org.structr.core.graph.NodeInterface.deleted;
-import static org.structr.core.graph.NodeInterface.hidden;
-import static org.structr.core.graph.NodeInterface.name;
-import static org.structr.core.graph.NodeInterface.owner;
-import org.structr.core.property.Property;
-import org.structr.core.property.StartNode;
-import org.structr.core.property.StringProperty;
 import org.structr.core.script.Scripting;
-import org.structr.mqtt.entity.relation.MQTTClientHAS_SUBSCRIBERMQTTSubscriber;
 import org.structr.rest.RestMethodResult;
 import org.structr.schema.SchemaService;
 import org.structr.schema.action.ActionContext;
 
-public class MQTTSubscriber extends AbstractNode {
+public class MQTTSubscriberMixin extends AbstractNode implements MQTTSubscriber {
 
-	private static final Logger logger = LoggerFactory.getLogger(MQTTSubscriber.class.getName());
-
-	public static final Property<MQTTClient>		client			= new StartNode<>("client", MQTTClientHAS_SUBSCRIBERMQTTSubscriber.class);
-	public static final Property<String>			topic			= new StringProperty("topic");
-	public static final Property<String>			source			= new StringProperty("source");
-
-	public static final View defaultView = new View(MQTTClient.class, PropertyView.Public, id, type, client, topic, source);
-
-	public static final View uiView = new View(MQTTClient.class, PropertyView.Ui,
-		id, name, owner, type, createdBy, deleted, hidden, createdDate, lastModifiedDate, visibleToPublicUsers, visibleToAuthenticatedUsers, visibilityStartDate, visibilityEndDate,
-        client, topic, source
-	);
+	private static final Logger logger = LoggerFactory.getLogger(MQTTSubscriberMixin.class.getName());
 
 	static {
 
-		SchemaService.registerBuiltinTypeOverride("MQTTSubscriber", MQTTSubscriber.class.getName());
+		SchemaService.registerMixinType("MQTTSubscriber", AbstractNode.class, MQTTSubscriberMixin.class);
 	}
 
 	@Override

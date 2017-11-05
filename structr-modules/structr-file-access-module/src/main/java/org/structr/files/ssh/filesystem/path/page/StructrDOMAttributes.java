@@ -40,11 +40,11 @@ import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.Group;
-import org.structr.core.entity.Principal;
 import org.structr.core.graph.Tx;
 import org.structr.web.entity.User;
 import org.structr.web.entity.dom.DOMNode;
+import org.structr.core.entity.Principal;
+import org.structr.core.entity.Group;
 
 /**
  *

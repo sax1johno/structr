@@ -21,12 +21,8 @@ package org.structr.ldap;
 import org.apache.directory.api.ldap.model.entry.Attribute;
 import org.apache.directory.api.ldap.model.entry.Entry;
 import org.apache.directory.api.ldap.model.exception.LdapInvalidAttributeValueException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.structr.common.PropertyView;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.Export;
-import org.structr.core.Services;
 import org.structr.core.property.Property;
 import org.structr.core.property.StringProperty;
 import org.structr.web.entity.User;
@@ -34,15 +30,12 @@ import org.structr.web.entity.User;
 /**
  *
  */
-public class LDAPUser extends User {
+public interface LDAPUser extends User {
 
-	private static final Logger logger = LoggerFactory.getLogger(LDAPUser.class);
-	
 	public static final Property<String> distinguishedName = new StringProperty("distinguishedName").unique().indexed();
 	public static final Property<String> description       = new StringProperty("description").indexed();
 	public static final Property<String> commonName        = new StringProperty("commonName").indexed();
 	public static final Property<String> entryUuid         = new StringProperty("entryUuid").unique().indexed();
-
 
 	public static final org.structr.common.View uiView = new org.structr.common.View(LDAPUser.class, PropertyView.Ui,
 		distinguishedName, entryUuid, commonName, description
@@ -52,53 +45,17 @@ public class LDAPUser extends User {
 		distinguishedName, entryUuid, commonName, description
 	);
 
-	public void initializeFrom(final Entry entry) throws FrameworkException, LdapInvalidAttributeValueException {
+	default void initializeFrom(final Entry entry) throws FrameworkException, LdapInvalidAttributeValueException {
 
-		setProperty(LDAPUser.description, getString(entry, "description"));
-		setProperty(LDAPUser.entryUuid,   getString(entry, "entryUUID"));
-		setProperty(LDAPUser.name,        getString(entry, "uid"));
-		setProperty(LDAPUser.commonName,  getString(entry, "cn"));
-		setProperty(LDAPUser.eMail,       getString(entry, "mail"));
+		setProperty(LDAPUserMixin.description, getString(entry, "description"));
+		setProperty(LDAPUserMixin.entryUuid,   getString(entry, "entryUUID"));
+		setProperty(LDAPUserMixin.name,        getString(entry, "uid"));
+		setProperty(LDAPUserMixin.commonName,  getString(entry, "cn"));
+		setProperty(LDAPUserMixin.eMail,       getString(entry, "mail"));
 	}
-
-	@Override
-	public boolean isValidPassword(final String password) {
-
-		final LDAPService ldapService = Services.getInstance().getService(LDAPService.class);
-		final String dn               = getProperty(distinguishedName);
-
-		if (ldapService != null) {
-
-			return ldapService.canSuccessfullyBind(dn, password);
-
-		} else {
-
-			logger.warn("Unable to reach LDAP server for authentication of {}", dn);
-		}
-
-		return false;
-	}
-
-	@Export
-	public void printDebug() {
-
-		final LDAPService ldapService = Services.getInstance().getService(LDAPService.class);
-		final String dn               = getProperty(distinguishedName);
-
-		if (ldapService != null) {
-
-			System.out.println(ldapService.fetchObjectInfo(dn));
-
-		} else {
-
-			logger.warn("Unable to reach LDAP server for user information of {}", dn);
-		}
-	}
-
-
 
 	// ----- private methods -----
-	private String getString(final Entry entry, final String key) throws LdapInvalidAttributeValueException {
+	default String getString(final Entry entry, final String key) throws LdapInvalidAttributeValueException {
 
 		final Attribute attribute = entry.get(key);
 		if (attribute != null) {

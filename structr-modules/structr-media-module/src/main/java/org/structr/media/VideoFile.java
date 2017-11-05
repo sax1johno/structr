@@ -18,25 +18,11 @@
  */
 package org.structr.media;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.structr.common.PropertyView;
-import org.structr.common.SecurityContext;
-import org.structr.common.error.ErrorBuffer;
-import org.structr.common.error.FrameworkException;
-import org.structr.core.Export;
 import static org.structr.core.GraphObject.type;
-import org.structr.core.GraphObjectMap;
-import org.structr.core.JsonInput;
-import org.structr.core.app.StructrApp;
-import org.structr.core.graph.ModificationQueue;
 import static org.structr.core.graph.NodeInterface.name;
 import static org.structr.core.graph.NodeInterface.owner;
-import org.structr.core.graph.Tx;
 import org.structr.core.property.ConstantBooleanProperty;
 import org.structr.core.property.DoubleProperty;
 import org.structr.core.property.EndNode;
@@ -45,31 +31,15 @@ import org.structr.core.property.IntProperty;
 import org.structr.core.property.Property;
 import org.structr.core.property.StartNode;
 import org.structr.core.property.StringProperty;
-import org.structr.dynamic.File;
-import org.structr.rest.RestMethodResult;
-import org.structr.schema.SchemaService;
-import org.structr.web.common.FileHelper;
-import static org.structr.web.entity.FileBase.relativeFilePath;
-import static org.structr.web.entity.FileBase.size;
+import static org.structr.web.entity.File.relativeFilePath;
+import static org.structr.web.entity.File.size;
 import org.structr.web.entity.Image;
-
-//~--- classes ----------------------------------------------------------------
+import org.structr.web.entity.File;
 
 /**
  * A video whose binary data will be stored on disk.
- *
- *
- *
  */
-public class VideoFile extends File {
-
-	private static final Logger logger = LoggerFactory.getLogger(VideoFile.class.getName());
-
-	// register this type as an overridden builtin type
-	static {
-
-		SchemaService.registerBuiltinTypeOverride("VideoFile", VideoFile.class.getName());
-	}
+public interface VideoFile extends File {
 
 	public static final Property<List<VideoFile>> convertedVideos = new EndNodes<>("convertedVideos", VideoFileHasConvertedVideoFile.class);
 	public static final Property<VideoFile> originalVideo         = new StartNode<>("originalVideo", VideoFileHasConvertedVideoFile.class);
@@ -100,23 +70,7 @@ public class VideoFile extends File {
 		convertedVideos, posterImage
 	);
 
-
-	@Override
-	public boolean onCreation(SecurityContext securityContext, ErrorBuffer errorBuffer) throws FrameworkException {
-
-		updateVideoInfo();
-
-		return super.onCreation(securityContext, errorBuffer);
-	}
-
-	@Override
-	public boolean onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
-
-		updateVideoInfo();
-
-		return super.onModification(securityContext, errorBuffer, modificationQueue);
-	}
-
+	/*
 	public String getDiskFilePath(final SecurityContext securityContext) {
 
 		try (final Tx tx = StructrApp.getInstance(securityContext).tx()) {
@@ -264,4 +218,5 @@ public class VideoFile extends File {
 
 		return null;
 	}
+	*/
 }

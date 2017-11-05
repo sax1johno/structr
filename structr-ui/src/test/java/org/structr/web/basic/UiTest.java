@@ -37,11 +37,10 @@ import org.structr.core.entity.AbstractNode;
 import org.structr.core.graph.NodeAttribute;
 import org.structr.core.graph.Tx;
 import org.structr.core.property.PropertyMap;
-import org.structr.dynamic.File;
 import org.structr.web.common.FileHelper;
 import org.structr.web.common.ImageHelper;
 import org.structr.web.common.ImageHelper.Thumbnail;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Folder;
 import org.structr.web.entity.Image;
 import org.structr.web.entity.TestImage;
@@ -328,7 +327,7 @@ public class UiTest extends StructrUiTest {
 
 		try (final Tx tx = app.tx()) {
 
-			FileBase file1 = (FileBase) app.create(File.class, "file1");
+			File file1 = (File) app.create(File.class, "file1");
 			assertNotNull(file1);
 			assertEquals(FileHelper.getFolderPath(file1), "/file1");
 
@@ -371,13 +370,13 @@ public class UiTest extends StructrUiTest {
 
 		final String base64Data = "data:text/plain;base64,RGllcyBpc3QgZWluIFRlc3Q=";
 		final String plaintext  = "Dies ist ein Test";
-		FileBase file           = null;
+		File file           = null;
 
 		try (final Tx tx = app.tx()) {
 
 			file = app.create(File.class,
 				new NodeAttribute<>(AbstractNode.name, "test.txt"),
-				new NodeAttribute<>(FileBase.base64Data, base64Data)
+				new NodeAttribute<>(File.base64Data, base64Data)
 			);
 
 			tx.success();
@@ -423,7 +422,7 @@ public class UiTest extends StructrUiTest {
 					final byte[] content  = fileEntry.getValue();
 
 					try {
-						final FileBase file = FileHelper.createFile(securityContext, content, null, File.class, fileName);
+						final File file = FileHelper.createFile(securityContext, content, null, File.class, fileName);
 						assertEquals("MIME type detection failed", mimeType, file.getContentType());
 
 					} catch (IOException ioex) {
@@ -490,7 +489,7 @@ public class UiTest extends StructrUiTest {
 					final byte[] content  = fileEntry.getValue();
 
 					try {
-						final FileBase file = FileHelper.createFile(securityContext, content, null, File.class, fileName);
+						final File file = FileHelper.createFile(securityContext, content, null, File.class, fileName);
 						assertEquals("MIME type detection failed for " + fileName, mimeType, file.getContentType());
 
 					} catch (IOException ioex) {

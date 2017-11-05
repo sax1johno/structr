@@ -142,6 +142,8 @@ public abstract class StructrUiTest {
 		Settings.ApplicationHost.setValue(host);
 		Settings.HttpPort.setValue(httpPort);
 
+		Settings.LogSchemaOutput.setValue(true);
+
 		Settings.Servlets.setValue("JsonRestServlet WebSocketServlet HtmlServlet");
 
 		final Services services = Services.getInstance();

@@ -28,11 +28,11 @@ import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.Result;
-import org.structr.core.entity.Principal;
 import org.structr.core.property.PropertyKey;
 import org.structr.rest.RestMethodResult;
 import org.structr.rest.exception.IllegalPathException;
 import org.structr.rest.exception.NotAllowedException;
+import org.structr.core.entity.Principal;
 
 /**
  *

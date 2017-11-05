@@ -97,7 +97,7 @@ public class FrameGrabberProcess extends AbstractProcess<Image> {
 
 			// build command line from builder options
 			commandLine.append(" ");
-			commandLine.append(inputFile.getDiskFilePath(securityContext));
+			commandLine.append(inputFile.getFileOnDisk().getAbsolutePath());
 			commandLine.append(" ");
 			commandLine.append(outputFileName);
 			commandLine.append(fileExtension);

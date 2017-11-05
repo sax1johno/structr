@@ -28,10 +28,10 @@ import org.slf4j.LoggerFactory;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
-import org.structr.core.entity.Principal;
 import org.structr.core.graph.Tx;
 import org.structr.rest.auth.AuthHelper;
 import org.structr.rest.auth.SessionHelper;
+import org.structr.core.entity.Principal;
 
 /**
  *

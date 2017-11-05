@@ -28,63 +28,58 @@ import org.structr.web.entity.dom.Page;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 
-/**
- *
- *
- */
-
 public abstract class DOMTest extends StructrUiTest {
-	
+
 	private static final Logger logger = LoggerFactory.getLogger(DOMTest.class.getName());
-	
+
 	protected Document getDocument() {
-		
+
 		try {
-			
+
 			List<Page> pages = this.createTestNodes(Page.class, 1);
 
 			if (!pages.isEmpty()) {
-				
+
 				return pages.get(0);
 			}
-			
+
 		} catch (FrameworkException fex) {
-			
+
 			logger.warn("", fex);
 		}
 
 		return null;
-		
-		
+
+
 	}
-	
+
 	protected Content getContentNode() {
-		
+
 		try {
-			
+
 			List<Content> contents = this.createTestNodes(Content.class, 1);
 
 			if (!contents.isEmpty()) {
-				
+
 				return contents.get(0);
 			}
-			
+
 		} catch (FrameworkException fex) {
-			
+
 			logger.warn("", fex);
 		}
 
 		return null;
 	 }
-	
+
 	protected void printNode(Node node, int depth) {
-		
+
 		for (int i=0; i<depth; i++) {
 			System.out.print("    ");
 		}
-		
+
 		System.out.println(node.getNodeName());
-		
+
 		Node child = node.getFirstChild();
 		while (child != null) {
 			printNode(child, depth + 1);

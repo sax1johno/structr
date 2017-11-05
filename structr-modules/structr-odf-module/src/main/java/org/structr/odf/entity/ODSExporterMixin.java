@@ -30,6 +30,8 @@ import java.util.StringJoiner;
 import org.odftoolkit.odfdom.doc.OdfSpreadsheetDocument;
 import org.odftoolkit.odfdom.doc.table.OdfTable;
 import org.odftoolkit.odfdom.doc.table.OdfTableCell;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.Export;
 import org.structr.core.GraphObject;
@@ -39,20 +41,21 @@ import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.property.StringProperty;
-import static org.structr.odf.entity.ODFExporter.logger;
 import static org.structr.odf.entity.ODFExporter.resultDocument;
 import org.structr.schema.SchemaService;
 import org.structr.transform.VirtualType;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 
 /**
  *
  */
-public class ODSExporter extends ODFExporter {
+public class ODSExporterMixin extends ODFExporterMixin implements ODSExporter {
 
 	static {
-		SchemaService.registerBuiltinTypeOverride("ODSExporter", ODSExporter.class.getName());
+		SchemaService.registerMixinType("ODSExporter", AbstractNode.class, ODSExporterMixin.class);
 	}
+
+	private static final Logger logger = LoggerFactory.getLogger(ODSExporterMixin.class);
 
 	private void writeCollectionToCells(OdfTable sheet, OdfTableCell startCell, Collection col) {
 
@@ -128,9 +131,10 @@ public class ODSExporter extends ODFExporter {
 	}
 
 	@Export
+	@Override
 	public void exportAttributes(String uuid) throws FrameworkException {
 
-		FileBase output = getProperty(resultDocument);
+		File output = getProperty(resultDocument);
 		VirtualType transformation = getProperty(transformationProvider);
 
 		try {

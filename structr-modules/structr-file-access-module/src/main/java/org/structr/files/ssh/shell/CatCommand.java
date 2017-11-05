@@ -29,10 +29,10 @@ import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.graph.Tx;
-import org.structr.dynamic.File;
 import org.structr.files.ssh.StructrShellCommand;
 import org.structr.web.entity.AbstractFile;
 import org.structr.web.entity.Folder;
+import org.structr.web.entity.File;
 
 /**
  *

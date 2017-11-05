@@ -29,7 +29,6 @@ import org.structr.util.AbstractProcess;
  *
  *
  */
-
 public class GetVideoInfoProcess extends AbstractProcess<Map<String, Object>> {
 
 	private String path = null;

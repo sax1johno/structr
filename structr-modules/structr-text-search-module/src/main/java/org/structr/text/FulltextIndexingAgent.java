@@ -48,10 +48,10 @@ import org.structr.common.fulltext.Indexable;
 import org.structr.core.Services;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.Person;
-import org.structr.core.entity.Principal;
 import static org.structr.core.graph.NodeInterface.owner;
 import org.structr.core.graph.NodeService;
 import org.structr.core.graph.Tx;
+import org.structr.core.entity.Principal;
 
 /**
  *

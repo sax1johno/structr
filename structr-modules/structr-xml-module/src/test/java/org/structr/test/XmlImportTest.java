@@ -31,18 +31,17 @@ import static org.junit.Assert.fail;
 import org.junit.Test;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.StructrApp;
-import org.structr.core.entity.Principal;
 import org.structr.core.graph.NodeAttribute;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.Tx;
-import org.structr.dynamic.File;
 import org.structr.schema.ConfigurationProvider;
 import org.structr.schema.export.StructrSchema;
 import org.structr.schema.json.JsonSchema;
 import org.structr.schema.json.JsonType;
 import org.structr.web.common.FileHelper;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.User;
+import org.structr.core.entity.Principal;
 
 /**
  */
@@ -77,7 +76,7 @@ public class XmlImportTest extends StructrUiTest {
 				+ "</items>\n";
 
 			final byte[] fileData = xmlData.getBytes("utf-8");
-			final FileBase file   = FileHelper.createFile(securityContext, fileData, "application/xml", File.class, "test.xml");
+			final File file   = FileHelper.createFile(securityContext, fileData, "application/xml", File.class, "test.xml");
 
 			// extract UUID for later use
 			newFileId = file.getUuid();

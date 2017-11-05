@@ -229,11 +229,11 @@ public class TypeResource extends SortableResource {
 				RelationshipInterface newRelationship = null;
 
 				if (sourceNode == null) {
-					errorBuffer.add(new EmptyPropertyToken(entityClass.getSimpleName(), template.getSourceIdProperty()));
+					errorBuffer.add(new EmptyPropertyToken(entityClass.getSimpleName(), template.getSourceIdProperty(), ""));
 				}
 
 				if (targetNode == null) {
-					errorBuffer.add(new EmptyPropertyToken(entityClass.getSimpleName(), template.getTargetIdProperty()));
+					errorBuffer.add(new EmptyPropertyToken(entityClass.getSimpleName(), template.getTargetIdProperty(), ""));
 				}
 
 				if (errorBuffer.hasError()) {

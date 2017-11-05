@@ -30,18 +30,17 @@ import org.apache.ftpserver.ftplet.FtpFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.error.FrameworkException;
-import static org.structr.core.GraphObject.lastModifiedDate;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.AbstractUser;
-import org.structr.core.entity.Principal;
 import org.structr.core.graph.Tx;
 import org.structr.web.common.RenderContext;
 import org.structr.web.diff.InvertibleModificationOperation;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.dom.Page;
 import org.structr.web.importer.Importer;
+import org.structr.core.entity.Principal;
+import org.structr.core.graph.NodeInterface;
 
 /**
  *
@@ -107,7 +106,7 @@ public class FtpFilePageWrapper implements FtpFile {
 
 		try (Tx tx = StructrApp.getInstance().tx()) {
 
-			Principal owner = page.getProperty(FileBase.owner);
+			Principal owner = page.getProperty(File.owner);
 			tx.success();
 
 			return owner;
@@ -128,7 +127,7 @@ public class FtpFilePageWrapper implements FtpFile {
 			Principal owner = getOwner();
 			if (owner != null) {
 
-				name = owner.getProperty(AbstractUser.name);
+				name = owner.getProperty(Principal.name);
 			}
 			tx.success();
 
@@ -177,7 +176,7 @@ public class FtpFilePageWrapper implements FtpFile {
 
 		try (Tx tx = StructrApp.getInstance().tx()) {
 
-			lastModified = page.getProperty(lastModifiedDate).getTime();
+			lastModified = page.getProperty(NodeInterface.lastModifiedDate).getTime();
 			tx.success();
 
 		} catch (FrameworkException fex) {
@@ -192,7 +191,7 @@ public class FtpFilePageWrapper implements FtpFile {
 
 		try (Tx tx = StructrApp.getInstance().tx()) {
 
-			page.setProperty(lastModifiedDate, new Date(time));
+			page.setProperty(NodeInterface.lastModifiedDate, new Date(time));
 			tx.success();
 
 		} catch (FrameworkException ex) {
@@ -262,7 +261,7 @@ public class FtpFilePageWrapper implements FtpFile {
 	public Object getPhysicalFile() {
 		throw new UnsupportedOperationException("Not supported yet.");
 	}
-	
+
 	@Override
 	public boolean delete() {
 		final App app = StructrApp.getInstance();

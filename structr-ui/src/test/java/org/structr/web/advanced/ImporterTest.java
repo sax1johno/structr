@@ -30,10 +30,9 @@ import org.structr.api.config.Settings;
 import org.structr.common.PathHelper;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.graph.Tx;
-import org.structr.dynamic.File;
 import org.structr.web.StructrUiTest;
 import org.structr.web.common.RenderContext;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.dom.Page;
 import org.structr.web.importer.Importer;
 import org.w3c.dom.NodeList;
@@ -402,15 +401,15 @@ public class ImporterTest extends StructrUiTest {
 
 	private void assertFileExists(final String expectedPath, final int expectedVersion) {
 
-		final FileBase file;
+		final File file;
 		try (final Tx tx = app.tx()) {
 
 			final String filename = PathHelper.getName(expectedPath);
 			file = app.nodeQuery(File.class).andName(filename).getFirst();
 
 			assertNotNull(filename + " file not found", file);
-			assertEquals("Wrong path of " + filename + " file", (String) file.getProperty(FileBase.path), expectedPath);
-			assertEquals("Wrong version of " + filename + " file", (int) file.getProperty(FileBase.version), expectedVersion);
+			assertEquals("Wrong path of " + filename + " file", (String) file.getProperty(File.path), expectedPath);
+			assertEquals("Wrong version of " + filename + " file", (int) file.getProperty(File.version), expectedVersion);
 
 		} catch (FrameworkException ex) {
 			logger.warn("", ex);
@@ -419,7 +418,7 @@ public class ImporterTest extends StructrUiTest {
 
 	private void assertFileNotExists(final String expectedPath) {
 
-		final FileBase file;
+		final File file;
 		try (final Tx tx = app.tx()) {
 
 			final String filename = PathHelper.getName(expectedPath);

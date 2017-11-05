@@ -34,7 +34,7 @@ import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.graph.Tx;
 import org.structr.web.entity.AbstractFile;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Folder;
 import org.structr.web.entity.dom.Page;
 
@@ -123,10 +123,10 @@ public class StructrFtpFolder extends AbstractStructrFtpFile implements FtpFile 
 
 					}
 
-					Result<FileBase> files = app.nodeQuery(FileBase.class).getResult();
+					Result<File> files = app.nodeQuery(File.class).getResult();
 					logger.debug("{} files found", files.size());
 
-					for (FileBase f : files.getResults()) {
+					for (File f : files.getResults()) {
 
 						if (f.getProperty(AbstractFile.hasParent)) {
 							continue;
@@ -170,9 +170,9 @@ public class StructrFtpFolder extends AbstractStructrFtpFile implements FtpFile 
 				ftpFiles.add(ftpFile);
 			}
 
-			List<FileBase> files = ((Folder) structrFile).getProperty(Folder.files);
+			List<File> files = ((Folder) structrFile).getProperty(Folder.files);
 
-			for (FileBase f : files) {
+			for (File f : files) {
 
 				FtpFile ftpFile = new StructrFtpFile(securityContext, f);
 				logger.debug("File found: {}", ftpFile.getAbsolutePath());

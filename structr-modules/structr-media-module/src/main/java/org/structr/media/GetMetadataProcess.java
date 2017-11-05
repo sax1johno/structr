@@ -33,7 +33,6 @@ import org.structr.util.AbstractProcess;
  *
  *
  */
-
 public class GetMetadataProcess extends AbstractProcess<Map<String, String>> {
 
 	private static final Logger logger = LoggerFactory.getLogger(GetMetadataProcess.class.getName());
@@ -57,7 +56,7 @@ public class GetMetadataProcess extends AbstractProcess<Map<String, String>> {
 		StringBuilder commandLine = new StringBuilder("avconv -y -loglevel quiet -i ");
 
 		// build command line from builder options
-		commandLine.append(inputVideo.getDiskFilePath(securityContext));
+		commandLine.append(inputVideo.getFileOnDisk().getAbsolutePath());
 		commandLine.append(" -f ffmetadata -");
 
 		return commandLine;

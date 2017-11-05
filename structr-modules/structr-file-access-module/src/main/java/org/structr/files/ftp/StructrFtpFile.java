@@ -29,7 +29,7 @@ import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.StructrApp;
 import org.structr.core.graph.Tx;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 
 /**
  *
@@ -39,7 +39,7 @@ public class StructrFtpFile extends AbstractStructrFtpFile {
 
 	private static final Logger logger = LoggerFactory.getLogger(StructrFtpFile.class.getName());
 	
-	public StructrFtpFile(final SecurityContext securityContext, final FileBase file) {
+	public StructrFtpFile(final SecurityContext securityContext, final File file) {
 		super(securityContext, file);
 	}
 
@@ -58,7 +58,7 @@ public class StructrFtpFile extends AbstractStructrFtpFile {
 		
 		try (Tx tx = StructrApp.getInstance(securityContext).tx()) {
 		
-			final Long size = ((FileBase) structrFile).getSize();
+			final Long size = ((File) structrFile).getSize();
 			
 			tx.success();
 			
@@ -80,7 +80,7 @@ public class StructrFtpFile extends AbstractStructrFtpFile {
 		
 		try (Tx tx = StructrApp.getInstance(securityContext).tx()) {
 		
-			final OutputStream outputStream = ((FileBase) structrFile).getOutputStream();
+			final OutputStream outputStream = ((File) structrFile).getOutputStream();
 			
 			tx.success();
 			
@@ -98,7 +98,7 @@ public class StructrFtpFile extends AbstractStructrFtpFile {
 
 		try (Tx tx = StructrApp.getInstance(securityContext).tx()) {
 
-			final InputStream inputStream = ((FileBase) structrFile).getInputStream();
+			final InputStream inputStream = ((File) structrFile).getInputStream();
 
 			tx.success();
 

@@ -46,7 +46,7 @@ import org.structr.files.ssh.filesystem.StructrFilesystem;
 import org.structr.files.ssh.filesystem.StructrPath;
 import org.structr.files.ssh.filesystem.StructrToplevelAttributes;
 import org.structr.web.entity.AbstractFile;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Folder;
 
 /**
@@ -87,7 +87,7 @@ public class StructrFilesPath extends StructrPath {
 							files.add(new StructrFilePath(fs, StructrFilesPath.this, folder.getName()));
 						}
 
-						for (final FileBase file : app.nodeQuery(FileBase.class).and(AbstractFile.hasParent, false).getAsList()) {
+						for (final File file : app.nodeQuery(File.class).and(AbstractFile.hasParent, false).getAsList()) {
 
 							files.add(new StructrFilePath(fs, StructrFilesPath.this, file.getName()));
 						}

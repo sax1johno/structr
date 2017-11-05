@@ -53,12 +53,12 @@ import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.GenericNode;
-import org.structr.core.entity.Principal;
 import org.structr.core.entity.Relation;
 import org.structr.core.graph.NodeAttribute;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.Tx;
 import org.structr.core.property.PropertyMap;
+import org.structr.core.entity.Principal;
 
 /**
  *

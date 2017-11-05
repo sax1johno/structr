@@ -21,14 +21,13 @@ package org.structr.rest.entity;
 import org.slf4j.LoggerFactory;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.AbstractUser;
 import org.structr.core.entity.Principal;
 
 /**
  *
  *
  */
-public class TestUser extends AbstractUser implements Principal {
+public class TestUser extends AbstractNode implements Principal {
 
 	@Override
 	public void onNodeCreation() {
