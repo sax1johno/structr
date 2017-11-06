@@ -31,6 +31,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import static junit.framework.TestCase.assertEquals;
 import static junit.framework.TestCase.fail;
+import org.apache.commons.lang3.StringUtils;
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -181,7 +182,7 @@ public class MaintenanceTest extends StructrTest {
 
 					Iterable<Label> labels = node.getNode().getLabels();
 
-					assertEquals(7, Iterables.count(labels));
+					assertEquals(8, Iterables.count(labels));
 
 					for (final Label label : labels) {
 						System.out.print(label.name() + " ");
@@ -190,12 +191,13 @@ public class MaintenanceTest extends StructrTest {
 
 					final Set<String> names = Iterables.toSet(labels).stream().map(Label::name).collect(Collectors.toSet());
 
-					assertEquals("Number of labels must be 7", 7, names.size());
+					assertEquals("Number of labels must be 8", 8, names.size());
 					assertTrue("Set of labels must contain AbstractNode",       names.contains("AbstractNode"));
 					assertTrue("Set of labels must contain NodeInterface",      names.contains("NodeInterface"));
 					assertTrue("Set of labels must contain AccessControllable", names.contains("AccessControllable"));
 					assertTrue("Set of labels must contain CMISInfo",           names.contains("CMISInfo"));
 					assertTrue("Set of labels must contain CMISItemInfo",       names.contains("CMISItemInfo"));
+					assertTrue("Set of labels must contain CMISObjectInfo",     names.contains("CMISObjectInfo"));
 					assertTrue("Set of labels must contain TestOne",            names.contains("TestOne"));
 					assertTrue("Set of labels must contain TestEleven",         names.contains("TestEleven"));
 				}
@@ -231,13 +233,14 @@ public class MaintenanceTest extends StructrTest {
 					Iterable<Label> labels = node.getNode().getLabels();
 					final Set<Label> set   = new HashSet<>(Iterables.toList(labels));
 
-					assertEquals(7, set.size());
+					assertEquals(8, set.size());
 
 					assertTrue("First label has to be AbstractNode",       set.contains(db.forName(Label.class, "AbstractNode")));
 					assertTrue("Second label has to be NodeInterface",     set.contains(db.forName(Label.class, "NodeInterface")));
 					assertTrue("Third label has to be AccessControllable", set.contains(db.forName(Label.class, "AccessControllable")));
 					assertTrue("Fourth label has to be CMISInfo",          set.contains(db.forName(Label.class, "CMISInfo")));
 					assertTrue("Firth label has to be CMISItemInfo",       set.contains(db.forName(Label.class, "CMISItemInfo")));
+					assertTrue("Firth label has to be CMISObjectInfo",     set.contains(db.forName(Label.class, "CMISObjectInfo")));
 					assertTrue("Sixth label has to be TestEleven",         set.contains(db.forName(Label.class, "TestEleven")));
 					assertTrue("Seventh label has to be TestOne",          set.contains(db.forName(Label.class, "TestOne")));
 
@@ -266,11 +269,11 @@ public class MaintenanceTest extends StructrTest {
 			expectedLabels.add(graphDb.forName(Label.class, "Principal"));
 			expectedLabels.add(graphDb.forName(Label.class, "Group"));
 			expectedLabels.add(graphDb.forName(Label.class, "AccessControllable"));
-			expectedLabels.add(graphDb.forName(Label.class, "AbstractUser"));
 			expectedLabels.add(graphDb.forName(Label.class, "AbstractNode"));
 			expectedLabels.add(graphDb.forName(Label.class, "NodeInterface"));
 			expectedLabels.add(graphDb.forName(Label.class, "CMISInfo"));
 			expectedLabels.add(graphDb.forName(Label.class, "CMISItemInfo"));
+			expectedLabels.add(graphDb.forName(Label.class, "CMISObjectInfo"));
 
 			// intentionally create raw Neo4j transaction and create nodes in there
 			try (Transaction tx = graphDb.beginTx()) {
@@ -316,6 +319,9 @@ public class MaintenanceTest extends StructrTest {
 				for (final Group group : app.nodeQuery(Group.class)) {
 
 					final Set<Label> labels = Iterables.toSet(group.getNode().getLabels());
+
+					System.out.println("Expected: " + StringUtils.join(expectedLabels.stream().map(l -> l.name()).sorted().iterator(), ", "));
+					System.out.println("Actual:   " + StringUtils.join(labels.stream().map(l -> l.name()).sorted().iterator(), ", "));
 
 					assertEquals("Invalid number of labels", 8, labels.size());
 					assertTrue("Invalid labels found", labels.containsAll(expectedLabels));

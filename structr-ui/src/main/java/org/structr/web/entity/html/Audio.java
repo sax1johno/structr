@@ -20,6 +20,7 @@ package org.structr.web.entity.html;
 
 import org.structr.common.PropertyView;
 import org.structr.core.property.Property;
+import org.structr.schema.SchemaService;
 import org.structr.web.common.HtmlProperty;
 import org.structr.web.entity.dom.DOMElement;
 
@@ -27,6 +28,8 @@ import org.structr.web.entity.dom.DOMElement;
  *
  */
 public interface Audio extends DOMElement {
+
+	static class Impl { static { SchemaService.registerMixinType(Audio.class); }}
 
 	public static final Property<String> _src          = new HtmlProperty("src");
 	public static final Property<String> _crossorigin  = new HtmlProperty("crossorigin");

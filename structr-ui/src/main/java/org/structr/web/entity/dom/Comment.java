@@ -18,17 +18,25 @@
  */
 package org.structr.web.entity.dom;
 
+import org.structr.common.SecurityContext;
+import org.structr.common.error.ErrorBuffer;
+import org.structr.common.error.FrameworkException;
+import org.structr.core.property.PropertyMap;
+import org.structr.web.common.RenderContext;
 import org.structr.schema.NonIndexed;
+import org.structr.schema.SchemaService;
+import org.w3c.dom.DOMException;
 
 /**
  */
 public interface Comment extends Content, org.w3c.dom.Comment, NonIndexed {
 
-	/*
-	@Override
-	public boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
+	static class Impl { static { SchemaService.registerMixinType(Comment.class); }}
 
-		if (super.isValid(errorBuffer)) {
+	@Override
+	default boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
+
+		if (Content.super.isValid(errorBuffer)) {
 
 			setProperties(securityContext, new PropertyMap(Comment.contentType, "text/html"));
 			return true;
@@ -38,7 +46,7 @@ public interface Comment extends Content, org.w3c.dom.Comment, NonIndexed {
 	}
 
 	@Override
-	public void render(RenderContext renderContext, int depth) throws FrameworkException {
+	default void render(RenderContext renderContext, int depth) throws FrameworkException {
 
 		final String _content = getProperty(content);
 
@@ -52,5 +60,9 @@ public interface Comment extends Content, org.w3c.dom.Comment, NonIndexed {
 		}
 
 	}
-	*/
+
+	@Override
+	default void replaceData(final int offset, final int count, final String data) throws DOMException {
+		Content.super.replaceData(offset, count, data);
+	}
 }

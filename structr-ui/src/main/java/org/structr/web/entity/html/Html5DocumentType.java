@@ -20,7 +20,6 @@ package org.structr.web.entity.html;
 
 import java.util.LinkedHashMap;
 import org.structr.web.entity.dom.Page;
-import org.structr.web.entity.html.Object;
 import org.w3c.dom.DOMException;
 import org.w3c.dom.Document;
 import org.w3c.dom.DocumentType;
@@ -36,11 +35,11 @@ import org.w3c.dom.UserDataHandler;
 public class Html5DocumentType implements DocumentType {
 
 	private Page parent = null;
-	
+
 	public Html5DocumentType(Page parent) {
 		this.parent = parent;
 	}
-	
+
 	@Override
 	public String getName() {
 		return "html";
@@ -254,7 +253,7 @@ public class Html5DocumentType implements DocumentType {
 	public java.lang.Object setUserData(String key, java.lang.Object data, UserDataHandler handler) {
 		return null;
 	}
-	
+
 	// ----- nested classes -----
 	private static class StructrNamedNodeMap extends LinkedHashMap<String, Node> implements NamedNodeMap {
 
@@ -275,15 +274,15 @@ public class Html5DocumentType implements DocumentType {
 
 		@Override
 		public Node item(int index) {
-			
+
 			int pos = 0;
-			
+
 			for (Node node : this.values()) {
 				if (pos++ == index) {
 					return node;
 				}
 			}
-			
+
 			return null;
 		}
 
@@ -306,6 +305,6 @@ public class Html5DocumentType implements DocumentType {
 		public Node removeNamedItemNS(String namespaceURI, String localName) throws DOMException {
 			return removeNamedItem(localName);
 		}
-		
+
 	}
 }

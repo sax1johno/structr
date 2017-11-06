@@ -18,16 +18,26 @@
  */
 package org.structr.web.entity.html;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.structr.common.PropertyView;
+import org.structr.common.SecurityContext;
 import org.structr.common.View;
+import org.structr.common.error.ErrorBuffer;
+import org.structr.common.error.FrameworkException;
 import org.structr.core.property.Property;
+import org.structr.core.property.PropertyMap;
+import org.structr.schema.SchemaService;
 import org.structr.web.common.HtmlProperty;
+import org.structr.web.entity.dom.Content;
 import org.structr.web.entity.dom.DOMElement;
+import org.w3c.dom.Node;
 
 /**
  *
  */
 public interface Style extends DOMElement {
+
+	static class Impl { static { SchemaService.registerMixinType(Style.class); }}
 
 	public static final Property<String> _media  = new HtmlProperty("media");
 	public static final Property<String> _type   = new HtmlProperty("type");
@@ -37,11 +47,10 @@ public interface Style extends DOMElement {
 		_media, _type, _scoped
 	);
 
-	/*
 	@Override
-	public boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
+	default boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
 
-		if (super.isValid(errorBuffer)) {
+		if (DOMElement.super.isValid(errorBuffer)) {
 
 			setProperty(Style._type, "text/css");
 			return true;
@@ -51,14 +60,12 @@ public interface Style extends DOMElement {
 	}
 
 	@Override
-	public Property[] getHtmlAttributes() {
-
-		return (Property[]) ArrayUtils.addAll(super.getHtmlAttributes(), htmlView.properties());
-
+	default Property[] getHtmlAttributes() {
+		return (Property[]) ArrayUtils.addAll(DOMElement.super.getHtmlAttributes(), htmlView.properties());
 	}
 
 	@Override
-	protected void handleNewChild(final Node newChild) {
+	default void handleNewChild(final Node newChild) {
 
 		if (newChild instanceof Content) {
 
@@ -71,15 +78,13 @@ public interface Style extends DOMElement {
 
 				if (childContentType == null && thisContentType != null) {
 
-					content.setProperties(securityContext, new PropertyMap(Content.contentType, thisContentType));
+					content.setProperties(getSecurityContext(), new PropertyMap(Content.contentType, thisContentType));
 				}
 
 			} catch (FrameworkException fex) {
 
 				logger.warn("Unable to set property on new child: {}", fex.getMessage());
-
 			}
 		}
 	}
-	*/
 }

@@ -24,11 +24,13 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
+import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.AbstractRelationship;
+import org.structr.core.graph.ModificationQueue;
 import org.structr.core.property.BooleanProperty;
 import org.structr.core.property.ConstantBooleanProperty;
 import org.structr.core.property.IntProperty;
@@ -69,76 +71,10 @@ public interface Image extends org.structr.web.entity.File {
 	public static final org.structr.common.View uiView            = new org.structr.common.View(Image.class, PropertyView.Ui, type, name, contentType, size, relativeFilePath, width, height, orientation, exifIFD0Data, exifSubIFDData, gpsData, tnSmall, tnMid, isThumbnail, owner, parent, path, isImage);
 	public static final org.structr.common.View publicView        = new org.structr.common.View(Image.class, PropertyView.Public, type, name, width, height, orientation, exifIFD0Data, exifSubIFDData, gpsData, tnSmall, tnMid, isThumbnail, owner, parent, path, isImage);
 
-	/*
 	@Override
-	default Object setProperty(final PropertyKey key, final Object value) throws FrameworkException {
+	default boolean onModification(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
 
-		// Copy visibility properties and owner to all thumbnails
-		if (visibleToPublicUsers.equals(key) ||
-			visibleToAuthenticatedUsers.equals(key) ||
-			visibilityStartDate.equals(key) ||
-			visibilityEndDate.equals(key) ||
-			owner.equals(key)) {
-
-			for (Image tn : getThumbnails()) {
-
-				if (!tn.getUuid().equals(getUuid())) {
-					tn.setProperty(key, value);
-				} else {
-//					logger.info("Ignoring recursive setProperty for thumbnail where image is its own thumbnail");
-				}
-
-			}
-
-		}
-
-		return super.setProperty(key, value);
-	}
-
-	@Override
-	public void setProperties(final SecurityContext securityContext, final PropertyMap properties) throws FrameworkException {
-
-		if ( !isThumbnail() ) {
-
-			final PropertyMap propertiesCopiedToAllThumbnails = new PropertyMap();
-
-			for (final PropertyKey key : properties.keySet()) {
-
-					if (visibleToPublicUsers.equals(key) ||
-						visibleToAuthenticatedUsers.equals(key) ||
-						visibilityStartDate.equals(key) ||
-						visibilityEndDate.equals(key) ||
-						owner.equals(key)) {
-
-						propertiesCopiedToAllThumbnails.put(key, properties.get(key));
-					}
-			}
-
-			if ( !propertiesCopiedToAllThumbnails.isEmpty() ) {
-
-				final List<Image> thumbnails = getThumbnails();
-
-				for (Image tn : thumbnails) {
-
-					if (!tn.getUuid().equals(getUuid())) {
-						tn.setProperties(tn.getSecurityContext(), propertiesCopiedToAllThumbnails);
-					} else {
-//						logger.info("Ignoring recursive setProperty for thumbnail where image is its own thumbnail");
-					}
-
-				}
-
-			}
-
-		}
-
-		super.setProperties(securityContext, properties);
-	}
-
-	@Override
-	public boolean onModification(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
-
-		if (super.onModification(securityContext, errorBuffer, modificationQueue)) {
+		if (File.super.onModification(securityContext, errorBuffer, modificationQueue)) {
 
 			if ( !isThumbnail() ) {
 
@@ -155,13 +91,9 @@ public interface Image extends org.structr.web.entity.File {
 
 							logger.debug("Auto-renaming Thumbnail({}) from '{}' to '{}'", tn.getUuid(), currentThumbnailName, expectedThumbnailName);
 							tn.setProperty(AbstractNode.name, expectedThumbnailName);
-
 						}
-
 					}
-
 				}
-
 			}
 
 			return true;
@@ -169,7 +101,6 @@ public interface Image extends org.structr.web.entity.File {
 
 		return false;
 	}
-	*/
 
 	default Integer getWidth() {
 		return getProperty(Image.width);

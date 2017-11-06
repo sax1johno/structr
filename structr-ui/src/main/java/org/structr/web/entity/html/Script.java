@@ -18,16 +18,27 @@
  */
 package org.structr.web.entity.html;
 
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.structr.common.PropertyView;
+import org.structr.common.SecurityContext;
 import org.structr.common.View;
+import org.structr.common.error.ErrorBuffer;
+import org.structr.common.error.FrameworkException;
 import org.structr.core.property.Property;
+import org.structr.core.property.PropertyMap;
+import org.structr.schema.SchemaService;
 import org.structr.web.common.HtmlProperty;
 import org.structr.web.entity.LinkSource;
+import org.structr.web.entity.dom.Content;
+import org.w3c.dom.Node;
 
 /**
  *
  */
 public interface Script extends LinkSource {
+
+	static class Impl { static { SchemaService.registerMixinType(Script.class); }}
 
 	public static final Property<String> _src     = new HtmlProperty("src");
 	public static final Property<String> _async   = new HtmlProperty("async");
@@ -43,11 +54,10 @@ public interface Script extends LinkSource {
 		_src, _async, _defer, _type, _charset
 	);
 
-	/*
 	@Override
-	public boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
+	default boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
 
-		if (super.isValid(errorBuffer)) {
+		if (LinkSource.super.isValid(errorBuffer)) {
 
 			setProperty(Script._type, "text/javascript");
 			return true;
@@ -57,14 +67,12 @@ public interface Script extends LinkSource {
 	}
 
 	@Override
-	public Property[] getHtmlAttributes() {
-
-		return (Property[]) ArrayUtils.addAll(super.getHtmlAttributes(), htmlView.properties());
-
+	default Property[] getHtmlAttributes() {
+		return (Property[]) ArrayUtils.addAll(LinkSource.super.getHtmlAttributes(), htmlView.properties());
 	}
 
 	@Override
-	protected void handleNewChild(final Node newChild) {
+	default void handleNewChild(final Node newChild) {
 
 		if (newChild instanceof Content) {
 
@@ -73,7 +81,7 @@ public interface Script extends LinkSource {
 
 				if (StringUtils.isNotBlank(scriptType)) {
 
-					((Content)newChild).setProperties(securityContext, new PropertyMap(Content.contentType, scriptType));
+					((Content)newChild).setProperties(getSecurityContext(), new PropertyMap(Content.contentType, scriptType));
 
 				}
 
@@ -84,5 +92,4 @@ public interface Script extends LinkSource {
 			}
 		}
 	}
-	*/
 }

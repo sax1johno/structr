@@ -359,9 +359,7 @@ public interface GraphObject {
 	 */
 	public void unlockReadOnlyPropertiesOnce();
 
-
-	public boolean isValid(ErrorBuffer errorBuffer);
-
+	boolean isValid(ErrorBuffer errorBuffer);
 
 	/**
 	 * Called when an entity of this type is created in the database. This method can cause
@@ -373,7 +371,9 @@ public interface GraphObject {
 	 * @return true if the transaction can go on, false if an error occurred
 	 * @throws FrameworkException
 	 */
-	public boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException;
+	default boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
+		return true;
+	}
 
 	/**
 	 * Called when an entity of this type is modified. This method can cause the underlying
@@ -386,7 +386,10 @@ public interface GraphObject {
 	 * @return true if the transaction can go on, false if an error occurred
 	 * @throws FrameworkException
 	 */
-	public boolean onModification(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException;
+	default boolean onModification(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
+		AbstractNode.clearPermissionResolutionCache();
+		return true;
+	}
 
 	/**
 	 * Called when an entity of this type is deleted. This method can cause the underlying
@@ -399,7 +402,10 @@ public interface GraphObject {
 	 * @return true if the transaction can go on, false if an error occurred
 	 * @throws FrameworkException
 	 */
-	public boolean onDeletion(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final PropertyMap properties) throws FrameworkException;
+	default boolean onDeletion(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final PropertyMap properties) throws FrameworkException {
+		AbstractNode.clearPermissionResolutionCache();
+		return true;
+	}
 
 	/**
 	 * Called when an entity was successfully created. Please note that this method
@@ -408,7 +414,8 @@ public interface GraphObject {
 	 *
 	 * @param securityContext the context in which the creation took place
 	 */
-	public void afterCreation(final SecurityContext securityContext);
+	default void afterCreation(final SecurityContext securityContext) {
+	}
 
 	/**
 	 * Called when an entity was successfully modified. Please note that this method
@@ -417,7 +424,8 @@ public interface GraphObject {
 	 *
 	 * @param securityContext the context in which the modification took place
 	 */
-	public void afterModification(final SecurityContext securityContext);
+	default void afterModification(final SecurityContext securityContext) {
+	}
 
 	/**
 	 * Called when an entity was successfully deleted. Please note that this method
@@ -427,7 +435,8 @@ public interface GraphObject {
 	 * @param securityContext the context in which the deletion took place
 	 * @param properties
 	 */
-	public void afterDeletion(final SecurityContext securityContext, final PropertyMap properties);
+	default void afterDeletion(final SecurityContext securityContext, final PropertyMap properties) {
+	}
 
 	/**
 	 * Called when the owner of this entity was successfully modified. Please note

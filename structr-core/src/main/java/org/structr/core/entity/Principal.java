@@ -189,7 +189,7 @@ public interface Principal extends NodeInterface, AccessControllable {
 	@Override
 	default public boolean isValid(final ErrorBuffer errorBuffer) {
 
-		boolean valid = true;
+		boolean valid = NodeInterface.super.isValid(errorBuffer);
 
 		valid &= ValidationHelper.isValidStringNotBlank(this, name, errorBuffer);
 		valid &= ValidationHelper.isValidUniqueProperty(this, eMail, errorBuffer);

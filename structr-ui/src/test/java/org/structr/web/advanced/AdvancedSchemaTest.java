@@ -71,7 +71,10 @@ public class AdvancedSchemaTest extends FrontendTest {
 		try (final Tx tx = app.tx()) {
 
 			// Add String property "testFile" to built-in File class
-			SchemaNode fileNodeDef = app.nodeQuery(SchemaNode.class).andName("File").getFirst();
+			SchemaNode fileNodeDef = app.create(SchemaNode.class,
+				new NodeAttribute<>(SchemaNode.name, "File"),
+				new NodeAttribute<>(SchemaNode.implementsInterfaces, "File")
+			);
 
 			SchemaProperty testFileProperty = app.create(SchemaProperty.class);
 
@@ -106,7 +109,7 @@ public class AdvancedSchemaTest extends FrontendTest {
 
 					.body("result",	                   hasSize(34))
 					.body("result[33].jsonName",       equalTo("testFile"))
-					.body("result[33].declaringClass", equalTo("_FileHelper"))
+					.body("result[33].declaringClass", equalTo("File"))
 
 				.when()
 					.get("/_schema/File/ui");
@@ -137,8 +140,8 @@ public class AdvancedSchemaTest extends FrontendTest {
 					.statusCode(200)
 
 					.body("result",	                   hasSize(44))
-					.body("result[43].jsonName",       equalTo("testFile"))
-					.body("result[43].declaringClass", equalTo("_FileHelper"))
+					.body("result[10].jsonName",       equalTo("testFile"))
+					.body("result[10].declaringClass", equalTo("File"))
 
 				.when()
 					.get("/_schema/Image/ui");

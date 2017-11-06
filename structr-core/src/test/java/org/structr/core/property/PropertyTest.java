@@ -1672,7 +1672,11 @@ public class PropertyTest extends StructrTest {
 		// schema setup
 		try (final Tx tx = app.tx()) {
 
-			final SchemaNode group = app.nodeQuery(SchemaNode.class).andName("Group").getFirst();
+			final SchemaNode group = app.create(SchemaNode.class,
+				new NodeAttribute<>(SchemaNode.name, "Group"),
+				new NodeAttribute<>(SchemaNode.implementsInterfaces, "Group")
+			);
+			
 			final SchemaNode test  = app.create(SchemaNode.class,
 				new NodeAttribute<>(SchemaNode.name, "Test"),
 				new NodeAttribute<>(new StringProperty("_testFunction"), "Function(this.group.name)")

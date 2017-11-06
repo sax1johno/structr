@@ -30,6 +30,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.structr.api.Predicate;
 import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
+import org.structr.common.ValidationHelper;
+import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.Export;
 import org.structr.core.app.App;
@@ -207,6 +209,17 @@ public interface Page extends DOMNode, Linkable, Document, DOMImplementation {
 		}
 
 		return page;
+	}
+
+	@Override
+	default boolean isValid(final ErrorBuffer errorBuffer) {
+
+		boolean valid = DOMNode.super.isValid(errorBuffer);
+
+		valid &= ValidationHelper.isValidStringNotBlank(this, AbstractNode.name, errorBuffer);
+		valid &= ValidationHelper.isValidStringMatchingRegex(this, name, "[_\\p{L}0-9\\s\\-\\.]+", errorBuffer);
+
+		return valid;
 	}
 
 	@Override

@@ -67,9 +67,7 @@ import org.structr.common.PermissionPropagation;
 import org.structr.common.PermissionResolutionMask;
 import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
-import org.structr.common.ValidationHelper;
 import org.structr.common.View;
-import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.common.error.InternalSystemPropertyToken;
 import org.structr.common.error.NullArgumentToken;
@@ -82,7 +80,6 @@ import org.structr.core.app.StructrApp;
 import org.structr.core.converter.PropertyConverter;
 import org.structr.core.entity.relationship.Ownership;
 import org.structr.core.entity.relationship.PrincipalOwnsNode;
-import org.structr.core.graph.ModificationQueue;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.NodeRelationshipStatisticsCommand;
 import org.structr.core.graph.NodeService;
@@ -129,16 +126,8 @@ public abstract class AbstractNode implements NodeInterface, AccessControllable,
 	}
 
 	@Override
-	public void onNodeCreation() {
-	}
-
-	@Override
 	public void onNodeInstantiation(final boolean isCreation) {
 		this.cachedUuid = getProperty(GraphObject.id);
-	}
-
-	@Override
-	public void onNodeDeletion() {
 	}
 
 	@Override
@@ -1163,35 +1152,6 @@ public abstract class AbstractNode implements NodeInterface, AccessControllable,
 	}
 
 	@Override
-	public boolean onCreation(SecurityContext securityContext, ErrorBuffer errorBuffer) throws FrameworkException {
-		return true;
-	}
-
-	@Override
-	public boolean onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
-		clearPermissionResolutionCache();
-		return true;
-	}
-
-	@Override
-	public boolean onDeletion(SecurityContext securityContext, ErrorBuffer errorBuffer, PropertyMap properties) throws FrameworkException {
-		clearPermissionResolutionCache();
-		return true;
-	}
-
-	@Override
-	public void afterCreation(SecurityContext securityContext) {
-	}
-
-	@Override
-	public void afterModification(SecurityContext securityContext) {
-	}
-
-	@Override
-	public void afterDeletion(SecurityContext securityContext, PropertyMap properties) {
-	}
-
-	@Override
 	public void ownerModified(SecurityContext securityContext) {
 		clearPermissionResolutionCache();
 	}
@@ -1209,25 +1169,6 @@ public abstract class AbstractNode implements NodeInterface, AccessControllable,
 	@Override
 	public void propagatedModification(SecurityContext securityContext) {
 		clearPermissionResolutionCache();
-	}
-
-	@Override
-	public boolean isValid(final ErrorBuffer errorBuffer) {
-
-		boolean valid = true;
-
-		// the following two checks can be omitted in release 2.4 when Neo4j uniqueness constraints are live
-		valid &= ValidationHelper.isValidStringNotBlank(this, id, errorBuffer);
-
-		if (securityContext != null && securityContext.uuidWasSetManually()) {
-			valid &= ValidationHelper.isValidGloballyUniqueProperty(this, id, errorBuffer);
-		}
-
-		valid &= ValidationHelper.isValidStringMatchingRegex(this, id, "[a-fA-F0-9]{32}", errorBuffer);
-		valid &= ValidationHelper.isValidStringNotBlank(this, type, errorBuffer);
-
-		return valid;
-
 	}
 
 	@Override

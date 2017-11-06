@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -50,7 +51,6 @@ import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.SchemaNode;
 import org.structr.core.entity.SchemaRelationshipNode;
-import org.structr.core.graph.NodeAttribute;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.Tx;
 import org.structr.core.graph.search.SearchCommand;
@@ -63,10 +63,10 @@ import org.structr.schema.compiler.NodeExtender;
  */
 public class SchemaService implements Service {
 
-	private static final Logger logger                      = LoggerFactory.getLogger(SchemaService.class.getName());
-	private static final AtomicBoolean compiling            = new AtomicBoolean(false);
-	private static final AtomicBoolean updating             = new AtomicBoolean(false);
-	private static final Map<String, MixinStorage> mixinMap = new LinkedHashMap<>();
+	private static final Logger logger                           = LoggerFactory.getLogger(SchemaService.class.getName());
+	private static final AtomicBoolean compiling                 = new AtomicBoolean(false);
+	private static final AtomicBoolean updating                  = new AtomicBoolean(false);
+	private static final Map<String, VirtualSchemaInfo> mixinMap = new LinkedHashMap<>();
 
 	@Override
 	public void injectArguments(final Command command) {
@@ -86,8 +86,16 @@ public class SchemaService implements Service {
 		return true;
 	}
 
+	public static void registerMixinType(final Class<? extends NodeInterface> iface) {
+		registerMixinType(iface.getSimpleName(), AbstractNode.class, iface);
+	}
+
 	public static void registerMixinType(final String type, final Class<? extends AbstractNode> baseClass, final Class... interfaces) {
-		mixinMap.put(type, new MixinStorage(type, baseClass, interfaces));
+		registerMixinType(type, baseClass.getName(), interfaces);
+	}
+
+	public static void registerMixinType(final String type, final String baseClass, final Class... interfaces) {
+		mixinMap.put(type, new VirtualSchemaInfo(type, baseClass, interfaces));
 	}
 
 	public static boolean reloadSchema(final ErrorBuffer errorBuffer, final String initiatedBySessionId) {
@@ -106,35 +114,24 @@ public class SchemaService implements Service {
 
 				try (final Tx tx = StructrApp.getInstance().tx()) {
 
-					SchemaService.ensureBuiltinTypesExist();
+					// collect auto-generated schema nodes
+					final List<SchemaInfo> schemaInfoList = SchemaService.ensureBuiltinTypesExist();
 
-					// collect node classes
-					final List<SchemaNode> schemaNodes = StructrApp.getInstance().nodeQuery(SchemaNode.class).getAsList();
-					for (final SchemaNode schemaNode : schemaNodes) {
+					// add schema nodes from database
+					schemaInfoList.addAll(StructrApp.getInstance().nodeQuery(SchemaNode.class).getAsList());
 
-						nodeExtender.addClass(schemaNode.getClassName(), schemaNode.getSource(errorBuffer));
+					for (final SchemaInfo schemaInfo : schemaInfoList) {
 
-						final String auxSource = schemaNode.getAuxiliarySource();
-						if (auxSource != null) {
+						nodeExtender.addClass(schemaInfo.getName(), SchemaHelper.getSource(schemaInfo, errorBuffer));
 
-							nodeExtender.addClass("_" + schemaNode.getClassName() + "Helper", auxSource);
-						}
-
-						dynamicViews.addAll(schemaNode.getViews());
+						dynamicViews.addAll(schemaInfo.getDynamicViews());
 					}
 
 					// collect relationship classes
 					for (final SchemaRelationshipNode schemaRelationship : StructrApp.getInstance().nodeQuery(SchemaRelationshipNode.class).getAsList()) {
 
 						nodeExtender.addClass(schemaRelationship.getClassName(), schemaRelationship.getSource(errorBuffer));
-
-						final String auxSource = schemaRelationship.getAuxiliarySource();
-						if (auxSource != null) {
-
-							nodeExtender.addClass("_" + schemaRelationship.getClassName() + "Helper", auxSource);
-						}
-
-						dynamicViews.addAll(schemaRelationship.getViews());
+						dynamicViews.addAll(schemaRelationship.getDynamicViews());
 					}
 
 					// this is a very critical section :)
@@ -232,35 +229,26 @@ public class SchemaService implements Service {
 		return true;
 	}
 
-	public static void ensureBuiltinTypesExist() throws FrameworkException {
+	public static List<SchemaInfo> ensureBuiltinTypesExist() throws FrameworkException {
 
-		final App app = StructrApp.getInstance();
+		final List<SchemaInfo> list = new LinkedList<>();
+		final App app               = StructrApp.getInstance();
 
-		for (final Entry<String, MixinStorage> entry : mixinMap.entrySet()) {
+		for (final Entry<String, VirtualSchemaInfo> entry : mixinMap.entrySet()) {
 
-			final String type        = entry.getKey();
-			final MixinStorage mixin = entry.getValue();
+			final String typeName        = entry.getKey();
+			final VirtualSchemaInfo type = entry.getValue();
 
-			SchemaNode schemaNode = app.nodeQuery(SchemaNode.class).andName(type).getFirst();
+			SchemaNode schemaNode = app.nodeQuery(SchemaNode.class).andName(typeName).getFirst();
 			if (schemaNode == null) {
 
-				schemaNode = app.create(SchemaNode.class,
-					new NodeAttribute<>(SchemaNode.name, type),
-					new NodeAttribute<>(SchemaNode.implementsInterfaces, StringUtils.join(mixin.interfaces.stream().map(i -> i.getSimpleName()).iterator(), ", "))
-				);
-			}
-
-			// creation can fail
-			if (schemaNode != null) {
-
-				if (mixin.baseClass != null) {
-					schemaNode.setProperty(SchemaNode.extendsClass, mixin.baseClass.getName());
-				}
-
-				schemaNode.unlockSystemPropertiesOnce();
-				schemaNode.setProperty(SchemaNode.isBuiltinType, true);
+				// if no schema node exists (internal type is not overridden), add
+				// virtual schema info to list of types so it will be generated
+				list.add(type);
 			}
 		}
+
+		return list;
 	}
 
 	@Override
@@ -468,18 +456,48 @@ public class SchemaService implements Service {
 	}
 
 	// ----- nested classes -----
-	private static class MixinStorage {
+	private static class VirtualSchemaInfo implements SchemaInfo {
 
-		public Set<Class> interfaces = new LinkedHashSet<>();
-		public String name           = null;
-		public Class baseClass       = null;
+		private final Set<String> views = new LinkedHashSet<>();
+		private String name             = null;
+		private String baseClass        = null;
+		private String interfaces       = null;
 
-		public MixinStorage(final String name, final Class baseClass, final Class... interfaces) {
+		public VirtualSchemaInfo(final String name, final String baseClass, final Class... interfaces) {
 
-			this.interfaces.addAll(Arrays.asList(interfaces));
+			this.name       = name;
+			this.baseClass  = baseClass;
+			this.interfaces = StringUtils.join(Arrays.asList(interfaces).stream().map(i -> i.getSimpleName()).iterator(), ", ");
+		}
 
-			this.baseClass = baseClass;
-			this.name      = name;
+		@Override
+		public String getName() {
+			return name;
+		}
+
+		@Override
+		public String getBaseClass() {
+			return baseClass;
+		}
+
+		@Override
+		public String getImplementedInterfaces() {
+			return interfaces;
+		}
+
+		@Override
+		public SchemaNode getSchemaNode() {
+			return null;
+		}
+
+		@Override
+		public void addDynamicView(final String dynamicView) {
+			this.views.add(dynamicView);
+		}
+
+		@Override
+		public Set<String> getDynamicViews() {
+			return views;
 		}
 	}
 }

@@ -49,6 +49,7 @@ import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.LinkedTreeNode;
 import org.structr.core.entity.Principal;
 import org.structr.core.entity.Security;
+import org.structr.core.graph.ModificationQueue;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.notion.PropertyNotion;
 import org.structr.core.property.BooleanProperty;
@@ -289,6 +290,27 @@ public interface DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, DOMNod
 	}
 
 	// ----- actual methods -----
+	@Override
+	default boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
+		return checkName(errorBuffer);
+	}
+
+	@Override
+	default boolean onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
+
+		try {
+
+			increasePageVersion();
+
+		} catch (FrameworkException ex) {
+
+			logger.warn("Updating page version failed", ex);
+
+		}
+
+		return checkName(errorBuffer);
+	}
+
 	default String getIdHash() {
 		return getUuid();
 	}

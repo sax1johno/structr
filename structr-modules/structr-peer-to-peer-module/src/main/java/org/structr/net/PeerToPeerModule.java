@@ -22,9 +22,8 @@ package org.structr.net;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import org.structr.api.service.LicenseManager;
-import org.structr.core.entity.AbstractSchemaNode;
-import org.structr.core.entity.SchemaNode;
 import org.structr.module.StructrModule;
+import org.structr.schema.SchemaInfo;
 import org.structr.schema.action.Actions;
 
 
@@ -50,16 +49,16 @@ public class PeerToPeerModule implements StructrModule {
 	}
 
 	@Override
-	public void insertImportStatements(final AbstractSchemaNode schemaNode, final StringBuilder buf) {
+	public void insertImportStatements(final SchemaInfo schemaInfo, final StringBuilder buf) {
 
-		if (isShared(schemaNode)) {
+		if (isShared(schemaInfo)) {
 
 			buf.append("import org.structr.net.SharedNodeInterface;\n");
 		}
 	}
 
 	@Override
-	public Set<String> getInterfacesForType(final AbstractSchemaNode schemaNode) {
+	public Set<String> getInterfacesForType(final SchemaInfo schemaNode) {
 
 		final Set<String> interfaces = new LinkedHashSet<>();
 
@@ -71,7 +70,7 @@ public class PeerToPeerModule implements StructrModule {
 	}
 
 	@Override
-	public void insertSaveAction(final AbstractSchemaNode schemaNode, final StringBuilder buf, final Actions.Type type) {
+	public void insertSaveAction(final SchemaInfo schemaNode, final StringBuilder buf, final Actions.Type type) {
 
 		if (isShared(schemaNode)) {
 
@@ -107,9 +106,9 @@ public class PeerToPeerModule implements StructrModule {
 	}
 
 	@Override
-	public void insertSourceCode(final AbstractSchemaNode schemaNode, final StringBuilder buf) {
+	public void insertSourceCode(final SchemaInfo schemaInfo, final StringBuilder buf) {
 
-		if (isShared(schemaNode)) {
+		if (isShared(schemaInfo)) {
 
 			buf.append("\tprivate boolean fullyCreated = false;\n");
 			buf.append("\n");
@@ -282,7 +281,7 @@ public class PeerToPeerModule implements StructrModule {
 	}
 
 	// ----- private methods -----
-	private boolean isShared(final AbstractSchemaNode schemaNode) {
-		return Boolean.TRUE.equals(schemaNode.getProperty(SchemaNode.shared));
+	private boolean isShared(final SchemaInfo schemaNode) {
+		return Boolean.TRUE.equals(schemaNode.isShared());
 	}
 }

@@ -23,7 +23,9 @@ import org.structr.api.config.Settings;
 import org.structr.common.KeyAndClass;
 import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
+import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
+import org.structr.common.error.SemanticErrorToken;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.Favoritable;
@@ -45,6 +47,8 @@ import org.structr.web.entity.relation.UserWorkDir;
 import org.structr.web.property.ImageDataProperty;
 import org.structr.web.property.UiNotion;
 import org.structr.core.entity.Group;
+import org.structr.core.graph.ModificationQueue;
+import org.structr.core.property.PropertyMap;
 
 public interface User extends Principal {
 
@@ -71,6 +75,58 @@ public interface User extends Principal {
 	public static final org.structr.common.View publicView = new org.structr.common.View(User.class, PropertyView.Public,
 		type, name, isUser
 	);
+
+	@Override
+	default boolean isValid(final ErrorBuffer errorBuffer) {
+
+		if ( getProperty(skipSecurityRelationships).equals(Boolean.TRUE) && !isAdmin()) {
+
+			errorBuffer.add(new SemanticErrorToken(getClass().getSimpleName(), skipSecurityRelationships, "can_only_be_set_for_admin_accounts"));
+			return false;
+		}
+
+		return Principal.super.isValid(errorBuffer);
+	}
+
+
+	@Override
+	default boolean onCreation(SecurityContext securityContext, ErrorBuffer errorBuffer) throws FrameworkException {
+
+		if (Principal.super.onCreation(securityContext, errorBuffer)) {
+
+			checkAndCreateHomeDirectory(securityContext);
+
+			return true;
+		}
+
+		return false;
+	}
+
+	@Override
+	default boolean onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
+
+		if (Principal.super.onModification(securityContext, errorBuffer, modificationQueue)) {
+
+			checkAndCreateHomeDirectory(securityContext);
+
+			return true;
+		}
+
+		return false;
+	}
+
+	@Override
+	default boolean onDeletion(SecurityContext securityContext, ErrorBuffer errorBuffer, PropertyMap properties) throws FrameworkException {
+
+		if (Principal.super.onDeletion(securityContext, errorBuffer, properties)) {
+
+			checkAndRemoveHomeDirectory(securityContext);
+
+			return true;
+		}
+
+		return false;
+	}
 
 	default void checkAndCreateHomeDirectory(final SecurityContext securityContext) throws FrameworkException {
 

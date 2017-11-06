@@ -22,8 +22,8 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import org.structr.api.service.LicenseManager;
-import org.structr.core.entity.AbstractSchemaNode;
 import org.structr.module.StructrModule;
+import org.structr.schema.SchemaInfo;
 import org.structr.schema.action.Actions;
 
 /**
@@ -56,19 +56,19 @@ public class XMLModule implements StructrModule, org.structr.module.xml.XMLModul
 	}
 
 	@Override
-	public void insertImportStatements(final AbstractSchemaNode schemaNode, final StringBuilder buf) {
+	public void insertImportStatements(final SchemaInfo schemaInfo, final StringBuilder buf) {
 	}
 
 	@Override
-	public void insertSourceCode(final AbstractSchemaNode schemaNode, final StringBuilder buf) {
+	public void insertSourceCode(final SchemaInfo schemaNode, final StringBuilder buf) {
 	}
 
 	@Override
-	public Set<String> getInterfacesForType(final AbstractSchemaNode schemaNode) {
+	public Set<String> getInterfacesForType(final SchemaInfo schemaNode) {
 		return null;
 	}
 
 	@Override
-	public void insertSaveAction(final AbstractSchemaNode schemaNode, final StringBuilder buf, final Actions.Type type) {
+	public void insertSaveAction(final SchemaInfo schemaNode, final StringBuilder buf, final Actions.Type type) {
 	}
 }

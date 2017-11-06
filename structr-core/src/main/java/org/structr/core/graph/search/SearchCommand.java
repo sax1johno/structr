@@ -23,8 +23,10 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,7 +66,7 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 	protected static final boolean PUBLIC_ONLY		  = false;
 
 	private static final Map<String, Set<String>> subtypeMapForType = new LinkedHashMap<>();
-	private static final Set<String> baseTypes                      = new LinkedHashSet<>();
+	private static final Set<Class> baseTypes                       = new LinkedHashSet<>();
 
 	public static final String LAT_LON_SEARCH_KEYWORD     = "latlon";
 	public static final String LOCATION_SEARCH_KEYWORD    = "location";
@@ -78,10 +80,8 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 
 	static {
 
-		baseTypes.add(RelationshipInterface.class.getSimpleName());
-		baseTypes.add(AbstractRelationship.class.getSimpleName());
-		baseTypes.add(NodeInterface.class.getSimpleName());
-		baseTypes.add(AbstractNode.class.getSimpleName());
+		baseTypes.add(AbstractRelationship.class);
+		baseTypes.add(GraphObject.class);
 	}
 
 	private final SearchAttributeGroup rootGroup = new SearchAttributeGroup(Occurrence.REQUIRED);
@@ -744,15 +744,35 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 
 		final ConfigurationProvider configuration = StructrApp.getConfiguration();
 		final Set<Class> allSupertypes            = new LinkedHashSet<>();
+		final Queue<Class> source                 = new LinkedList<>();
 
-		Class localType = type;
+		source.add(type);
 
-		while (localType != null && !localType.equals(Object.class)) {
+		while (!source.isEmpty()) {
 
+			final Class localType = source.poll();
+
+			// skip (and remove) type Object
+			if (localType.equals(Object.class)) {
+				continue;
+			}
+
+			// record type
 			allSupertypes.add(localType);
-			allSupertypes.addAll(configuration.getInterfacesForType(localType));
 
-			localType = localType.getSuperclass();
+			// add superclass
+			final Class superclass = localType.getSuperclass();
+			if (superclass != null) {
+
+				source.add(superclass);
+			}
+
+			// record interfaces (and extract superinterfaces as well)
+			for (final Class interfaceType : configuration.getInterfacesForType(localType)) {
+
+				allSupertypes.add(interfaceType);
+				source.add(interfaceType);
+			}
 		}
 
 		// remove base types

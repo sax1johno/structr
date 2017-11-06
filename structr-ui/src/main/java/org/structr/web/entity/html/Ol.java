@@ -18,9 +18,11 @@
  */
 package org.structr.web.entity.html;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.structr.common.PropertyView;
 import org.structr.common.View;
 import org.structr.core.property.Property;
+import org.structr.schema.SchemaService;
 import org.structr.web.common.HtmlProperty;
 import org.structr.web.entity.dom.DOMElement;
 
@@ -29,6 +31,8 @@ import org.structr.web.entity.dom.DOMElement;
  */
 public interface Ol extends DOMElement {
 
+	static class Impl { static { SchemaService.registerMixinType(Ol.class); }}
+
 	public static final Property<String> _reversed = new HtmlProperty("reversed");
 	public static final Property<String> _start    = new HtmlProperty("start");
 
@@ -36,12 +40,8 @@ public interface Ol extends DOMElement {
 	    _reversed, _start
 	);
 
-	/*
 	@Override
-	public Property[] getHtmlAttributes() {
-
-		return (Property[]) ArrayUtils.addAll(super.getHtmlAttributes(), htmlView.properties());
-
+	default Property[] getHtmlAttributes() {
+		return (Property[]) ArrayUtils.addAll(DOMElement.super.getHtmlAttributes(), htmlView.properties());
 	}
-	*/
 }

@@ -20,8 +20,8 @@ package org.structr.odf;
 
 import java.util.Set;
 import org.structr.api.service.LicenseManager;
-import org.structr.core.entity.AbstractSchemaNode;
 import org.structr.module.StructrModule;
+import org.structr.schema.SchemaInfo;
 import org.structr.schema.action.Actions;
 
 /**
@@ -49,19 +49,19 @@ public class ODFModule implements StructrModule{
         }
 
         @Override
-        public void insertImportStatements(AbstractSchemaNode schemaNode, StringBuilder buf) {
+        public void insertImportStatements(SchemaInfo schemaInfo, StringBuilder buf) {
         }
 
         @Override
-        public void insertSourceCode(AbstractSchemaNode schemaNode, StringBuilder buf) {
+        public void insertSourceCode(SchemaInfo schemaInfo, StringBuilder buf) {
         }
 
         @Override
-        public void insertSaveAction(AbstractSchemaNode schemaNode, StringBuilder buf, Actions.Type type) {
+        public void insertSaveAction(SchemaInfo schemaNode, StringBuilder buf, Actions.Type type) {
         }
 
         @Override
-        public Set<String> getInterfacesForType(AbstractSchemaNode schemaNode) {
+        public Set<String> getInterfacesForType(SchemaInfo schemaNode) {
                 return null;
         }
 

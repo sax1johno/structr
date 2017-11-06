@@ -18,9 +18,11 @@
  */
 package org.structr.web.entity.html;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.structr.common.PropertyView;
 import org.structr.common.View;
 import org.structr.core.property.Property;
+import org.structr.schema.SchemaService;
 import org.structr.web.common.HtmlProperty;
 import org.structr.web.entity.dom.DOMElement;
 
@@ -28,6 +30,8 @@ import org.structr.web.entity.dom.DOMElement;
  *
  */
 public interface Meta extends DOMElement {
+
+	static class Impl { static { SchemaService.registerMixinType(Meta.class); }}
 
 	public static final Property<String> _name      = new HtmlProperty("name");
 	public static final Property<String> _httpEquiv = new HtmlProperty("http-equiv");
@@ -38,20 +42,13 @@ public interface Meta extends DOMElement {
 		_name, _httpEquiv, _content, _charset
 	);
 
-
-	/*
 	@Override
-	public Property[] getHtmlAttributes() {
-
-		return (Property[]) ArrayUtils.addAll(super.getHtmlAttributes(), htmlView.properties());
-
+	default Property[] getHtmlAttributes() {
+		return (Property[]) ArrayUtils.addAll(DOMElement.super.getHtmlAttributes(), htmlView.properties());
 	}
 
 	@Override
-	public boolean isVoidElement() {
-
+	default boolean isVoidElement() {
 		return true;
-
 	}
-	*/
 }

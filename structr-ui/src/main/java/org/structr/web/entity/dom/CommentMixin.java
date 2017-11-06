@@ -16,20 +16,18 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with Structr.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.structr.web.entity.html;
+package org.structr.web.entity.dom;
 
 import org.structr.core.entity.AbstractNode;
-import org.structr.schema.SchemaService;
-import org.structr.web.entity.dom.DOMElement;
 
 /**
- *
  */
-public class HtmlMixin extends AbstractNode implements DOMElement {
+public class CommentMixin extends AbstractNode implements Comment {
 
-	static {
-
-		SchemaService.registerMixinType("Html", AbstractNode.class, Html.class);
+	// ----- BEGIN Structr Mixin -----
+	@Override
+	public Object getFeature(final String version, final String feature) {
+		return null;
 	}
-
+	// ----- END Structr Mixin -----
 }

@@ -31,7 +31,9 @@ import org.structr.cmis.info.CMISSecondaryInfo;
 import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
 import org.structr.common.View;
+import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
+import org.structr.core.graph.ModificationQueue;
 import org.structr.core.notion.PropertySetNotion;
 import org.structr.core.property.ConstantBooleanProperty;
 import org.structr.core.property.EndNodes;
@@ -63,6 +65,31 @@ public interface Folder extends AbstractFile, CMISInfo, CMISFolderInfo {
 			parent, owner, folders, files, images, isFolder, includeInFrontendExport
 	);
 
+	@Override
+	default boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
+
+		if (AbstractFile.super.onCreation(securityContext, errorBuffer)) {
+
+			setHasParent();
+
+			return true;
+		}
+
+		return false;
+	}
+
+	@Override
+	default boolean onModification(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
+
+		if (AbstractFile.super.onModification(securityContext, errorBuffer, modificationQueue)) {
+
+			setHasParent();
+
+			return true;
+		}
+
+		return false;
+	}
 
 	// ----- CMIS support -----
 	@Override

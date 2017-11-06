@@ -18,10 +18,13 @@
  */
 package org.structr.web.entity.html;
 
+import org.structr.schema.SchemaService;
 import org.structr.web.entity.dom.DOMElement;
 
 /**
  *
  */
 public interface Output extends DOMElement {
+
+	static class Impl { static { SchemaService.registerMixinType(Output.class); }}
 }

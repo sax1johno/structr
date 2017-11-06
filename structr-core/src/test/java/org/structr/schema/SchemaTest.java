@@ -36,7 +36,6 @@ import org.slf4j.LoggerFactory;
 import org.structr.api.config.Settings;
 import org.structr.common.StructrTest;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.app.StructrApp;
 import org.structr.core.entity.Relation;
 import org.structr.core.entity.Relation.Cardinality;
 import org.structr.core.entity.SchemaMethod;
@@ -56,7 +55,6 @@ import org.structr.schema.json.JsonSchema;
 import org.structr.schema.json.JsonSchema.Cascade;
 import org.structr.schema.json.JsonType;
 import org.structr.core.entity.Group;
-import org.structr.core.entity.Principal;
 
 /**
  *
@@ -186,40 +184,6 @@ public class SchemaTest extends StructrTest {
 
 			t.printStackTrace();
 			fail("Unexpected exception.");
-		}
-
-	}
-
-	@Test
-	public void test01Inheritance() {
-
-		// we need to wait for the schema service to be initialized here.. :(
-		try { Thread.sleep(1000); } catch (Throwable t) {}
-
-		try {
-
-			final JsonSchema sourceSchema = StructrSchema.createFromDatabase(app);
-
-			final JsonType contact  = sourceSchema.addType("Contact").setExtends(StructrApp.getSchemaId(Principal.class));
-			final JsonType customer = sourceSchema.addType("Customer").setExtends(contact);
-
-			final String schema = sourceSchema.toString();
-
-			final Map<String, Object> map = new GsonBuilder().create().fromJson(schema, Map.class);
-
-			mapPathValue(map, "definitions.Contact.type",      "object");
-			mapPathValue(map, "definitions.Contact.$extends",  "https://structr.org/v1.1/definitions/AbstractUser");
-
-			mapPathValue(map, "definitions.Customer.type",      "object");
-			mapPathValue(map, "definitions.Customer.$extends",  "#/definitions/Contact");
-
-
-			// advanced: test schema roundtrip
-			compareSchemaRoundtrip(sourceSchema);
-
-		} catch (Exception t) {
-			t.printStackTrace();
-			logger.warn("", t);
 		}
 
 	}
@@ -488,7 +452,10 @@ public class SchemaTest extends StructrTest {
 
 		try (final Tx tx = app.tx()) {
 
-			final SchemaNode schemaNode = app.nodeQuery(SchemaNode.class).andName("Group").getFirst();
+			final SchemaNode schemaNode = app.create(SchemaNode.class,
+				new NodeAttribute<>(SchemaNode.name, "Group"),
+				new NodeAttribute<>(SchemaNode.implementsInterfaces, "Group")
+			);
 
 			assertNotNull("Schema node Group should exist", schemaNode);
 
@@ -544,7 +511,11 @@ public class SchemaTest extends StructrTest {
 
 		try (final Tx tx = app.tx()) {
 
-			final SchemaNode group = app.nodeQuery(SchemaNode.class).andName("Group").getFirst();
+			//final SchemaNode group = app.nodeQuery(SchemaNode.class).andName("Group").getFirst();
+			final SchemaNode group = app.create(SchemaNode.class,
+				new NodeAttribute<>(SchemaNode.name, "Group"),
+				new NodeAttribute<>(SchemaNode.implementsInterfaces, "Group")
+			);
 
 			assertNotNull("Schema node Group should exist", group);
 

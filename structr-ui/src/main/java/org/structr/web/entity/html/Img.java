@@ -18,9 +18,11 @@
  */
 package org.structr.web.entity.html;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.structr.common.PropertyView;
 import org.structr.common.View;
 import org.structr.core.property.Property;
+import org.structr.schema.SchemaService;
 import org.structr.web.common.HtmlProperty;
 import org.structr.web.entity.LinkSource;
 
@@ -28,6 +30,8 @@ import org.structr.web.entity.LinkSource;
  *
  */
 public interface Img extends LinkSource {
+
+	static class Impl { static { SchemaService.registerMixinType(Img.class); }}
 
 	public static final Property<String> _alt         = new HtmlProperty("alt");
 	public static final Property<String> _src         = new HtmlProperty("src");
@@ -41,20 +45,18 @@ public interface Img extends LinkSource {
 	    _alt, _src, _crossorigin, _usemap, _ismap, _width, _height
 	);
 
-	/*
 	@Override
-	public boolean avoidWhitespace() {
+	default boolean avoidWhitespace() {
 		return true;
 	}
 
 	@Override
-	public boolean isVoidElement() {
+	default boolean isVoidElement() {
 		return true;
 	}
 
 	@Override
-	public Property[] getHtmlAttributes() {
-		return (Property[]) ArrayUtils.addAll(super.getHtmlAttributes(), htmlView.properties());
+	default Property[] getHtmlAttributes() {
+		return (Property[]) ArrayUtils.addAll(LinkSource.super.getHtmlAttributes(), htmlView.properties());
 	}
-	*/
 }

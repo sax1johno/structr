@@ -23,7 +23,7 @@ import java.nio.file.Path;
 import java.util.Set;
 import org.structr.api.service.LicenseManager;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.entity.AbstractSchemaNode;
+import org.structr.schema.SchemaInfo;
 import org.structr.schema.action.Actions;
 
 /**
@@ -61,10 +61,10 @@ public interface StructrModule {
 	Set<String> getFeatures();
 
 
-	void insertImportStatements(final AbstractSchemaNode schemaNode, final StringBuilder buf);
-	void insertSourceCode(final AbstractSchemaNode schemaNode, final StringBuilder buf);
-	void insertSaveAction(final AbstractSchemaNode schemaNode, final StringBuilder buf, final Actions.Type type);
-	Set<String> getInterfacesForType(final AbstractSchemaNode schemaNode);
+	void insertImportStatements(final SchemaInfo schemaInfo, final StringBuilder buf);
+	void insertSourceCode(final SchemaInfo schemaInfo, final StringBuilder buf);
+	void insertSaveAction(final SchemaInfo schemaInfo, final StringBuilder buf, final Actions.Type type);
+	Set<String> getInterfacesForType(final SchemaInfo schemaInfo);
 
 
 	// ---- Deployment-specific methods

@@ -33,11 +33,8 @@ import org.structr.web.auth.UiAuthenticator;
 import org.structr.web.entity.User;
 import static org.structr.web.basic.ResourceAccessTest.createResourceAccess;
 
-//~--- classes ----------------------------------------------------------------
 /**
  * Run casperjs frontend tests
- *
- *
  */
 public abstract class FrontendTest extends StructrUiTest {
 

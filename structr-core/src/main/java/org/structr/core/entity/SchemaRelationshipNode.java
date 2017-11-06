@@ -62,6 +62,7 @@ import org.structr.core.property.StringProperty;
 import org.structr.schema.ReloadSchema;
 import org.structr.schema.SchemaHelper;
 import org.structr.schema.SchemaHelper.Type;
+import org.structr.schema.SchemaInfo;
 import org.structr.schema.action.ActionEntry;
 import org.structr.schema.action.Actions;
 import org.structr.schema.json.JsonSchema;
@@ -72,7 +73,7 @@ import org.structr.schema.parser.Validator;
  *
  *
  */
-public class SchemaRelationshipNode extends AbstractSchemaNode {
+public class SchemaRelationshipNode extends AbstractSchemaNode implements SchemaInfo {
 
 	private static final Logger logger                              = LoggerFactory.getLogger(SchemaRelationshipNode.class.getName());
 	private static final Set<Class> propagatingRelTypes             = new HashSet<>();
@@ -466,7 +467,6 @@ public class SchemaRelationshipNode extends AbstractSchemaNode {
 		return propertyName;
 	}
 
-	@Override
 	public String getSource(final ErrorBuffer errorBuffer) throws FrameworkException {
 
 		final Map<Actions.Type, List<ActionEntry>> actions = new LinkedHashMap<>();
@@ -583,52 +583,30 @@ public class SchemaRelationshipNode extends AbstractSchemaNode {
 		return src.toString();
 	}
 
+	// ----- interface SchemaInfo -----
 	@Override
-	public Set<String> getViews() {
-		return dynamicViews;
+	public String getBaseClass() {
+		return getProperty(extendsClass);
 	}
 
 	@Override
-	public String getAuxiliarySource() throws FrameworkException {
+	public String getImplementedInterfaces() {
+		return null;
+	}
 
-		final Set<String> existingPropertyNames = new LinkedHashSet<>();
-		final String sourceNodeType             = getSchemaNodeSourceType();
-		final String targetNodeType             = getSchemaNodeTargetType();
-		final StringBuilder src                 = new StringBuilder();
-		final String _className                 = getClassName();
-		final Class baseType                    = AbstractRelationship.class;
+	@Override
+	public SchemaNode getSchemaNode() {
+		return null;
+	}
 
-		if (!"File".equals(sourceNodeType) && !"File".equals(targetNodeType)) {
-			return null;
-		}
+	@Override
+	public void addDynamicView(final String view) {
+		dynamicViews.add(view);
+	}
 
-		src.append("package org.structr.dynamic;\n\n");
-
-		SchemaHelper.formatImportStatements(this, src, baseType, Collections.emptyList());
-
-		src.append("public class _").append(_className).append("Helper {\n\n");
-
-		src.append("\n\tstatic {\n\n");
-		src.append("\t\tfinal PropertyKey outKey = ");
-		src.append(getPropertySource(getPropertyName(sourceNodeType, existingPropertyNames, true), true, true));
-		src.append(";\n");
-		src.append("\t\toutKey.setDeclaringClass(").append(sourceNodeType).append(".class);\n\n");
-		src.append("\t\tfinal PropertyKey inKey = ");
-		src.append(getPropertySource(getPropertyName(targetNodeType, existingPropertyNames, false), false, true));
-		src.append(";\n");
-		src.append("\t\tinKey.setDeclaringClass(").append(targetNodeType).append(".class);\n\n");
-		src.append("\t\tStructrApp.getConfiguration().registerDynamicProperty(");
-		src.append(sourceNodeType).append(".class, outKey);\n");
-		src.append("\t\tStructrApp.getConfiguration().registerDynamicProperty(");
-		src.append(targetNodeType).append(".class, inKey);\n\n");
-		src.append("\t\tStructrApp.getConfiguration().registerPropertySet(").append(sourceNodeType).append(".class, PropertyView.Ui, outKey);\n");
-		src.append("\t\tStructrApp.getConfiguration().registerPropertySet(").append(targetNodeType).append(".class, PropertyView.Ui, inKey);\n");
-		src.append("\t}\n");
-		src.append("}\n");
-
-		return src.toString();
-
-//		return null;
+	@Override
+	public Set<String> getDynamicViews() {
+		return dynamicViews;
 	}
 
 	// ----- public methods -----

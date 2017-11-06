@@ -18,6 +18,7 @@
  */
 package org.structr.web.entity.html;
 
+import org.structr.schema.SchemaService;
 import org.structr.web.entity.dom.DOMElement;
 
 /**
@@ -25,12 +26,10 @@ import org.structr.web.entity.dom.DOMElement;
  */
 public interface Keygen extends DOMElement {
 
-	/*
+	static class Impl { static { SchemaService.registerMixinType(Keygen.class); }}
+
 	@Override
-	public boolean isVoidElement() {
-
+	default boolean isVoidElement() {
 		return true;
-
 	}
-	*/
 }

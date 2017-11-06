@@ -18,6 +18,7 @@
  */
 package org.structr.web.entity.html;
 
+import org.structr.schema.SchemaService;
 import org.structr.web.entity.dom.DOMElement;
 
 /**
@@ -25,12 +26,10 @@ import org.structr.web.entity.dom.DOMElement;
  */
 public interface Pre extends DOMElement {
 
-	/*
+	static class Impl { static { SchemaService.registerMixinType(Pre.class); }}
+
 	@Override
-	public boolean avoidWhitespace() {
-
+	default boolean avoidWhitespace() {
 		return true;
-
 	}
-	*/
 }

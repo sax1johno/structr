@@ -24,6 +24,7 @@ import org.structr.common.View;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.property.Property;
 import org.structr.core.property.StringProperty;
+import org.structr.schema.SchemaService;
 import org.structr.web.common.AsyncBuffer;
 import org.structr.web.common.HtmlProperty;
 import org.structr.web.common.RenderContext;
@@ -33,6 +34,8 @@ import org.structr.web.entity.dom.DOMElement;
  *
  */
 public interface Html extends DOMElement {
+
+	static class Impl { static { SchemaService.registerMixinType(Html.class); }}
 
 	public static final Property<String> _manifest         = new HtmlProperty("manifest");
 	public static final Property<String> _customOpeningTag = new StringProperty("customOpeningTag");

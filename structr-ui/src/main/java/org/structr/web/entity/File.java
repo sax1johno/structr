@@ -42,6 +42,7 @@ import org.apache.chemistry.opencmis.commons.enums.BaseTypeId;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.structr.api.config.Settings;
 import org.structr.cmis.CMISInfo;
 import org.structr.cmis.info.CMISDocumentInfo;
 import org.structr.cmis.info.CMISFolderInfo;
@@ -51,7 +52,9 @@ import org.structr.cmis.info.CMISRelationshipInfo;
 import org.structr.cmis.info.CMISSecondaryInfo;
 import org.structr.common.Permission;
 import org.structr.common.PropertyView;
+import org.structr.common.SecurityContext;
 import org.structr.common.View;
+import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.common.error.UnlicensedException;
 import org.structr.common.fulltext.FulltextIndexer;
@@ -115,6 +118,136 @@ public interface File extends AbstractFile, Indexable, Linkable, JavaScriptSourc
 	public static final View uiView = new View(File.class, PropertyView.Ui,
 		type, relativeFilePath, size, url, parent, checksum, version, cacheForSeconds, owner, isFile, hasParent, includeInFrontendExport, isFavoritable, isTemplate
 	);
+
+	@Override
+	default boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
+
+		if (AbstractFile.super.onCreation(securityContext, errorBuffer)) {
+
+			final PropertyMap changedProperties = new PropertyMap();
+
+			if (Settings.FilesystemEnabled.getValue() && !getProperty(AbstractFile.hasParent)) {
+
+				final Folder workingOrHomeDir = getCurrentWorkingDir();
+				if (workingOrHomeDir != null && getProperty(AbstractFile.parent) == null) {
+
+					changedProperties.put(AbstractFile.parent, workingOrHomeDir);
+				}
+			}
+
+			changedProperties.put(hasParent, getProperty(parentId) != null);
+
+			setProperties(securityContext, changedProperties);
+
+			return true;
+		}
+
+		return false;
+	}
+
+	@Override
+	default boolean onModification(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
+
+		if (AbstractFile.super.onModification(securityContext, errorBuffer, modificationQueue)) {
+
+			synchronized (this) {
+
+				// save current security context
+				final SecurityContext previousSecurityContext = getSecurityContext();
+
+				// replace with SU context
+				setSecurityContext(SecurityContext.getSuperUserInstance());
+
+				// update metadata and parent as superuser
+				FileHelper.updateMetadata(this, new PropertyMap(hasParent, getProperty(parentId) != null));
+
+				// restore previous security context
+				setSecurityContext(previousSecurityContext);
+			}
+
+			triggerMinificationIfNeeded(modificationQueue);
+
+			return true;
+		}
+
+		return false;
+	}
+
+	@Override
+	default void onNodeCreation() {
+
+		final String uuid     = getUuid();
+		final String filePath = File.getDirectoryPath(uuid) + "/" + uuid;
+
+		try {
+			unlockSystemPropertiesOnce();
+			setProperties(getSecurityContext(), new PropertyMap(relativeFilePath, filePath));
+
+		} catch (Throwable t) {
+
+			logger.warn("Exception while trying to set relative file path {}: {}", new Object[]{filePath, t});
+
+		}
+	}
+
+	@Override
+	default void onNodeDeletion() {
+
+		String filePath = null;
+		try {
+			final String path = getRelativeFilePath();
+
+			if (path != null) {
+
+				filePath = FileHelper.getFilePath(path);
+
+				java.io.File toDelete = new java.io.File(filePath);
+
+				if (toDelete.exists() && toDelete.isFile()) {
+
+					toDelete.delete();
+				}
+			}
+
+		} catch (Throwable t) {
+
+			logger.debug("Exception while trying to delete file {}: {}", new Object[]{filePath, t});
+
+		}
+
+	}
+
+	@Override
+	default void afterCreation(SecurityContext securityContext) {
+
+		try {
+
+			final String filesPath        = Settings.FilesPath.getValue();
+			final java.io.File fileOnDisk = new java.io.File(filesPath + "/" + getRelativeFilePath());
+
+			if (fileOnDisk.exists()) {
+				return;
+			}
+
+			fileOnDisk.getParentFile().mkdirs();
+
+			try {
+
+				fileOnDisk.createNewFile();
+
+			} catch (IOException ex) {
+
+				logger.error("Could not create file", ex);
+				return;
+			}
+
+			FileHelper.updateMetadata(this, new PropertyMap(version, 0));
+
+		} catch (FrameworkException ex) {
+
+			logger.error("Could not create file", ex);
+		}
+	}
 
 	@Override
 	default String getPath() {

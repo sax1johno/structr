@@ -18,13 +18,6 @@
  */
 package org.structr.core.entity;
 
-import org.structr.common.ValidationHelper;
-import org.structr.common.error.ErrorBuffer;
-import org.structr.common.error.FrameworkException;
-import org.structr.common.error.UniqueToken;
-import org.structr.core.Result;
-import org.structr.core.app.StructrApp;
-import org.structr.core.entity.AbstractNode;
 import org.structr.core.graph.Mixin;
 import org.structr.schema.SchemaService;
 
@@ -33,42 +26,7 @@ import org.structr.schema.SchemaService;
 public class MailTemplateMixin extends AbstractNode implements MailTemplate, Mixin {
 
 	static {
+		
 		SchemaService.registerMixinType("MailTemplate", AbstractNode.class, MailTemplate.class);
 	}
-
-	// ----- BEGIN Structr Mixin -----
-
-	@Override
-	public boolean isValid(final ErrorBuffer errorBuffer) {
-
-		boolean valid = super.isValid(errorBuffer);
-
-		String _name	= getProperty(name);
-		String _locale	= getProperty(locale);
-		String _uuid	= getProperty(id);
-
-		valid &= ValidationHelper.isValidStringNotBlank(this, name, errorBuffer);
-		valid &= ValidationHelper.isValidStringNotBlank(this, locale, errorBuffer);
-
-		try {
-			Result<MailTemplate> res = StructrApp.getInstance(securityContext).nodeQuery(MailTemplate.class).andName(_name).and(locale, _locale).getResult();
-			if (res.size() > 1) {
-
-				errorBuffer.add(new UniqueToken(MailTemplate.class.getName(), name, _uuid));
-				errorBuffer.add(new UniqueToken(MailTemplate.class.getName(), locale, _uuid));
-
-				valid = false;
-			}
-
-		} catch (FrameworkException fe) {
-
-			logger.warn("Could not search a MailTemplate with name {} and locale {}", new Object[]{getProperty(name), getProperty(locale)});
-
-		}
-
-		return valid;
-
-	}
-
-	// ----- END Structr Mixin -----
 }

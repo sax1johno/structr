@@ -21,6 +21,7 @@ package org.structr.web.entity.html;
 import org.structr.common.PropertyView;
 import org.structr.common.View;
 import org.structr.core.property.Property;
+import org.structr.schema.SchemaService;
 import org.structr.web.common.HtmlProperty;
 import org.structr.web.entity.dom.DOMElement;
 
@@ -28,6 +29,8 @@ import org.structr.web.entity.dom.DOMElement;
  *
  */
 public interface Button extends DOMElement {
+
+	static class Impl { static { SchemaService.registerMixinType(Button.class); }}
 
 	public static final Property<String> _autofocus      = new HtmlProperty("autofocus");
 	public static final Property<String> _disabled       = new HtmlProperty("disabled");

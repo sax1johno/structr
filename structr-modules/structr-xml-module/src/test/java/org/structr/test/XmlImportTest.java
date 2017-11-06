@@ -76,7 +76,7 @@ public class XmlImportTest extends StructrUiTest {
 				+ "</items>\n";
 
 			final byte[] fileData = xmlData.getBytes("utf-8");
-			final File file   = FileHelper.createFile(securityContext, fileData, "application/xml", File.class, "test.xml");
+			final File file       = FileHelper.createFile(securityContext, fileData, "application/xml", File.class, "test.xml");
 
 			// extract UUID for later use
 			newFileId = file.getUuid();

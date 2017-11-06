@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with Structr.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.structr.web.entity.html;
+package org.structr.web.entity.dom;
 
 import org.structr.core.entity.AbstractNode;
 import org.structr.schema.SchemaService;
@@ -24,10 +24,17 @@ import org.structr.schema.SchemaService;
 /**
  *
  */
-public class HeadMixin extends AbstractNode implements Head {
+public class DocumentFragmentMixin extends AbstractNode implements DocumentFragment {
 
 	static {
 
-		SchemaService.registerMixinType("Head", AbstractNode.class, Head.class);
+		SchemaService.registerMixinType("DocumentFragment", AbstractNode.class, DocumentFragment.class);
 	}
+
+	// ----- BEGIN Structr Mixin -----
+	@Override
+	public java.lang.Object getFeature(final String feature, final String version) {
+		return false;
+	}
+	// ----- END Structr Mixin -----
 }

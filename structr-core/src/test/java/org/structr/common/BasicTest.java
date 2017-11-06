@@ -79,6 +79,7 @@ import org.structr.core.property.PropertyMap;
 import org.structr.core.property.StringProperty;
 import org.structr.core.entity.MailTemplate;
 import org.structr.core.entity.Group;
+import org.structr.core.entity.TestMailTemplate;
 
 /**
  *
@@ -859,6 +860,7 @@ public class BasicTest extends StructrTest {
 			entityList.remove(TestTwo.class);
 			entityList.remove(TestNine.class);
 			entityList.remove(MailTemplate.class);
+			entityList.remove(TestMailTemplate.class);
 			entityList.remove(SchemaNode.class);
 			entityList.remove(SchemaRelationshipNode.class);
 
@@ -866,7 +868,7 @@ public class BasicTest extends StructrTest {
 
 				// for (Entry<String, Class> entity : entities.entrySet()) {
 				// Class entityClass = entity.getValue();
-				if (AbstractNode.class.isAssignableFrom(type)) {
+				if (AbstractNode.class.isAssignableFrom(type) && !type.getSimpleName().endsWith("Mixin")) {
 
 					props.clear();
 
@@ -916,9 +918,9 @@ public class BasicTest extends StructrTest {
 
 					}
 
-					NodeInterface node = app.create(type, props);
+					logger.info("Creating node of type {}", type);
 
-					logger.info("Created node of type {} with ID {}", type, node.getUuid());
+					NodeInterface node = app.create(type, props);
 
 					assertTrue(type.getSimpleName().equals(node.getProperty(AbstractNode.type)));
 

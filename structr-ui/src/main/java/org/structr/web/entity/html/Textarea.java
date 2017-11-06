@@ -18,9 +18,11 @@
  */
 package org.structr.web.entity.html;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.structr.common.PropertyView;
 import org.structr.common.View;
 import org.structr.core.property.Property;
+import org.structr.schema.SchemaService;
 import org.structr.web.common.HtmlProperty;
 import org.structr.web.entity.dom.DOMElement;
 
@@ -28,6 +30,8 @@ import org.structr.web.entity.dom.DOMElement;
  *
  */
 public interface Textarea extends DOMElement {
+
+	static class Impl { static { SchemaService.registerMixinType(Textarea.class); }}
 
 	public static final Property<String> _name        = new HtmlProperty("name");
 	public static final Property<String> _disabled    = new HtmlProperty("disabled");
@@ -46,19 +50,13 @@ public interface Textarea extends DOMElement {
 	    _name, _disabled, _form, _readonly, _maxlenght, _autofocus, _required, _placeholder, _dirname, _rows, _wrap, _cols
 	);
 
-	/*
 	@Override
-	public boolean avoidWhitespace() {
-
+	default boolean avoidWhitespace() {
 		return true;
-
 	}
 
 	@Override
-	public Property[] getHtmlAttributes() {
-
-		return (Property[]) ArrayUtils.addAll(super.getHtmlAttributes(), htmlView.properties());
-
+	default Property[] getHtmlAttributes() {
+		return (Property[]) ArrayUtils.addAll(DOMElement.super.getHtmlAttributes(), htmlView.properties());
 	}
-	*/
 }

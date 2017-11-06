@@ -19,6 +19,7 @@
 package org.structr.web.entity.dom;
 
 import org.structr.common.PropertyView;
+import org.structr.schema.SchemaService;
 
 /**
  * Shadow document.
@@ -30,24 +31,7 @@ import org.structr.common.PropertyView;
  */
 public interface ShadowDocument extends Page {
 
+	static class Impl { static { SchemaService.registerMixinType(ShadowDocument.class); }}
+
 	public static final org.structr.common.View publicView = new org.structr.common.View(ShadowDocument.class, PropertyView.Public, type, name, id);
-
-	/*
-	public ShadowDocument() { }
-
-	// ----- interface Syncable -----
-	@Override
-	public List<GraphObject> getSyncData() throws FrameworkException {
-
-		final List<GraphObject> data = super.getSyncData();
-
-		for (final PageLink pageLink : getIncomingRelationships(PageLink.class)) {
-
-			data.add(pageLink.getSourceNode());
-			data.add(pageLink);
-		}
-
-		return data;
-	}
-	*/
 }

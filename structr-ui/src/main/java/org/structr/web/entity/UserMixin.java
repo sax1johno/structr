@@ -18,67 +18,14 @@
  */
 package org.structr.web.entity;
 
-import org.structr.common.SecurityContext;
-import org.structr.common.error.ErrorBuffer;
-import org.structr.common.error.FrameworkException;
-import org.structr.common.error.SemanticErrorToken;
 import org.structr.core.entity.AbstractNode;
-import org.structr.core.graph.ModificationQueue;
-import org.structr.core.property.PropertyMap;
+import org.structr.core.graph.Mixin;
+import org.structr.schema.SchemaService;
 
-public class UserMixin extends AbstractNode implements User {
+public class UserMixin extends AbstractNode implements User, Mixin {
 
-	// ----- BEGIN Structr Mixin -----
-	@Override
-	public boolean isValid(ErrorBuffer errorBuffer) {
+	static {
 
-		if ( getProperty(skipSecurityRelationships).equals(Boolean.TRUE) && !isAdmin()) {
-
-			errorBuffer.add(new SemanticErrorToken(getClass().getSimpleName(), skipSecurityRelationships, "can_only_be_set_for_admin_accounts"));
-			return false;
-		}
-
-		return super.isValid(errorBuffer);
+		SchemaService.registerMixinType("User", AbstractNode.class, User.class);
 	}
-
-
-	@Override
-	public boolean onCreation(SecurityContext securityContext, ErrorBuffer errorBuffer) throws FrameworkException {
-
-		if (super.onCreation(securityContext, errorBuffer)) {
-
-			checkAndCreateHomeDirectory(securityContext);
-
-			return true;
-		}
-
-		return false;
-	}
-
-	@Override
-	public boolean onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
-
-		if (super.onModification(securityContext, errorBuffer, modificationQueue)) {
-
-			checkAndCreateHomeDirectory(securityContext);
-
-			return true;
-		}
-
-		return false;
-	}
-
-	@Override
-	public boolean onDeletion(SecurityContext securityContext, ErrorBuffer errorBuffer, PropertyMap properties) throws FrameworkException {
-
-		if (super.onDeletion(securityContext, errorBuffer, properties)) {
-
-			checkAndRemoveHomeDirectory(securityContext);
-
-			return true;
-		}
-
-		return false;
-	}
-	// ----- END Structr Mixin -----
 }

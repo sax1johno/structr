@@ -18,16 +18,17 @@
  */
 package org.structr.web.entity.html;
 
+import org.structr.schema.SchemaService;
 import org.structr.web.entity.dom.DOMElement;
 
 /**
  */
 public interface Abbr extends DOMElement {
 
-	/*
+	static class Impl { static { SchemaService.registerMixinType(Abbr.class); }}
+
 	@Override
-	public boolean avoidWhitespace() {
+	default boolean avoidWhitespace() {
 		return true;
 	}
-	*/
 }

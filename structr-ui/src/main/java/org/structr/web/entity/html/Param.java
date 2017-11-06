@@ -20,6 +20,7 @@ package org.structr.web.entity.html;
 
 import org.structr.common.PropertyView;
 import org.structr.core.property.Property;
+import org.structr.schema.SchemaService;
 import org.structr.web.common.HtmlProperty;
 import org.structr.web.entity.dom.DOMElement;
 
@@ -28,19 +29,16 @@ import org.structr.web.entity.dom.DOMElement;
  */
 public interface Param extends DOMElement {
 
+	static class Impl { static { SchemaService.registerMixinType(Param.class); }}
+
 	public static final Property<String> _value		= new HtmlProperty("value");
 
 	public static final org.structr.common.View htmlView	= new org.structr.common.View(Param.class, PropertyView.Html,
 		_value
 	);
 
-
-	/*
 	@Override
-	public boolean isVoidElement() {
-
+	default boolean isVoidElement() {
 		return true;
-
 	}
-	*/
 }

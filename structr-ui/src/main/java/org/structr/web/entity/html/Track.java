@@ -20,6 +20,7 @@ package org.structr.web.entity.html;
 
 import org.structr.common.PropertyView;
 import org.structr.core.property.Property;
+import org.structr.schema.SchemaService;
 import org.structr.web.common.HtmlProperty;
 import org.structr.web.entity.dom.DOMElement;
 
@@ -27,6 +28,8 @@ import org.structr.web.entity.dom.DOMElement;
  *
  */
 public interface Track extends DOMElement {
+
+	static class Impl { static { SchemaService.registerMixinType(Track.class); }}
 
 	public static final Property<String> _kind		= new HtmlProperty("kind");
 	public static final Property<String> _src		= new HtmlProperty("src");
@@ -38,12 +41,8 @@ public interface Track extends DOMElement {
 		_kind, _src, _srclang, _label, _default
 	);
 
-	/*
 	@Override
-	public boolean isVoidElement() {
-
+	default boolean isVoidElement() {
 		return true;
-
 	}
-	*/
 }

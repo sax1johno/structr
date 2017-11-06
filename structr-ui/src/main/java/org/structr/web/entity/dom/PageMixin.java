@@ -19,8 +19,6 @@
 package org.structr.web.entity.dom;
 
 import org.structr.web.entity.html.Html5DocumentType;
-import org.structr.common.ValidationHelper;
-import org.structr.common.error.ErrorBuffer;
 import org.structr.core.entity.AbstractNode;
 import org.structr.schema.SchemaService;
 import org.w3c.dom.Node;
@@ -28,7 +26,7 @@ import org.w3c.dom.Node;
 /**
  * Mixin code for Page interface, to be loaded at runtime.
  */
-public class PageMixin extends DOMNodeMixin implements Page {
+public class PageMixin extends AbstractNode implements Page {
 
 	// register this type as an overridden builtin type
 	static {
@@ -51,17 +49,6 @@ public class PageMixin extends DOMNodeMixin implements Page {
 		}
 
 		return docTypeNode;
-	}
-
-	@Override
-	public boolean isValid(final ErrorBuffer errorBuffer) {
-
-		boolean valid = super.isValid(errorBuffer);
-
-		valid &= ValidationHelper.isValidStringNotBlank(this, AbstractNode.name, errorBuffer);
-		valid &= ValidationHelper.isValidStringMatchingRegex(this, name, "[_\\p{L}0-9\\s\\-\\.]+", errorBuffer);
-
-		return valid;
 	}
 	// ----- END Structr Mixin -----
 }

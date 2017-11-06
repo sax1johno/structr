@@ -478,6 +478,11 @@ public class BoltDatabaseService implements DatabaseService, GraphProperties {
 		}
 
 		@Override
+		public String toString() {
+			return name();
+		}
+
+		@Override
 		public int hashCode() {
 			return name.hashCode();
 		}
@@ -504,6 +509,11 @@ public class BoltDatabaseService implements DatabaseService, GraphProperties {
 		@Override
 		public String name() {
 			return name;
+		}
+
+		@Override
+		public String toString() {
+			return name();
 		}
 
 		@Override

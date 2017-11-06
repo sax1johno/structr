@@ -41,12 +41,12 @@ import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
-import org.structr.core.entity.AbstractSchemaNode;
 import org.structr.core.graph.NodeAttribute;
 import org.structr.core.graph.Tx;
 import org.structr.core.property.PropertyMap;
 import org.structr.module.StructrModule;
 import org.structr.module.api.APIBuilder;
+import org.structr.schema.SchemaInfo;
 import org.structr.schema.action.Actions;
 
 /**
@@ -77,20 +77,20 @@ public class APIBuilderModule implements StructrModule, APIBuilder {
 	}
 
 	@Override
-	public void insertImportStatements(final AbstractSchemaNode schemaNode, final StringBuilder buf) {
+	public void insertImportStatements(final SchemaInfo schemaInfo, final StringBuilder buf) {
 	}
 
 	@Override
-	public void insertSourceCode(final AbstractSchemaNode schemaNode, final StringBuilder buf) {
+	public void insertSourceCode(final SchemaInfo schemaInfo, final StringBuilder buf) {
 	}
 
 	@Override
-	public Set<String> getInterfacesForType(final AbstractSchemaNode schemaNode) {
+	public Set<String> getInterfacesForType(final SchemaInfo schemaNode) {
 		return null;
 	}
 
 	@Override
-	public void insertSaveAction(final AbstractSchemaNode schemaNode, final StringBuilder buf, final Actions.Type type) {
+	public void insertSaveAction(final SchemaInfo schemaNode, final StringBuilder buf, final Actions.Type type) {
 	}
 
 	@Override

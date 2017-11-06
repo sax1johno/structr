@@ -496,7 +496,11 @@ public abstract class StreamingWriter {
 							final Object value = source.getProperty(localKey, range);
 							if (value != null) {
 
-								if (!(reduceRedundancy && visitedObjects.contains(value.hashCode()))) {
+								if (reduceRedundancy && value instanceof GraphObject && visitedObjects.contains(value.hashCode())) {
+
+									// skip
+
+								} else {
 
 									writer.name(key.jsonName());
 									serializeProperty(writer, localKey, value, localPropertyView, depth+1);

@@ -24,7 +24,9 @@ import org.structr.api.graph.Relationship;
 import org.structr.api.graph.RelationshipType;
 import org.structr.common.AccessControllable;
 import org.structr.common.SecurityContext;
+import org.structr.common.ValidationHelper;
 import org.structr.common.View;
+import org.structr.common.error.ErrorBuffer;
 import org.structr.core.GraphObject;
 import static org.structr.core.GraphObject.id;
 import static org.structr.core.GraphObject.type;
@@ -64,9 +66,16 @@ public interface NodeInterface extends GraphObject, Comparable, AccessControllab
 
 	void init(final SecurityContext securityContext, final Node dbNode, final Class type, final boolean isCreation);
 
-	void onNodeCreation();
-	void onNodeInstantiation(final boolean isCreation);
-	void onNodeDeletion();
+
+	default void onNodeCreation() {
+	}
+
+	default void onNodeInstantiation(final boolean isCreation) {
+	}
+
+	default void onNodeDeletion() {
+	}
+
 	Node getNode();
 
 	String getName();
@@ -96,6 +105,25 @@ public interface NodeInterface extends GraphObject, Comparable, AccessControllab
 	Relationship getRawPathSegment();
 
 	// ----- default methods -----
+	@Override
+	default boolean isValid(final ErrorBuffer errorBuffer) {
+
+		final SecurityContext securityContext = getSecurityContext();
+		boolean valid                         = true;
+
+		// the following two checks can be omitted in release 2.4 when Neo4j uniqueness constraints are live
+		valid &= ValidationHelper.isValidStringNotBlank(this, id, errorBuffer);
+
+		if (securityContext != null && securityContext.uuidWasSetManually()) {
+			valid &= ValidationHelper.isValidGloballyUniqueProperty(this, id, errorBuffer);
+		}
+
+		valid &= ValidationHelper.isValidStringMatchingRegex(this, id, "[a-fA-F0-9]{32}", errorBuffer);
+		valid &= ValidationHelper.isValidStringNotBlank(this, type, errorBuffer);
+
+		return valid;
+	}
+
 	default Long getNodeId() {
 		return getId();
 	}

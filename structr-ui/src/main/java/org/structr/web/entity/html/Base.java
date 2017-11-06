@@ -18,9 +18,11 @@
  */
 package org.structr.web.entity.html;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.structr.common.PropertyView;
 import org.structr.common.View;
 import org.structr.core.property.Property;
+import org.structr.schema.SchemaService;
 import org.structr.web.common.HtmlProperty;
 import org.structr.web.entity.dom.DOMElement;
 
@@ -29,6 +31,8 @@ import org.structr.web.entity.dom.DOMElement;
  */
 public interface Base extends DOMElement {
 
+	static class Impl { static { SchemaService.registerMixinType(Base.class); }}
+
 	public static final Property<String> _href   = new HtmlProperty("href");
 	public static final Property<String> _target = new HtmlProperty("target");
 
@@ -36,19 +40,13 @@ public interface Base extends DOMElement {
 		_href, _target
 	);
 
-	/*
 	@Override
-	public Property[] getHtmlAttributes() {
-
-		return (Property[]) ArrayUtils.addAll(super.getHtmlAttributes(), htmlView.properties());
-
+	default Property[] getHtmlAttributes() {
+		return (Property[]) ArrayUtils.addAll(DOMElement.super.getHtmlAttributes(), htmlView.properties());
 	}
 
 	@Override
-	public boolean isVoidElement() {
-
+	default boolean isVoidElement() {
 		return true;
-
 	}
-	*/
 }

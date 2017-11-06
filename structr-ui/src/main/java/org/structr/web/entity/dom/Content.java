@@ -18,22 +18,42 @@
  */
 package org.structr.web.entity.dom;
 
+import com.vladsch.flexmark.html.HtmlRenderer;
+import com.vladsch.flexmark.parser.Parser;
+import com.vladsch.flexmark.profiles.pegdown.Extensions;
+import com.vladsch.flexmark.profiles.pegdown.PegdownOptionsAdapter;
+import com.vladsch.flexmark.util.options.MutableDataSet;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import net.java.textilej.parser.MarkupParser;
+import net.java.textilej.parser.markup.confluence.ConfluenceDialect;
+import net.java.textilej.parser.markup.mediawiki.MediaWikiDialect;
+import net.java.textilej.parser.markup.textile.TextileDialect;
+import net.java.textilej.parser.markup.trac.TracWikiDialect;
 import org.apache.commons.lang3.StringUtils;
+import org.asciidoctor.Asciidoctor;
+import org.asciidoctor.Asciidoctor.Factory;
 import org.structr.common.Permission;
 import org.structr.common.PropertyView;
+import org.structr.common.SecurityContext;
+import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.Adapter;
 import org.structr.core.entity.Favoritable;
+import org.structr.core.graph.ModificationQueue;
 import org.structr.core.property.ConstantBooleanProperty;
 import org.structr.core.property.Property;
 import org.structr.core.property.PropertyMap;
 import org.structr.core.property.StringProperty;
 import org.structr.core.script.Scripting;
 import org.structr.schema.NonIndexed;
+import org.structr.schema.SchemaService;
 import org.structr.web.common.AsyncBuffer;
 import org.structr.web.common.RenderContext;
 import org.structr.web.common.RenderContext.EditMode;
 import org.structr.web.entity.html.Textarea;
+import org.structr.web.entity.relation.Sync;
 import org.w3c.dom.DOMException;
 import org.w3c.dom.Document;
 import org.w3c.dom.NamedNodeMap;
@@ -46,9 +66,19 @@ import org.w3c.dom.Text;
  */
 public interface Content extends DOMNode, Text, NonIndexed, Favoritable {
 
-	public static final Property<String> contentType                                     = new StringProperty("contentType").indexed();
-	public static final Property<String> content                                         = new StringProperty("content").indexed();
-	public static final Property<Boolean> isContent                                      = new ConstantBooleanProperty("isContent", true);
+	static class Impl { static { SchemaService.registerMixinType(Content.class); }}
+
+	static final Map<String, Adapter<String, String>> contentConverters          = new LinkedHashMap<>();
+	static final ThreadLocalAsciiDocProcessor asciiDocProcessor                  = new ThreadLocalAsciiDocProcessor();
+	static final ThreadLocalTracWikiProcessor tracWikiProcessor                  = new ThreadLocalTracWikiProcessor();
+	static final ThreadLocalTextileProcessor textileProcessor                    = new ThreadLocalTextileProcessor();
+	static final ThreadLocalFlexMarkProcessor flexMarkProcessor                  = new ThreadLocalFlexMarkProcessor();
+	static final ThreadLocalMediaWikiProcessor mediaWikiProcessor                = new ThreadLocalMediaWikiProcessor();
+	static final ThreadLocalConfluenceProcessor confluenceProcessor              = new ThreadLocalConfluenceProcessor();
+
+	public static final Property<String> contentType                             = new StringProperty("contentType").indexed();
+	public static final Property<String> content                                 = new StringProperty("content").indexed();
+	public static final Property<Boolean> isContent                              = new ConstantBooleanProperty("isContent", true);
 
 	public static final org.structr.common.View uiView                                   = new org.structr.common.View(Content.class, PropertyView.Ui,
 		content, contentType, parent, pageId, syncedNodes, sharedComponent, sharedComponentConfiguration, dataKey, restQuery, cypherQuery, xpathQuery, functionQuery,
@@ -60,7 +90,61 @@ public interface Content extends DOMNode, Text, NonIndexed, Favoritable {
 		hideOnDetail, hideOnIndex, showForLocales, hideForLocales, showConditions, hideConditions, isContent, isDOMNode, isFavoritable
 	);
 
-	Adapter<String, String> getContentConverter(final String contentType);
+	@Override
+	default boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
+
+		if (DOMNode.super.isValid(errorBuffer)) {
+
+			if (getProperty(Content.contentType) == null) {
+				setProperty(Content.contentType, "text/plain");
+			}
+
+			return true;
+		}
+
+		return false;
+	}
+
+	@Override
+	default boolean onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
+
+		if (DOMNode.super.onModification(securityContext, errorBuffer, modificationQueue)) {
+
+			for (final Sync rel : getOutgoingRelationships(Sync.class)) {
+
+				final Content syncedNode = (Content) rel.getTargetNode();
+				final PropertyMap map    = new PropertyMap();
+
+				// sync content only
+				map.put(content, getProperty(content));
+				map.put(contentType, getProperty(contentType));
+				map.put(name, getProperty(name));
+
+				syncedNode.setProperties(securityContext, map);
+			}
+
+			final Sync rel = getIncomingRelationship(Sync.class);
+			if (rel != null) {
+
+				final Content otherNode = (Content) rel.getSourceNode();
+				if (otherNode != null) {
+
+					final PropertyMap map = new PropertyMap();
+
+					// sync both ways
+					map.put(content, getProperty(content));
+					map.put(contentType, getProperty(contentType));
+					map.put(name, getProperty(name));
+
+					otherNode.setProperties(otherNode.getSecurityContext(), map);
+				}
+			}
+
+			return true;
+		}
+
+		return false;
+	}
 
 	@Override
 	default boolean contentEquals(DOMNode otherNode) {
@@ -547,5 +631,168 @@ public interface Content extends DOMNode, Text, NonIndexed, Favoritable {
 	@Override
 	default void setFavoriteContent(String content) throws FrameworkException {
 		setProperty(Content.content, content);
+	}
+
+	default Adapter<String, String> getContentConverter(final String contentType) {
+
+		if (contentConverters.isEmpty()) {
+
+			contentConverters.put("text/markdown", new Adapter<String, String>() {
+
+				@Override
+				public String adapt(String s) throws FrameworkException {
+
+					if (s != null) {
+						com.vladsch.flexmark.ast.Node document = flexMarkProcessor.get().parser.parse(s);
+						return flexMarkProcessor.get().renderer.render(document);
+					}
+
+					return "";
+				}
+
+			});
+			contentConverters.put("text/textile", new Adapter<String, String>() {
+
+				@Override
+				public String adapt(String s) throws FrameworkException {
+
+					if (s != null) {
+						return textileProcessor.get().parseToHtml(s);
+					}
+
+					return "";
+
+				}
+
+			});
+			contentConverters.put("text/mediawiki", new Adapter<String, String>() {
+
+				@Override
+				public String adapt(String s) throws FrameworkException {
+
+					if (s != null) {
+						return mediaWikiProcessor.get().parseToHtml(s);
+					}
+
+					return "";
+				}
+
+			});
+			contentConverters.put("text/tracwiki", new Adapter<String, String>() {
+
+				@Override
+				public String adapt(String s) throws FrameworkException {
+
+					if (s != null) {
+						return tracWikiProcessor.get().parseToHtml(s);
+					}
+
+					return "";
+
+				}
+
+			});
+			contentConverters.put("text/confluence", new Adapter<String, String>() {
+
+				@Override
+				public String adapt(String s) throws FrameworkException {
+
+					if (s != null) {
+						return confluenceProcessor.get().parseToHtml(s);
+					}
+
+					return "";
+
+				}
+
+			});
+			contentConverters.put("text/asciidoc", new Adapter<String, String>() {
+
+				@Override
+				public String adapt(String s) throws FrameworkException {
+
+					if (s != null) {
+						return asciiDocProcessor.get().render(s, new HashMap<String, java.lang.Object>());
+					}
+
+					return "";
+
+				}
+			});
+		}
+
+		return contentConverters.get(contentType);
+	}
+
+	// ----- nested classes -----
+	static class ThreadLocalConfluenceProcessor extends ThreadLocal<MarkupParser> {
+
+		@Override
+		protected MarkupParser initialValue() {
+
+			return new MarkupParser(new ConfluenceDialect());
+		}
+	}
+
+
+	static class ThreadLocalMediaWikiProcessor extends ThreadLocal<MarkupParser> {
+
+		@Override
+		protected MarkupParser initialValue() {
+
+			return new MarkupParser(new MediaWikiDialect());
+		}
+	}
+
+	static class ThreadLocalFlexMarkProcessor extends ThreadLocal<FlexMarkProcessor> {
+
+		@Override
+		protected FlexMarkProcessor initialValue() {
+
+			final MutableDataSet options = new MutableDataSet();
+
+                        options.setAll(PegdownOptionsAdapter.flexmarkOptions(Extensions.ALL));
+
+			Parser parser = Parser.builder(options).build();
+			HtmlRenderer renderer = HtmlRenderer.builder(options).build();
+
+			return new FlexMarkProcessor(parser, renderer);
+		}
+	}
+
+
+	static class ThreadLocalTextileProcessor extends ThreadLocal<MarkupParser> {
+
+		@Override
+		protected MarkupParser initialValue() {
+			return new MarkupParser(new TextileDialect());
+		}
+	}
+
+	static class ThreadLocalTracWikiProcessor extends ThreadLocal<MarkupParser> {
+
+		@Override
+		protected MarkupParser initialValue() {
+			return new MarkupParser(new TracWikiDialect());
+		}
+	}
+
+	static class ThreadLocalAsciiDocProcessor extends ThreadLocal<Asciidoctor> {
+
+		@Override
+		protected Asciidoctor initialValue() {
+			return Factory.create();
+		}
+	}
+
+	static class FlexMarkProcessor {
+
+		Parser parser;
+		HtmlRenderer renderer;
+
+		public FlexMarkProcessor(final Parser parser, final HtmlRenderer renderer) {
+			this.parser = parser;
+			this.renderer = renderer;
+		}
 	}
 }

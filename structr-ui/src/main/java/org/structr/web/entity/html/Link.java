@@ -18,6 +18,7 @@
  */
 package org.structr.web.entity.html;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.structr.common.PropertyView;
 import org.structr.common.View;
 import org.structr.core.entity.AbstractNode;
@@ -25,6 +26,7 @@ import org.structr.core.notion.PropertyNotion;
 import org.structr.core.property.EndNode;
 import org.structr.core.property.EntityIdProperty;
 import org.structr.core.property.Property;
+import org.structr.schema.SchemaService;
 import org.structr.web.common.HtmlProperty;
 import org.structr.web.entity.LinkSource;
 import org.structr.web.entity.Linkable;
@@ -34,6 +36,8 @@ import org.structr.web.entity.html.relation.ResourceLink;
  *
  */
 public interface Link extends LinkSource {
+
+	static class Impl { static { SchemaService.registerMixinType(Link.class); }}
 
 	public static final Property<String> _href        = new HtmlProperty("href");
 	public static final Property<String> _rel         = new HtmlProperty("rel");
@@ -52,19 +56,13 @@ public interface Link extends LinkSource {
 		_href, _rel, _media, _hreflang, _type, _sizes
 	);
 
-	/*
 	@Override
-	public Property[] getHtmlAttributes() {
-
-		return (Property[]) ArrayUtils.addAll(super.getHtmlAttributes(), htmlView.properties());
-
+	default Property[] getHtmlAttributes() {
+		return (Property[]) ArrayUtils.addAll(LinkSource.super.getHtmlAttributes(), htmlView.properties());
 	}
 
 	@Override
-	public boolean isVoidElement() {
-
+	default boolean isVoidElement() {
 		return true;
-
 	}
-	*/
 }

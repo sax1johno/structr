@@ -26,10 +26,7 @@ import org.structr.core.property.ISO8601DateProperty;
 import org.structr.core.property.Property;
 import org.structr.core.property.StringProperty;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
- *
  *
  */
 public class Person extends AbstractNode {

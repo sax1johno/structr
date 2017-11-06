@@ -18,6 +18,7 @@
  */
 package org.structr.web.entity.html;
 
+import org.structr.schema.SchemaService;
 import org.structr.web.entity.dom.DOMElement;
 
 /**
@@ -25,12 +26,10 @@ import org.structr.web.entity.dom.DOMElement;
  */
 public interface Hr extends DOMElement {
 
-	/*
+	static class Impl { static { SchemaService.registerMixinType(Hr.class); }}
+
 	@Override
-	public boolean isVoidElement() {
-
+	default boolean isVoidElement() {
 		return true;
-
 	}
-	*/
 }

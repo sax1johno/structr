@@ -20,6 +20,7 @@ package org.structr.web.entity.html;
 
 import org.structr.common.PropertyView;
 import org.structr.core.property.Property;
+import org.structr.schema.SchemaService;
 import org.structr.web.common.HtmlProperty;
 import org.structr.web.entity.dom.DOMElement;
 
@@ -28,18 +29,16 @@ import org.structr.web.entity.dom.DOMElement;
  */
 public interface Time extends DOMElement {
 
+	static class Impl { static { SchemaService.registerMixinType(Time.class); }}
+
 	public static final Property<String> _datetime = new HtmlProperty("datetime");
 
 	public static final org.structr.common.View htmlView	= new org.structr.common.View(Time.class, PropertyView.Html,
 		_datetime
 	);
 
-	/*
 	@Override
-	public boolean avoidWhitespace() {
-
+	default boolean avoidWhitespace() {
 		return false;
-
 	}
-	*/
 }

@@ -18,9 +18,11 @@
  */
 package org.structr.web.entity.html;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.structr.common.PropertyView;
 import org.structr.common.View;
 import org.structr.core.property.Property;
+import org.structr.schema.SchemaService;
 import org.structr.web.common.HtmlProperty;
 import org.structr.web.entity.dom.DOMElement;
 
@@ -28,6 +30,8 @@ import org.structr.web.entity.dom.DOMElement;
  *
  */
 public interface Input extends DOMElement {
+
+	static class Impl { static { SchemaService.registerMixinType(Input.class); }}
 
 	public static final Property<String> _accept         = new HtmlProperty("accept");
 	public static final Property<String> _alt            = new HtmlProperty("alt");
@@ -68,15 +72,13 @@ public interface Input extends DOMElement {
 		_readonly, _required, _size, _src, _step, _type, _value, _width
 	 );
 
-	/*
 	@Override
-	public boolean isVoidElement() {
+	default boolean isVoidElement() {
 		return true;
 	}
 
 	@Override
-	public Property[] getHtmlAttributes() {
-		return (Property[]) ArrayUtils.addAll(super.getHtmlAttributes(), htmlView.properties());
+	default Property[] getHtmlAttributes() {
+		return (Property[]) ArrayUtils.addAll(DOMElement.super.getHtmlAttributes(), htmlView.properties());
 	}
-	*/
 }

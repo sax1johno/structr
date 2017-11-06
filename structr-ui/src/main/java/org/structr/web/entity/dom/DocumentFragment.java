@@ -18,75 +18,78 @@
  */
 package org.structr.web.entity.dom;
 
+import org.structr.common.error.FrameworkException;
 import org.structr.schema.NonIndexed;
+import org.structr.web.common.RenderContext;
+import org.structr.web.entity.Renderable;
+import org.w3c.dom.DOMException;
+import org.w3c.dom.NamedNodeMap;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
 /**
  *
- *
  */
-
 public interface DocumentFragment extends DOMNode, org.w3c.dom.DocumentFragment, NonIndexed {
 
-	/*
-
 	@Override
-	public String getContextName() {
+	default String getContextName() {
 		return "DocumentFragment";
 	}
 
 	// ----- interface org.w3c.dom.Node -----
 	@Override
-	public String getLocalName() {
+	default String getLocalName() {
 		return null;
 	}
 
 	@Override
-	public String getNodeName() {
+	default String getNodeName() {
 		return "#document-fragment";
 	}
 
 	@Override
-	public String getNodeValue() throws DOMException {
+	default String getNodeValue() throws DOMException {
 		return null;
 	}
 
 	@Override
-	public void setNodeValue(String string) throws DOMException {
+	default void setNodeValue(final String string) throws DOMException {
 	}
 
 	@Override
-	public short getNodeType() {
+	default short getNodeType() {
 		return DOCUMENT_FRAGMENT_NODE;
 	}
 
 	@Override
-	public NamedNodeMap getAttributes() {
+	default NamedNodeMap getAttributes() {
 		return null;
 	}
 
 	@Override
-	public boolean hasAttributes() {
+	default boolean hasAttributes() {
 		return false;
 	}
 
 	@Override
-	public boolean contentEquals(final DOMNode otherNode) {
+	default boolean contentEquals(final DOMNode otherNode) {
 		return false;
 	}
 
 	@Override
-	public void updateFromNode(final DOMNode newNode) throws FrameworkException {
+	default void updateFromNode(final DOMNode newNode) throws FrameworkException {
 		// do nothing
 	}
 
 	@Override
-	public boolean isSynced() {
+	default boolean isSynced() {
 		return false;
 	}
 
 	// ----- interface Renderable -----
 	@Override
-	public void render(RenderContext renderContext, int depth) throws FrameworkException {
+	default void render(final RenderContext renderContext, final int depth) throws FrameworkException {
 
 		NodeList _children = getChildNodes();
 		int len            = _children.getLength();
@@ -104,11 +107,11 @@ public interface DocumentFragment extends DOMNode, org.w3c.dom.DocumentFragment,
 	}
 
 	@Override
-	public void renderContent(final RenderContext renderContext, final int depth) throws FrameworkException {
+	default void renderContent(final RenderContext renderContext, final int depth) throws FrameworkException {
 	}
 
 	@Override
-	public Node doAdopt(Page newPage) throws DOMException {
+	default Node doAdopt(final Page newPage) throws DOMException {
 
 		// do nothing, only children of DocumentFragments are
 		// adopted
@@ -116,10 +119,9 @@ public interface DocumentFragment extends DOMNode, org.w3c.dom.DocumentFragment,
 	}
 
 	@Override
-	public Node doImport(Page newPage) throws DOMException {
+	default Node doImport(final Page newPage) throws DOMException {
 		// simply return an empty DocumentFragment, as the importing
 		// will be done by the Page method if deep importing is enabled.
 		return newPage.createDocumentFragment();
 	}
-	*/
 }

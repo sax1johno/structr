@@ -16,11 +16,26 @@
  * You should have received a copy of the GNU General Public License
  * along with Structr.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.structr.core.entity;
+package org.structr.schema;
+
+import java.util.Set;
+import org.structr.core.entity.SchemaNode;
 
 /**
- *
+ * Abstract representation of schema information.
  */
-public class TestMailTemplate extends AbstractNode implements MailTemplate {
+public interface SchemaInfo {
 
+	public String getName();
+	public String getBaseClass();
+	public String getImplementedInterfaces();
+
+	public SchemaNode getSchemaNode();
+
+	public void addDynamicView(final String dynamicView);
+	public Set<String> getDynamicViews();
+
+	default boolean isShared() {
+		return false;
+	}
 }

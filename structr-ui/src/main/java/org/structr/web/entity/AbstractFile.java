@@ -20,6 +20,7 @@ package org.structr.web.entity;
 
 
 import java.util.List;
+import org.structr.api.config.Settings;
 import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
 import org.structr.common.ValidationHelper;
@@ -29,6 +30,7 @@ import org.structr.common.error.FrameworkException;
 import org.structr.common.error.UniqueToken;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.LinkedTreeNode;
+import org.structr.core.graph.ModificationQueue;
 import static org.structr.core.graph.NodeInterface.name;
 import org.structr.core.property.BooleanProperty;
 import org.structr.core.property.CollectionIdProperty;
@@ -64,9 +66,8 @@ public interface AbstractFile extends LinkedTreeNode<FileChildren, FileSiblings,
 	public static final View defaultView = new View(AbstractFile.class, PropertyView.Public, path);
 	public static final View uiView      = new View(AbstractFile.class, PropertyView.Ui, path);
 
-	/*
 	@Override
-	public boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
+	default boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
 
 		boolean valid = true;
 
@@ -74,11 +75,11 @@ public interface AbstractFile extends LinkedTreeNode<FileChildren, FileSiblings,
 			valid = validateAndRenameFileOnce(securityContext, errorBuffer);
 		}
 
-		return valid && super.onCreation(securityContext, errorBuffer);
+		return valid && LinkedTreeNode.super.onCreation(securityContext, errorBuffer);
 	}
 
 	@Override
-	public boolean onModification(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
+	default boolean onModification(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
 
 		boolean valid = true;
 
@@ -86,9 +87,8 @@ public interface AbstractFile extends LinkedTreeNode<FileChildren, FileSiblings,
 			valid = validatePath(securityContext, errorBuffer);
 		}
 
-		return valid && super.onModification(securityContext, errorBuffer, modificationQueue);
+		return valid && LinkedTreeNode.super.onModification(securityContext, errorBuffer, modificationQueue);
 	}
-	*/
 
 	default boolean validatePath(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
 

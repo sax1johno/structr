@@ -18,6 +18,7 @@
  */
 package org.structr.web.entity.html;
 
+import org.structr.schema.SchemaService;
 import org.structr.web.entity.dom.DOMElement;
 
 /**
@@ -25,7 +26,5 @@ import org.structr.web.entity.dom.DOMElement;
  */
 public interface H3 extends DOMElement {
 
-//	public static final EndNodes<Content> contents = new EndNodes<Content>("contents", Content.class, RelType.CONTAINS, Direction.OUTGOING, false);
-//	public static final EndNodes<B>       bs       = new EndNodes<B>("bs", B.class, RelType.CONTAINS, Direction.OUTGOING, false);
-//	public static final EndNodes<Span>    spans    = new EndNodes<Span>("spans", Span.class, RelType.CONTAINS, Direction.OUTGOING, false);
+	static class Impl { static { SchemaService.registerMixinType(H3.class); }}
 }

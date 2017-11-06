@@ -1619,7 +1619,7 @@ public class DeploymentTest extends StructrUiTest {
 
 			Object obj = div.treeGetFirstChild();
 
-			Assert.assertEquals(Template.class, obj.getClass());
+			Assert.assertTrue(Template.class.isAssignableFrom(obj.getClass()));
 
 			Template template = (Template)obj;
 
@@ -1697,7 +1697,7 @@ public class DeploymentTest extends StructrUiTest {
 				break;
 			}
 
-			Assert.assertEquals(Div.class, obj.getClass());
+			Assert.assertTrue(Div.class.isAssignableFrom(obj.getClass()));
 
 			Div clonedNode = (Div)obj;
 

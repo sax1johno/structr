@@ -28,11 +28,14 @@ import org.structr.common.ThreadLocalMatcher;
 import org.structr.common.error.EmptyPropertyToken;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.entity.AbstractNode;
+import static org.structr.core.GraphObject.type;
+import org.structr.core.graph.NodeInterface;
+import static org.structr.core.graph.NodeInterface.name;
 import org.structr.core.property.ConstantBooleanProperty;
 import org.structr.core.property.EndNodes;
 import org.structr.core.property.Property;
 import org.structr.core.property.StringProperty;
+import org.structr.schema.SchemaService;
 import org.structr.web.entity.dom.DOMNode;
 import org.structr.web.entity.dom.Page;
 import org.structr.web.entity.relation.ImageWidget;
@@ -44,9 +47,11 @@ import org.structr.web.property.UiNotion;
  *
  *
  */
-public class Widget extends AbstractNode {
+public interface Widget extends NodeInterface {
 
-	private static final ThreadLocalMatcher threadLocalTemplateMatcher = new ThreadLocalMatcher("\\[[^\\]]+\\]");
+	static class Impl { static { SchemaService.registerMixinType(Widget.class); }}
+
+	static final ThreadLocalMatcher threadLocalTemplateMatcher = new ThreadLocalMatcher("\\[[^\\]]+\\]");
 
 	public static final Property<String>      source        = new StringProperty("source").cmis();
 	public static final Property<String>      description   = new StringProperty("description").cmis();

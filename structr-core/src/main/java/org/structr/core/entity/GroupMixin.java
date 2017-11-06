@@ -18,9 +18,10 @@
  */
 package org.structr.core.entity;
 
+import org.structr.core.graph.Mixin;
 import org.structr.schema.SchemaService;
 
-public class GroupMixin extends AbstractNode implements Group {
+public class GroupMixin extends AbstractNode implements Group, Mixin {
 
 	static {
 		SchemaService.registerMixinType("Group", AbstractNode.class, Group.class);
