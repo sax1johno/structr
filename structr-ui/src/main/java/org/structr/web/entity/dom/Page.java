@@ -155,7 +155,7 @@ public interface Page extends DOMNode, Linkable, Document, DOMImplementation {
 			properties.put(Page.id, uuid);
 		}
 
-		return app.create(Page.class, properties);
+		return (Page)app.create(StructrApp.getConfiguration().getNodeEntityClass(Page.class.getSimpleName()), properties);
 	}
 
 	/**

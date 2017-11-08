@@ -29,6 +29,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.structr.api.util.Iterables;
 import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
+import org.structr.common.ValidationHelper;
+import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.Result;
 import org.structr.core.app.StructrApp;
@@ -184,9 +186,8 @@ public interface DOMElement extends DOMNode, Element, NamedNodeMap, NonIndexed {
 		_ontimeupdate, _onvolumechange, _onwaiting, _role
 	);
 
-	/*
 	@Override
-	default boolean isValid(ErrorBuffer errorBuffer) {
+	default boolean isValid(final ErrorBuffer errorBuffer) {
 
 		boolean valid = DOMNode.super.isValid(errorBuffer);
 
@@ -195,7 +196,6 @@ public interface DOMElement extends DOMNode, Element, NamedNodeMap, NonIndexed {
 
 		return valid;
 	}
-	*/
 
 	@Override
 	default Object getFeature(final String version, final String feature) {

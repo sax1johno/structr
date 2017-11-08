@@ -552,7 +552,7 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 		}
 
 		// interface that extends NodeInterface, must be stored
-		if (type.isInterface()) {
+		if (type.isInterface() && GraphObject.class.isAssignableFrom(type)) {
 			reverseInterfaceMap.put(type.getSimpleName(), type);
 		}
 

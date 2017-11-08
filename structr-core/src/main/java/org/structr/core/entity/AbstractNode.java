@@ -37,10 +37,8 @@ import org.apache.chemistry.opencmis.commons.data.Ace;
 import org.apache.chemistry.opencmis.commons.data.AllowableActions;
 import org.apache.chemistry.opencmis.commons.enums.BaseTypeId;
 import org.apache.chemistry.opencmis.commons.enums.PropertyType;
-import org.apache.commons.codec.digest.DigestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.structr.api.Predicate;
 import org.structr.api.config.Settings;
 import org.structr.api.graph.Direction;
 import org.structr.api.graph.Node;
@@ -386,52 +384,6 @@ public abstract class AbstractNode implements NodeInterface, AccessControllable,
 	 */
 	public final boolean getVisibleToAuthenticatedUsers() {
 		return getProperty(visibleToPublicUsers);
-	}
-
-	/**
-	 * Returns the (converted, validated, transformed, etc.) property for
-	 * the given property key.
-	 *
-	 * @param <T>
-	 * @param key the property key to retrieve the value for
-	 * @return the converted, validated, transformed property value
-	 */
-	@Override
-	public <T> T getProperty(final PropertyKey<T> key) {
-		return getProperty(key, null);
-	}
-
-	@Override
-	public <T> T getProperty(final PropertyKey<T> key, final Predicate<GraphObject> predicate) {
-		return getProperty(key, true, predicate);
-	}
-
-	private <T> T getProperty(final PropertyKey<T> key, boolean applyConverter, final Predicate<GraphObject> predicate) {
-
-		// early null check, this should not happen...
-		if (key == null || key.dbName() == null) {
-			return null;
-		}
-
-		return key.getProperty(securityContext, this, applyConverter, predicate);
-	}
-
-	public final String getPropertyMD5(final PropertyKey key) {
-
-		Object value = getProperty(key);
-
-		if (value instanceof String) {
-
-			return DigestUtils.md5Hex((String) value);
-		} else if (value instanceof byte[]) {
-
-			return DigestUtils.md5Hex((byte[]) value);
-		}
-
-		logger.warn("Could not create MD5 hex out of value {}", value);
-
-		return null;
-
 	}
 
 	/**

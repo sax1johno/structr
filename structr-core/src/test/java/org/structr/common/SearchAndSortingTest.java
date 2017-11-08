@@ -403,13 +403,13 @@ public class SearchAndSortingTest extends StructrTest {
 
 				long t1 = System.currentTimeMillis();
 				logger.info("Query with inexact type took {} ms", t1-t0);
-				assertEquals(1000, result.size());
+				assertEquals(1009, result.size());
 
 				result = app.nodeQuery(NodeInterface.class).getResult();
 
 				long t2 = System.currentTimeMillis();
 				logger.info("Query with exact type took {} ms", t2-t1);
-				assertEquals(1000, result.size());
+				assertEquals(1009, result.size());
 
 				tx.success();
 			}
@@ -1082,7 +1082,7 @@ public class SearchAndSortingTest extends StructrTest {
 
 			props.put(key, date);
 
-			AbstractNode node = createTestNode(type, props);
+			AbstractNode node = (AbstractNode)createTestNode(type, props);
 
 			try (final Tx tx = app.tx()) {
 
@@ -1167,7 +1167,7 @@ public class SearchAndSortingTest extends StructrTest {
 			props.put(lon, 8.73923d);
 			props.put(AbstractNode.name, "TestSeven-0");
 
-			AbstractNode node = createTestNode(type, props);
+			AbstractNode node = (AbstractNode)createTestNode(type, props);
 
 			try (final Tx tx = app.tx()) {
 

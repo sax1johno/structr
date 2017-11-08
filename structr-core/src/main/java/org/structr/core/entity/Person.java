@@ -21,6 +21,8 @@ package org.structr.core.entity;
 import java.util.Date;
 import org.structr.common.PropertyView;
 import org.structr.common.View;
+import org.structr.common.error.ErrorBuffer;
+import org.structr.core.graph.NodeInterface;
 import org.structr.core.property.BooleanProperty;
 import org.structr.core.property.ISO8601DateProperty;
 import org.structr.core.property.Property;
@@ -29,7 +31,7 @@ import org.structr.core.property.StringProperty;
 /**
  *
  */
-public class Person extends AbstractNode {
+public interface Person extends NodeInterface {
 
 	public static final Property<String>  salutation          = new StringProperty("salutation").cmis();
 	public static final Property<String>  firstName           = new StringProperty("firstName").cmis().indexed();
@@ -62,5 +64,10 @@ public class Person extends AbstractNode {
 	public static final View uiView = new View(Person.class, PropertyView.Ui,
 		id, name, salutation, firstName, middleNameOrInitial, lastName, twitterName, eMail, eMail2, phoneNumber1, phoneNumber2, faxNumber1, faxNumber2, zipCode, city, state, country, birthday, gender, newsletter
 	);
+
+	@Override
+	default boolean isValid(final ErrorBuffer errorBuffer) {
+		return NodeInterface.super.isValid(errorBuffer);
+	}
 
 }

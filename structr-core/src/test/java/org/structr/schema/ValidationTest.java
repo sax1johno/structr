@@ -1784,20 +1784,6 @@ public class ValidationTest extends StructrTest {
 
 		try (final Tx tx = app.tx()) {
 
-			app.create(SchemaNode.class,
-				new NodeAttribute<>(SchemaNode.name, "Group"),
-				new NodeAttribute<>(SchemaNode.implementsInterfaces, "Group")
-			);
-
-			tx.success();
-
-		} catch (FrameworkException fex) {
-			fex.printStackTrace();
-			fail("Unexpected exception.");
-		}
-
-		try (final Tx tx = app.tx()) {
-
 			app.create(SchemaRelationshipNode.class,
 				new NodeAttribute<>(SchemaRelationshipNode.sourceNode, null),
 				new NodeAttribute<>(SchemaRelationshipNode.targetNode, null)

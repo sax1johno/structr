@@ -18,20 +18,31 @@
  */
 package org.structr.web.entity.feed;
 
+import java.io.InputStream;
+import java.nio.charset.Charset;
+import org.apache.commons.io.IOUtils;
 import org.structr.common.PropertyView;
+import org.structr.common.SecurityContext;
 import org.structr.common.View;
+import org.structr.common.error.FrameworkException;
+import org.structr.common.fulltext.FulltextIndexer;
 import org.structr.common.fulltext.Indexable;
-import org.structr.core.graph.NodeInterface;
+import org.structr.core.Export;
+import org.structr.core.GraphObject;
+import org.structr.core.app.StructrApp;
 import org.structr.core.property.Property;
 import org.structr.core.property.StartNode;
 import org.structr.core.property.StringProperty;
+import org.structr.schema.SchemaService;
 import org.structr.web.entity.relation.FeedItemContents;
 
 /**
  * Represents a content element of a feed item
  *
  */
-public interface FeedItemContent extends NodeInterface, Indexable {
+public interface FeedItemContent extends Indexable {
+
+	static class Impl { static { SchemaService.registerMixinType(FeedItemContent.class); }}
 
 	public static final Property<String> mode                    = new StringProperty("mode");
 	public static final Property<String> itemType                = new StringProperty("itemType");
@@ -45,4 +56,36 @@ public interface FeedItemContent extends NodeInterface, Indexable {
 	public static final View uiView = new View(FeedItemContent.class, PropertyView.Ui,
 		type, contentType, owner, extractedContent, indexedWords, mode, itemType, value, item
 	);
+
+	@Override
+	default void afterCreation(SecurityContext securityContext) {
+
+		try {
+			final FulltextIndexer indexer = StructrApp.getInstance(securityContext).getFulltextIndexer();
+			indexer.addToFulltextIndex(this);
+
+		} catch (FrameworkException fex) {
+
+			logger.warn("Unable to index " + this, fex);
+		}
+	}
+
+	@Export
+	@Override
+	default GraphObject getSearchContext(final String searchTerm, final int contextLength) {
+
+		final String text = getProperty(extractedContent);
+		if (text != null) {
+
+			final FulltextIndexer indexer = StructrApp.getInstance(getSecurityContext()).getFulltextIndexer();
+			return indexer.getContextObject(searchTerm, text, contextLength);
+		}
+
+		return null;
+	}
+
+	@Override
+	default InputStream getInputStream() {
+		return IOUtils.toInputStream(getProperty(value), Charset.forName("utf-8"));
+	}
 }

@@ -102,6 +102,11 @@ public interface Image extends org.structr.web.entity.File {
 		return false;
 	}
 
+	@Override
+	default public boolean isValid(final ErrorBuffer errorBuffer) {
+		return File.super.isValid(errorBuffer);
+	}
+
 	default Integer getWidth() {
 		return getProperty(Image.width);
 	}

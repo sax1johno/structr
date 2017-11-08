@@ -62,7 +62,6 @@ import org.structr.core.property.StringProperty;
 import org.structr.schema.ReloadSchema;
 import org.structr.schema.SchemaHelper;
 import org.structr.schema.SchemaHelper.Type;
-import org.structr.schema.SchemaInfo;
 import org.structr.schema.action.ActionEntry;
 import org.structr.schema.action.Actions;
 import org.structr.schema.json.JsonSchema;
@@ -73,7 +72,7 @@ import org.structr.schema.parser.Validator;
  *
  *
  */
-public class SchemaRelationshipNode extends AbstractSchemaNode implements SchemaInfo {
+public class SchemaRelationshipNode extends AbstractSchemaNode {
 
 	private static final Logger logger                              = LoggerFactory.getLogger(SchemaRelationshipNode.class.getName());
 	private static final Set<Class> propagatingRelTypes             = new HashSet<>();
@@ -571,8 +570,8 @@ public class SchemaRelationshipNode extends AbstractSchemaNode implements Schema
 		src.append("\t\treturn \"").append(getRelationshipType()).append("\";\n");
 		src.append("\t}\n\n");
 
-		SchemaHelper.formatValidators(src, validators, compoundIndexKeys);
-		SchemaHelper.formatSaveActions(this, src, actions);
+		SchemaHelper.formatValidators(src, validators, compoundIndexKeys, Collections.emptySet(), false);
+		SchemaHelper.formatSaveActions(this, src, actions, Collections.emptySet());
 
 		formatRelationshipFlags(src);
 
@@ -581,32 +580,6 @@ public class SchemaRelationshipNode extends AbstractSchemaNode implements Schema
 		src.append("}\n");
 
 		return src.toString();
-	}
-
-	// ----- interface SchemaInfo -----
-	@Override
-	public String getBaseClass() {
-		return getProperty(extendsClass);
-	}
-
-	@Override
-	public String getImplementedInterfaces() {
-		return null;
-	}
-
-	@Override
-	public SchemaNode getSchemaNode() {
-		return null;
-	}
-
-	@Override
-	public void addDynamicView(final String view) {
-		dynamicViews.add(view);
-	}
-
-	@Override
-	public Set<String> getDynamicViews() {
-		return dynamicViews;
 	}
 
 	// ----- public methods -----

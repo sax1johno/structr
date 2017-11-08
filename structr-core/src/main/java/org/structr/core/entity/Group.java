@@ -20,13 +20,17 @@ package org.structr.core.entity;
 
 import java.util.List;
 import org.structr.common.PropertyView;
+import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.entity.relationship.Groups;
 import org.structr.core.property.ConstantBooleanProperty;
 import org.structr.core.property.EndNodes;
 import org.structr.core.property.Property;
+import org.structr.schema.SchemaService;
 
 public interface Group extends Principal {
+
+	static class Impl { static { SchemaService.registerMixinType(Group.class); }}
 
 	public static final Property<List<Principal>> members = new EndNodes<>("members", Groups.class);
 	public static final Property<Boolean>        isGroup  = new ConstantBooleanProperty("isGroup", true);
@@ -53,5 +57,10 @@ public interface Group extends Principal {
 		_users.remove(user);
 
 		setProperty(members, _users);
+	}
+
+	@Override
+	default public boolean isValid(final ErrorBuffer errorBuffer) {
+		return Principal.super.isValid(errorBuffer);
 	}
 }

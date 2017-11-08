@@ -18,9 +18,14 @@
  */
 package org.structr.odf.entity;
 
+import java.net.URI;
+import org.odftoolkit.odfdom.doc.OdfDocument;
+import org.odftoolkit.odfdom.pkg.OdfPackage;
 import org.structr.common.PropertyView;
 import org.structr.common.View;
 import org.structr.common.error.FrameworkException;
+import org.structr.core.Export;
+import org.structr.core.GraphObject;
 import static org.structr.core.GraphObject.createdBy;
 import static org.structr.core.GraphObject.createdDate;
 import static org.structr.core.GraphObject.id;
@@ -30,6 +35,9 @@ import static org.structr.core.GraphObject.visibilityEndDate;
 import static org.structr.core.GraphObject.visibilityStartDate;
 import static org.structr.core.GraphObject.visibleToAuthenticatedUsers;
 import static org.structr.core.GraphObject.visibleToPublicUsers;
+import org.structr.core.app.App;
+import org.structr.core.app.StructrApp;
+import org.structr.core.entity.AbstractNode;
 import org.structr.core.graph.NodeInterface;
 import static org.structr.core.graph.NodeInterface.deleted;
 import static org.structr.core.graph.NodeInterface.hidden;
@@ -37,11 +45,17 @@ import static org.structr.core.graph.NodeInterface.name;
 import static org.structr.core.graph.NodeInterface.owner;
 import org.structr.core.property.EndNode;
 import org.structr.core.property.Property;
+import org.structr.core.property.StringProperty;
 import org.structr.odf.relations.DocumentResult;
 import org.structr.odf.relations.DocumentTemplate;
 import org.structr.odf.relations.TransformationRules;
 import org.structr.transform.VirtualType;
+import org.structr.web.common.FileHelper;
 import org.structr.web.entity.File;
+import org.structr.web.entity.Image;
+import org.w3c.dom.NamedNodeMap;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
 /**
  * Base class for ODF exporter
@@ -70,6 +84,88 @@ public interface ODFExporter extends NodeInterface {
 		transformationProvider, documentTemplate, resultDocument
 	);
 
-	void createDocumentFromTemplate() throws FrameworkException;
-	void exportImage(String uuid);
+	@Export
+	default void createDocumentFromTemplate() throws FrameworkException {
+
+		OdfDocument templateOdt;
+		final File template = getProperty(documentTemplate);
+		File output = getProperty(resultDocument);
+
+		try {
+
+			// If no result file is given, create one and set it as result document
+			if (output == null) {
+
+				output = FileHelper.createFile(getSecurityContext(), new byte[]{}, template.getContentType(), File.class, getName().concat("_").concat(template.getName()));
+
+				output.setProperty(File.parent, template.getProperty(File.parent));
+
+				output.unlockSystemPropertiesOnce();
+				output.setProperty(AbstractNode.type, File.class.getSimpleName());
+
+				setProperty(resultDocument, output);
+
+			}
+
+			templateOdt = OdfDocument.loadDocument(template.getFileOnDisk().getAbsolutePath());
+			templateOdt.save(output.getOutputStream());
+			templateOdt.close();
+
+		} catch (Exception e) {
+
+			logger.error("Error while creating ODS from template", e);
+
+		}
+	}
+
+	@Export
+	default void exportImage(String uuid) {
+
+		File output = getProperty(resultDocument);
+
+		try {
+
+			final App app = StructrApp.getInstance();
+			final Image result = app.nodeQuery(Image.class).and(GraphObject.id, uuid).getFirst();
+
+			String imageName = result.getProperty(new StringProperty("name"));
+			String contentType = result.getProperty(new StringProperty("contentType"));
+
+			String templateImagePath = null;
+
+			OdfDocument doc = OdfDocument.loadDocument(output.getFileOnDisk().getAbsolutePath());
+
+			NodeList nodes = doc.getContentRoot().getElementsByTagName(ODF_IMAGE_PARENT_NAME);
+			for (int i = 0; i < nodes.getLength(); i++) {
+
+				Node currentNode = nodes.item(i);
+				NamedNodeMap attrs = currentNode.getAttributes();
+				Node fieldName = attrs.getNamedItem(ODF_IMAGE_ATTRIBUTE_PARENT_IMAGE_NAME);
+				if (fieldName != null && fieldName.getTextContent().equals(imageName)) {
+					NamedNodeMap childAttrs = currentNode.getFirstChild().getAttributes();
+					Node filePath = childAttrs.getNamedItem(ODF_IMAGE_ATTRIBUTE_FILE_PATH);
+					templateImagePath = filePath.getTextContent();
+					filePath.setTextContent(ODF_IMAGE_DIRECTORY + imageName);
+				}
+
+			}
+
+			OdfPackage pkg = doc.getPackage();
+			if (templateImagePath != null && templateImagePath.length() > 0) {
+
+				pkg.remove(templateImagePath);
+
+			}
+			pkg.insert(new URI(result.getFileOnDisk().getAbsolutePath()), ODF_IMAGE_DIRECTORY + imageName, contentType);
+			pkg.save(output.getFileOnDisk().getAbsolutePath());
+			pkg.close();
+			doc.close();
+
+		} catch (Exception e) {
+
+			logger.error("Error while exporting image to document", e);
+
+		}
+	}
+
 }

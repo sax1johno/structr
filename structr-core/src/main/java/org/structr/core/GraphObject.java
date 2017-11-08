@@ -294,27 +294,31 @@ public interface GraphObject {
 		}
 	}
 
-
 	/**
-	 * Returns the (converted, validated, transformed, etc.) property for the given
-	 * property key.
+	 * Returns the (converted, validated, transformed, etc.) property for
+	 * the given property key.
 	 *
 	 * @param <T>
-	 * @param propertyKey the property key to retrieve the value for
+	 * @param key the property key to retrieve the value for
 	 * @return the converted, validated, transformed property value
 	 */
-	public <T> T getProperty(final PropertyKey<T> propertyKey);
+	default <T> T getProperty(final PropertyKey<T> key) {
+		return getProperty(key, null);
+	}
 
-	/**
-	 * Returns the (converted, validated, transformed, etc.) property for the given
-	 * property key with the given filter applied to it.
-	 *
-	 * @param <T>
-	 * @param propertyKey the property key to retrieve the value for
-	 * @param filter the filter to apply to all properties
-	 * @return the converted, validated, transformed property value
-	 */
-	public <T> T getProperty(final PropertyKey<T> propertyKey, final Predicate<GraphObject> filter);
+	default <T> T getProperty(final PropertyKey<T> key, final Predicate<GraphObject> predicate) {
+		return getProperty(key, true, predicate);
+	}
+
+	default <T> T getProperty(final PropertyKey<T> key, boolean applyConverter, final Predicate<GraphObject> predicate) {
+
+		// early null check, this should not happen...
+		if (key == null || key.dbName() == null) {
+			return null;
+		}
+
+		return key.getProperty(getSecurityContext(), this, applyConverter, predicate);
+	}
 
 	/**
 	 * Returns the property value for the given key as a Comparable

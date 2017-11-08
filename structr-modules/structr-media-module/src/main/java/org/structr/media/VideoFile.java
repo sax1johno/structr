@@ -31,6 +31,7 @@ import org.structr.core.property.IntProperty;
 import org.structr.core.property.Property;
 import org.structr.core.property.StartNode;
 import org.structr.core.property.StringProperty;
+import org.structr.schema.SchemaService;
 import static org.structr.web.entity.File.relativeFilePath;
 import static org.structr.web.entity.File.size;
 import org.structr.web.entity.Image;
@@ -40,6 +41,8 @@ import org.structr.web.entity.File;
  * A video whose binary data will be stored on disk.
  */
 public interface VideoFile extends File {
+
+	static class Impl { static { SchemaService.registerMixinType(VideoFile.class); }}
 
 	public static final Property<List<VideoFile>> convertedVideos = new EndNodes<>("convertedVideos", VideoFileHasConvertedVideoFile.class);
 	public static final Property<VideoFile> originalVideo         = new StartNode<>("originalVideo", VideoFileHasConvertedVideoFile.class);

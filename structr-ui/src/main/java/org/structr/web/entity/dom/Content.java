@@ -421,7 +421,7 @@ public interface Content extends DOMNode, Text, NonIndexed, Favoritable {
 
 		checkWriteAccess();
 		try {
-			setProperties(getSecurityContext(), new PropertyMap(content, data));
+			setProperty(Content.content, data);
 
 		} catch (FrameworkException fex) {
 
@@ -472,7 +472,7 @@ public interface Content extends DOMNode, Text, NonIndexed, Favoritable {
 
 		try {
 			String text = getProperty(content);
-			setProperties(getSecurityContext(), new PropertyMap(content, text.concat(data)));
+			setProperty(Content.content, text.concat(data));
 
 		} catch (FrameworkException fex) {
 
@@ -499,7 +499,7 @@ public interface Content extends DOMNode, Text, NonIndexed, Favoritable {
 			buf.append(rightPart);
 
 			// finally, set content to concatenated left, data and right parts
-			setProperties(getSecurityContext(), new PropertyMap(content, buf.toString()));
+			setProperty(Content.content, buf.toString());
 
 
 		} catch (FrameworkException fex) {
@@ -522,7 +522,7 @@ public interface Content extends DOMNode, Text, NonIndexed, Favoritable {
 			String leftPart  = text.substring(0, offset);
 			String rightPart = text.substring(offset + count);
 
-			setProperties(getSecurityContext(), new PropertyMap(content, leftPart.concat(rightPart)));
+			setProperty(Content.content, leftPart.concat(rightPart));
 
 		} catch (FrameworkException fex) {
 
@@ -549,7 +549,7 @@ public interface Content extends DOMNode, Text, NonIndexed, Favoritable {
 			buf.append(data);
 			buf.append(rightPart);
 
-			setProperties(getSecurityContext(), new PropertyMap(content, buf.toString()));
+			setProperty(Content.content, buf.toString());
 
 		} catch (FrameworkException fex) {
 

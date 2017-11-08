@@ -31,13 +31,11 @@ import org.structr.core.Export;
 import org.structr.core.GraphObjectMap;
 import org.structr.core.JsonInput;
 import org.structr.core.app.StructrApp;
-import org.structr.core.entity.AbstractNode;
 import org.structr.core.graph.ModificationQueue;
 import org.structr.core.graph.Tx;
 import org.structr.core.property.Property;
 import org.structr.core.property.StringProperty;
 import org.structr.rest.RestMethodResult;
-import org.structr.schema.SchemaService;
 import org.structr.web.common.FileHelper;
 import org.structr.web.entity.FileMixin;
 
@@ -47,12 +45,6 @@ import org.structr.web.entity.FileMixin;
 public class VideoFileMixin extends FileMixin implements VideoFile {
 
 	private static final Logger logger = LoggerFactory.getLogger(VideoFileMixin.class.getName());
-
-	// register this type as an overridden builtin type
-	static {
-
-		SchemaService.registerMixinType("VideoFile", AbstractNode.class, VideoFileMixin.class);
-	}
 
 	@Override
 	public boolean onCreation(SecurityContext securityContext, ErrorBuffer errorBuffer) throws FrameworkException {

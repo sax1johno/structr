@@ -20,9 +20,9 @@ package org.structr.geo;
 
 import java.util.Set;
 import org.structr.api.service.LicenseManager;
+import org.structr.core.entity.AbstractSchemaNode;
 import org.structr.core.function.Functions;
 import org.structr.module.StructrModule;
-import org.structr.schema.SchemaInfo;
 import org.structr.schema.action.Actions;
 
 /**
@@ -55,19 +55,19 @@ public class GeoTransformationsModule implements StructrModule {
 	}
 
 	@Override
-	public void insertImportStatements(final SchemaInfo schemaInfo, final StringBuilder buf) {
+	public void insertImportStatements(final AbstractSchemaNode schemaInfo, final StringBuilder buf) {
 	}
 
 	@Override
-	public void insertSourceCode(final SchemaInfo schemaNode, final StringBuilder buf) {
+	public void insertSourceCode(final AbstractSchemaNode schemaInfo, final StringBuilder buf) {
 	}
 
 	@Override
-	public Set<String> getInterfacesForType(final SchemaInfo schemaNode) {
+	public Set<String> getInterfacesForType(final AbstractSchemaNode schemaInfo) {
 		return null;
 	}
 
 	@Override
-	public void insertSaveAction(final SchemaInfo schemaNode, final StringBuilder buf, final Actions.Type type) {
+	public void insertSaveAction(final AbstractSchemaNode schemaInfo, final StringBuilder buf, final Actions.Type type) {
 	}
 }

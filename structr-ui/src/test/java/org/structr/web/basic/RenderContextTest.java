@@ -32,6 +32,7 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.config.Settings;
 import org.structr.common.AccessMode;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
@@ -168,6 +169,8 @@ public class RenderContextTest extends StructrUiTest {
 
 		NodeInterface item  = null;
 
+		Settings.LogSchemaOutput.setValue(true);
+
 		try (final Tx tx = app.tx()) {
 
 			app.create(SchemaNode.class,
@@ -180,6 +183,8 @@ public class RenderContextTest extends StructrUiTest {
 			tx.success();
 
 		} catch (FrameworkException fex) {
+
+			fex.printStackTrace();
 
 			logger.warn("", fex);
 
@@ -571,7 +576,7 @@ public class RenderContextTest extends StructrUiTest {
 			assertEquals("Invalid escape_html() result", "&lt;a b=&quot;c&quot;&gt;&amp;d&lt;/a&gt;", Scripting.replaceVariables(ctx, testOne, "${escape_html(this.htmlString)}"));
 
 			testOne.setProperty(TestOne.htmlString, "&lt;a b=&quot;c&quot;&gt;&amp;d&lt;/a&gt;");
-			
+
 			// unescape_html
 			assertEquals("Invalid unescape_html() result", "<a b=\"c\">&d</a>", Scripting.replaceVariables(ctx, testOne, "${unescape_html(this.htmlString)}"));
 

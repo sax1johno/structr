@@ -218,7 +218,8 @@ public class FileImportVisitor implements FileVisitor<Path> {
 					try (final FileInputStream fis = new FileInputStream(path.toFile())) {
 
 						// create file in folder structure
-						file                     = FileHelper.createFile(securityContext, fis, null, File.class, fileName);
+						final Class type         = StructrApp.getConfiguration().getNodeEntityClass(File.class.getSimpleName());
+						file                     = FileHelper.createFile(securityContext, fis, null, type, fileName);
 						final String contentType = file.getContentType();
 
 						final PropertyMap changedProperties = new PropertyMap();

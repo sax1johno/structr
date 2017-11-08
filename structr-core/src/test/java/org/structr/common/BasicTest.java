@@ -79,6 +79,7 @@ import org.structr.core.property.PropertyMap;
 import org.structr.core.property.StringProperty;
 import org.structr.core.entity.MailTemplate;
 import org.structr.core.entity.Group;
+import org.structr.core.entity.Principal;
 import org.structr.core.entity.TestMailTemplate;
 
 /**
@@ -1770,8 +1771,30 @@ public class BasicTest extends StructrTest {
 			logger.warn("", fex);
 			fail("Unexpected exception.");
 		}
+	}
 
+	@Test
+	public void testPasswordSecurity() {
 
+		// we need to make sure that password hash and salt values are never
+		// exposed via REST (or otherwise)
+
+		try (final Tx tx = app.tx()) {
+
+			final TestUser user = app.create(TestUser.class,
+				new NodeAttribute<>(Principal.name, "testuser"),
+				new NodeAttribute<>(Principal.password, "test")
+			);
+
+			assertEquals("Password hash exposed, this must not happen", Principal.HIDDEN, user.getProperty(Principal.password));
+			assertEquals("Password salt exposed, this must not happen", Principal.HIDDEN, user.getProperty(Principal.salt));
+
+			tx.success();
+
+		} catch (FrameworkException fex) {
+			logger.warn("", fex);
+			fail("Unexpected exception.");
+		}
 
 	}
 
@@ -1780,8 +1803,8 @@ public class BasicTest extends StructrTest {
 
 		try (final Tx tx = app.tx()) {
 
-			AbstractNode start       = createTestNode(type1);
-			AbstractNode end         = createTestNode(type2);
+			AbstractNode start       = (AbstractNode)createTestNode(type1);
+			AbstractNode end         = (AbstractNode)createTestNode(type2);
 			AbstractRelationship rel = createTestRelationship(start, end, NodeHasLocation.class);
 
 			rel.setProperty(AbstractRelationship.cascadeDelete, cascadeDeleteFlag);

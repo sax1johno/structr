@@ -27,7 +27,6 @@ import java.util.Set;
 import org.apache.chemistry.opencmis.commons.enums.PropertyType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.structr.api.Predicate;
 import org.structr.api.graph.Direction;
 import org.structr.api.graph.Node;
 import org.structr.api.graph.PropertyContainer;
@@ -51,7 +50,6 @@ import org.structr.core.Services;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.converter.PropertyConverter;
-import org.structr.core.graph.ModificationQueue;
 import org.structr.core.graph.NodeFactory;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.NodeService;
@@ -311,26 +309,6 @@ public abstract class AbstractRelationship<S extends NodeInterface, T extends No
 	}
 
 	@Override
-	public <T> T getProperty(final PropertyKey<T> key) {
-		return getProperty(key, true, null);
-	}
-
-	@Override
-	public <T> T getProperty(final PropertyKey<T> key, final Predicate<GraphObject> predicate) {
-		return getProperty(key, true, predicate);
-	}
-
-	private <T> T getProperty(final PropertyKey<T> key, boolean applyConverter, final Predicate<GraphObject> predicate) {
-
-		// early null check, this should not happen...
-		if (key == null || key.dbName() == null) {
-			return null;
-		}
-
-		return key.getProperty(securityContext, this, applyConverter, predicate);
-	}
-
-	@Override
 	public final <T> Comparable getComparableProperty(final PropertyKey<T> key) {
 
 		if (key != null) {
@@ -470,19 +448,7 @@ public abstract class AbstractRelationship<S extends NodeInterface, T extends No
 	}
 
 	public final String getOtherNodeId(final AbstractNode node) {
-
 		return getOtherNode(node).getProperty(AbstractRelationship.id);
-
-	}
-
-	@Override
-	public boolean onCreation(SecurityContext securityContext, ErrorBuffer errorBuffer) throws FrameworkException {
-		return isValid(errorBuffer);
-	}
-
-	@Override
-	public boolean onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
-		return isValid(errorBuffer);
 	}
 
 	@Override

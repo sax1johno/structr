@@ -46,7 +46,6 @@ import org.structr.core.entity.relationship.Ownership;
 import org.structr.core.entity.relationship.PrincipalOwnsNode;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.Tx;
-import org.structr.core.entity.GroupMixin;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.core.entity.Principal;
@@ -967,9 +966,10 @@ public class AccessControlTest extends StructrTest {
 
 		try (final Tx tx = app.tx()) {
 
+			final Class type           = StructrApp.getConfiguration().getNodeEntityClass("Group");
 			final List<TestUser> users = createTestNodes(TestUser.class, 2);
 			final TestUser user1       = (TestUser) users.get(0);
-			final GroupMixin group1    = createTestNode(GroupMixin.class, "test group");
+			final Group group1         = (Group)createTestNode(type, "test group");
 			final TestOne t1           = createTestNode(TestOne.class);
 
 			t1.setProperty(AbstractNode.owner, user1);

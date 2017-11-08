@@ -26,11 +26,14 @@ import org.structr.core.property.Property;
 import org.structr.core.property.StartNode;
 import org.structr.core.property.StringProperty;
 import org.structr.payment.api.PaymentItem;
+import org.structr.schema.SchemaService;
 
 /**
  *
  */
 public interface PaymentItemNode extends NodeInterface, PaymentItem {
+
+	static class Impl { static { SchemaService.registerMixinType(PaymentItemNode.class); }}
 
 	public static final Property<PaymentNode> payment           = new StartNode<>("payment", PaymentItems.class);
 	public static final Property<Integer>     amount            = new IntProperty("amount").indexed();
@@ -46,4 +49,29 @@ public interface PaymentItemNode extends NodeInterface, PaymentItem {
 	public static final View uiView = new View(PaymentItemNode.class, PropertyView.Ui,
 		name, amount, quantity, description, number, url
 	);
+
+	@Override
+	default int getAmount() {
+		return getProperty(amount);
+	}
+
+	@Override
+	default int getQuantity() {
+		return getProperty(quantity);
+	}
+
+	@Override
+	default String getDescription() {
+		return getProperty(description);
+	}
+
+	@Override
+	default String getItemNumber() {
+		return getProperty(number);
+	}
+
+	@Override
+	default String getItemUrl() {
+		return getProperty(url);
+	}
 }

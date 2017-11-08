@@ -25,7 +25,6 @@ import org.structr.core.property.PropertyMap;
 import org.structr.web.common.RenderContext;
 import org.structr.schema.NonIndexed;
 import org.structr.schema.SchemaService;
-import org.w3c.dom.DOMException;
 
 /**
  */
@@ -59,10 +58,5 @@ public interface Comment extends Content, org.w3c.dom.Comment, NonIndexed {
 			renderContext.getBuffer().append("<!--").append(_content).append("-->");
 		}
 
-	}
-
-	@Override
-	default void replaceData(final int offset, final int count, final String data) throws DOMException {
-		Content.super.replaceData(offset, count, data);
 	}
 }

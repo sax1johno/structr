@@ -19,6 +19,7 @@
 package org.structr.core.entity;
 
 import org.structr.api.graph.Node;
+import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
@@ -36,6 +37,11 @@ import org.structr.core.property.PropertyMap;
 public interface LinkedListNode<R extends AbstractListSiblings<T, T>, T extends LinkedListNode> extends NodeInterface {
 
 	public Class<R> getSiblingLinkType();
+
+	@Override
+	default boolean isValid(final ErrorBuffer errorBuffer) {
+		return NodeInterface.super.isValid(errorBuffer);
+	}
 
 	/**
 	 * Returns the predecessor of the given element in the list structure

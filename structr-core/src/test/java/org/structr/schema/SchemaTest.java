@@ -452,10 +452,7 @@ public class SchemaTest extends StructrTest {
 
 		try (final Tx tx = app.tx()) {
 
-			final SchemaNode schemaNode = app.create(SchemaNode.class,
-				new NodeAttribute<>(SchemaNode.name, "Group"),
-				new NodeAttribute<>(SchemaNode.implementsInterfaces, "Group")
-			);
+			final SchemaNode schemaNode = app.nodeQuery(SchemaNode.class).andName("Group").getFirst();
 
 			assertNotNull("Schema node Group should exist", schemaNode);
 
@@ -511,11 +508,7 @@ public class SchemaTest extends StructrTest {
 
 		try (final Tx tx = app.tx()) {
 
-			//final SchemaNode group = app.nodeQuery(SchemaNode.class).andName("Group").getFirst();
-			final SchemaNode group = app.create(SchemaNode.class,
-				new NodeAttribute<>(SchemaNode.name, "Group"),
-				new NodeAttribute<>(SchemaNode.implementsInterfaces, "Group")
-			);
+			final SchemaNode group = app.nodeQuery(SchemaNode.class).andName("Group").getFirst();
 
 			assertNotNull("Schema node Group should exist", group);
 
@@ -545,7 +538,7 @@ public class SchemaTest extends StructrTest {
 
 			app.create(SchemaNode.class,
 				new NodeAttribute<>(SchemaNode.name, "Test"),
-				new NodeAttribute<>(SchemaNode.implementsInterfaces, "MailTemplate")
+				new NodeAttribute<>(SchemaNode.implementsInterfaces, org.structr.core.entity.MailTemplate.class.getName())
 			);
 
 			tx.success();

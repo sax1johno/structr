@@ -18,13 +18,22 @@
  */
 package org.structr.web.entity.feed;
 
+import java.io.InputStream;
+import java.nio.charset.Charset;
+import org.apache.commons.io.IOUtils;
 import org.structr.common.PropertyView;
+import org.structr.common.SecurityContext;
 import org.structr.common.View;
+import org.structr.common.error.FrameworkException;
+import org.structr.common.fulltext.FulltextIndexer;
 import org.structr.common.fulltext.Indexable;
 import static org.structr.common.fulltext.Indexable.contentType;
 import static org.structr.common.fulltext.Indexable.extractedContent;
 import static org.structr.common.fulltext.Indexable.indexedWords;
+import org.structr.core.Export;
+import org.structr.core.GraphObject;
 import static org.structr.core.GraphObject.type;
+import org.structr.core.app.StructrApp;
 import org.structr.core.graph.NodeInterface;
 import static org.structr.core.graph.NodeInterface.owner;
 import org.structr.core.property.LongProperty;
@@ -38,16 +47,48 @@ import org.structr.web.entity.relation.FeedItemContents;
  */
 public interface FeedItemEnclosure extends NodeInterface, Indexable {
 
-    public static final Property<String> url                    = new StringProperty("url");
-    public static final Property<Long> enclosureLength          = new LongProperty("enclosureLength");
-    public static final Property<String> enclosureType          = new StringProperty("enclosureType");
-    public static final Property<FeedItem> item                 = new StartNode<>("item", FeedItemContents.class);
+	public static final Property<String> url                    = new StringProperty("url");
+	public static final Property<Long> enclosureLength          = new LongProperty("enclosureLength");
+	public static final Property<String> enclosureType          = new StringProperty("enclosureType");
+	public static final Property<FeedItem> item                 = new StartNode<>("item", FeedItemContents.class);
 
-    public static final View publicView = new View(FeedItemContent.class, PropertyView.Public,
+	public static final View publicView = new View(FeedItemContent.class, PropertyView.Public,
 	    type, contentType, owner, url, enclosureLength, enclosureType, item
-    );
+	);
 
-    public static final View uiView = new View(FeedItemContent.class, PropertyView.Ui,
+	public static final View uiView = new View(FeedItemContent.class, PropertyView.Ui,
 	    type, contentType, owner, extractedContent, indexedWords, url, enclosureLength, enclosureType, item
-    );
+	);
+
+	@Override
+	default void afterCreation(SecurityContext securityContext) {
+
+		try {
+			final FulltextIndexer indexer = StructrApp.getInstance(securityContext).getFulltextIndexer();
+			indexer.addToFulltextIndex(this);
+
+		} catch (FrameworkException fex) {
+
+			logger.warn("Unable to index " + this, fex);
+		}
+	}
+
+	@Export
+	@Override
+	default GraphObject getSearchContext(final String searchTerm, final int contextLength) {
+
+		final String text = getProperty(url);
+		if (text != null) {
+
+			final FulltextIndexer indexer = StructrApp.getInstance(getSecurityContext()).getFulltextIndexer();
+			return indexer.getContextObject(searchTerm, text, contextLength);
+		}
+
+		return null;
+	}
+
+	@Override
+	default InputStream getInputStream() {
+		return IOUtils.toInputStream(getProperty(url), Charset.forName("utf-8"));
+	}
 }

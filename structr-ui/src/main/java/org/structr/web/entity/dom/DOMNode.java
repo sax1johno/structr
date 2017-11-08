@@ -311,6 +311,11 @@ public interface DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, DOMNod
 		return checkName(errorBuffer);
 	}
 
+	@Override
+	default boolean isValid(final ErrorBuffer errorBuffer) {
+		return LinkedTreeNode.super.isValid(errorBuffer);
+	}
+
 	default String getIdHash() {
 		return getUuid();
 	}

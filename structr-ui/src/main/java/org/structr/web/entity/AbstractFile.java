@@ -144,7 +144,7 @@ public interface AbstractFile extends LinkedTreeNode<FileChildren, FileSiblings,
 	@Override
 	default boolean isValid(ErrorBuffer errorBuffer) {
 
-		boolean valid = true;//LinkedTreeNode.super.isValid(errorBuffer);
+		boolean valid = LinkedTreeNode.super.isValid(errorBuffer);
 
 		valid &= ValidationHelper.isValidStringNotBlank(this, AbstractFile.name, errorBuffer);
 		valid &= ValidationHelper.isValidStringMatchingRegex(this, name, "[^\\/\\x00]+", errorBuffer);

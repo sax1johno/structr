@@ -22,11 +22,13 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -345,21 +347,20 @@ public class StructrSchemaDefinition implements JsonSchema, StructrDefinition {
 		}
 
 
-		final StructrSchemaDefinition sourceSchema = new StructrSchemaDefinition(id);
-		sourceSchema.deserialize(app);
-
 		final StructrSchemaDefinition schema = new StructrSchemaDefinition(id);
 		schema.deserialize(app);
 
 		if (types != null && !types.isEmpty()) {
 
-			for (final StructrTypeDefinition t : sourceSchema.getTypes()) {
+			final Set<String> schemaTypes = new LinkedHashSet<>(schema.getTypes().stream().map(t -> t.getName()).collect(Collectors.toSet()));
 
-				final String name = t.getName();
+			for (final String toRemove : schemaTypes) {
 
-				if (!types.contains(name)) {
+				if (!types.contains(toRemove)) {
+
 					try {
-						schema.removeType(name);
+						schema.removeType(toRemove);
+
 					} catch (URISyntaxException ex) {
 						throw new FrameworkException(422, ex.getMessage());
 					}

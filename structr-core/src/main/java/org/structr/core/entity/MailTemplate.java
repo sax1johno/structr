@@ -30,11 +30,14 @@ import org.structr.core.graph.NodeInterface;
 import static org.structr.core.graph.NodeInterface.name;
 import org.structr.core.property.Property;
 import org.structr.core.property.StringProperty;
+import org.structr.schema.SchemaService;
 
 /**
  * Interface that represents a template with placeholders, to be used for sending e-mails.
  */
 public interface MailTemplate extends NodeInterface {
+
+	static class Impl { static { SchemaService.registerMixinType(MailTemplate.class); }}
 
 	public static final Property<String>  text   = new StringProperty("text").cmis().indexed().notNull().compound();
 	public static final Property<String>  locale = new StringProperty("locale").cmis().indexed().notNull().compound();

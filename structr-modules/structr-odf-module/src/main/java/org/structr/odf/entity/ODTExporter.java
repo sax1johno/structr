@@ -18,7 +18,27 @@
  */
 package org.structr.odf.entity;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.odftoolkit.simple.TextDocument;
 import org.structr.common.error.FrameworkException;
+import org.structr.core.Export;
+import org.structr.core.GraphObject;
+import org.structr.core.GraphObjectMap;
+import org.structr.core.Result;
+import org.structr.core.app.App;
+import org.structr.core.app.StructrApp;
+import org.structr.core.entity.AbstractNode;
+import org.structr.schema.SchemaService;
+import org.structr.transform.VirtualType;
+import org.structr.web.entity.File;
+import org.w3c.dom.NamedNodeMap;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
 /**
  * Reads a nodes attributes and tries to replace matching attributes in the
@@ -26,9 +46,78 @@ import org.structr.common.error.FrameworkException;
  */
 public interface ODTExporter extends ODFExporter {
 
+	static class Impl { static { SchemaService.registerMixinType(ODTExporter.class); }}
+
 	public final String ODT_FIELD_TAG_NAME        = "text:user-field-decl";
 	public final String ODT_FIELD_ATTRIBUTE_NAME  = "text:name";
 	public final String ODT_FIELD_ATTRIBUTE_VALUE = "office:string-value";
 
-	void exportAttributes(String uuid) throws FrameworkException;
+	@Export
+	default void exportAttributes(String uuid) throws FrameworkException {
+
+		File output = getProperty(resultDocument);
+		VirtualType transformation = getProperty(transformationProvider);
+
+		try {
+
+			final App app = StructrApp.getInstance();
+			final Result result = app.nodeQuery(AbstractNode.class).and(GraphObject.id, uuid).getResult();
+			final Result transformedResult = transformation.transformOutput(getSecurityContext(), AbstractNode.class, result);
+
+			Map<String, Object> nodeProperties = new HashMap<>();
+			GraphObjectMap node = (GraphObjectMap) transformedResult.get(0);
+			node.getPropertyKeys(null).forEach(
+				p -> nodeProperties.put(p.dbName(), node.getProperty(p))
+			);
+
+			TextDocument text = TextDocument.loadDocument(output.getFileOnDisk().getAbsolutePath());
+
+			NodeList nodes = text.getContentRoot().getElementsByTagName(ODT_FIELD_TAG_NAME);
+			for (int i = 0; i < nodes.getLength(); i++) {
+
+				Node currentNode = nodes.item(i);
+				NamedNodeMap attrs = currentNode.getAttributes();
+				Node fieldName = attrs.getNamedItem(ODT_FIELD_ATTRIBUTE_NAME);
+				Object nodeFieldValue = nodeProperties.get(fieldName.getNodeValue());
+				Node currentContent = attrs.getNamedItem(ODT_FIELD_ATTRIBUTE_VALUE);
+
+				if (nodeFieldValue != null) {
+					if (nodeFieldValue instanceof String[]) {
+
+						String[] arr = (String[]) nodeFieldValue;
+						List<String> list = new ArrayList<>(Arrays.asList(arr));
+
+						StringBuilder sb = new StringBuilder();
+						list.forEach(
+							s -> sb.append(s + "\n")
+						);
+
+						currentContent.setNodeValue(sb.toString());
+
+					} else if (nodeFieldValue instanceof Collection) {
+
+						Collection col = (Collection) nodeFieldValue;
+						StringBuilder sb = new StringBuilder();
+						col.forEach(
+							s -> sb.append(s + "\n")
+						);
+
+						currentContent.setNodeValue(sb.toString());
+
+					} else {
+
+						currentContent.setNodeValue(nodeFieldValue.toString());
+
+					}
+				}
+
+			}
+
+			text.save(output.getFileOnDisk().getAbsolutePath());
+			text.close();
+
+		} catch (Exception e) {
+			logger.error("Error while exporting to ODT", e);
+		}
+	}
 }

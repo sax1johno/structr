@@ -18,8 +18,15 @@
  */
 package org.structr.mqtt.entity;
 
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.structr.common.PropertyView;
+import org.structr.common.SecurityContext;
 import org.structr.common.View;
+import org.structr.common.error.ErrorBuffer;
+import org.structr.common.error.FrameworkException;
+import org.structr.core.Export;
 import static org.structr.core.GraphObject.createdBy;
 import static org.structr.core.GraphObject.createdDate;
 import static org.structr.core.GraphObject.id;
@@ -29,6 +36,7 @@ import static org.structr.core.GraphObject.visibilityEndDate;
 import static org.structr.core.GraphObject.visibilityStartDate;
 import static org.structr.core.GraphObject.visibleToAuthenticatedUsers;
 import static org.structr.core.GraphObject.visibleToPublicUsers;
+import org.structr.core.graph.ModificationQueue;
 import org.structr.core.graph.NodeInterface;
 import static org.structr.core.graph.NodeInterface.deleted;
 import static org.structr.core.graph.NodeInterface.hidden;
@@ -37,9 +45,15 @@ import static org.structr.core.graph.NodeInterface.owner;
 import org.structr.core.property.Property;
 import org.structr.core.property.StartNode;
 import org.structr.core.property.StringProperty;
+import org.structr.core.script.Scripting;
 import org.structr.mqtt.entity.relation.MQTTClientHAS_SUBSCRIBERMQTTSubscriber;
+import org.structr.rest.RestMethodResult;
+import org.structr.schema.SchemaService;
+import org.structr.schema.action.ActionContext;
 
 public interface MQTTSubscriber extends NodeInterface {
+
+	static class Impl { static { SchemaService.registerMixinType(MQTTSubscriber.class); }}
 
 	public static final Property<MQTTClient>		client			= new StartNode<>("client", MQTTClientHAS_SUBSCRIBERMQTTSubscriber.class);
 	public static final Property<String>			topic			= new StringProperty("topic");
@@ -51,4 +65,52 @@ public interface MQTTSubscriber extends NodeInterface {
 		id, name, owner, type, createdBy, deleted, hidden, createdDate, lastModifiedDate, visibleToPublicUsers, visibleToAuthenticatedUsers, visibilityStartDate, visibilityEndDate,
         client, topic, source
 	);
+
+	@Override
+	default boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
+
+		if(!StringUtils.isEmpty(getProperty(topic)) && (getProperty(client) != null) && getProperty(client).getProperty(MQTTClient.isConnected)) {
+			Map<String,Object> params = new HashMap<>();
+			params.put("topic", getProperty(topic));
+			getProperty(client).invokeMethod("subscribeTopic", params, false);
+		}
+
+		return NodeInterface.super.onCreation(securityContext, errorBuffer);
+	}
+
+	@Override
+	default boolean onModification(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
+
+		if(!StringUtils.isEmpty(getProperty(topic)) && (getProperty(client) != null) && getProperty(client).getProperty(MQTTClient.isConnected)) {
+
+			if(modificationQueue.isPropertyModified(this,topic)){
+
+				Map<String,Object> params = new HashMap<>();
+				params.put("topic", getProperty(topic));
+				getProperty(client).invokeMethod("subscribeTopic", params, false);
+			}
+		}
+
+
+		return NodeInterface.super.onModification(securityContext, errorBuffer, modificationQueue);
+	}
+
+	@Export
+	default RestMethodResult onMessage(final String topic, final String message) throws FrameworkException {
+
+		if (!StringUtils.isEmpty(getProperty(source))) {
+
+			String script = "${" + getProperty(source) + "}";
+
+			Map<String, Object> params = new HashMap<>();
+			params.put("topic", topic);
+			params.put("message", message);
+
+			ActionContext ac = new ActionContext(getSecurityContext(), params);
+			Scripting.replaceVariables(ac, this, script);
+		}
+
+		return new RestMethodResult(200);
+	}
+
 }

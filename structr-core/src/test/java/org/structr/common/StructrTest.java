@@ -249,7 +249,7 @@ public class StructrTest {
 		return null;
 	}
 
-	protected <T extends AbstractNode> List<T> createTestNodes(final Class<T> type, final int number, final long delay) throws FrameworkException {
+	protected <T extends NodeInterface> List<T> createTestNodes(final Class<T> type, final int number, final long delay) throws FrameworkException {
 
 		try (final Tx tx = app.tx()) {
 
@@ -283,17 +283,17 @@ public class StructrTest {
 		return null;
 	}
 
-	protected <T extends AbstractNode> List<T> createTestNodes(final Class<T> type, final int number) throws FrameworkException {
+	protected <T extends NodeInterface> List<T> createTestNodes(final Class<T> type, final int number) throws FrameworkException {
 
 		return createTestNodes(type, number, 0);
 
 	}
 
-	protected <T extends AbstractNode> T createTestNode(final Class<T> type) throws FrameworkException {
+	protected <T extends NodeInterface> T createTestNode(final Class<T> type) throws FrameworkException {
 		return (T) createTestNode(type, new PropertyMap());
 	}
 
-	protected <T extends AbstractNode> T createTestNode(final Class<T> type, final String name) throws FrameworkException {
+	protected <T extends NodeInterface> T createTestNode(final Class<T> type, final String name) throws FrameworkException {
 
 		final PropertyMap map = new PropertyMap();
 
@@ -302,7 +302,7 @@ public class StructrTest {
 		return (T) createTestNode(type, map);
 	}
 
-	protected <T extends AbstractNode> T createTestNode(final Class<T> type, final PropertyMap props) throws FrameworkException {
+	protected <T extends NodeInterface> T createTestNode(final Class<T> type, final PropertyMap props) throws FrameworkException {
 
 		props.put(AbstractNode.type, type.getSimpleName());
 

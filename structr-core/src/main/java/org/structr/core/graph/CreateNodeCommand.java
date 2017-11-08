@@ -286,7 +286,7 @@ public class CreateNodeCommand<T extends NodeInterface> extends NodeServiceComma
 		throw new RuntimeException("Unable to create new node.");
 	}
 
-	private Class getTypeOrGeneric(final Object typeObject) {
+	private Class getTypeOrGeneric(final Object typeObject) throws FrameworkException {
 
 		if (typeObject != null) {
 			return SchemaHelper.getEntityClassForRawType(typeObject.toString());

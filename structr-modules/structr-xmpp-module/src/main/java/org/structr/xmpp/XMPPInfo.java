@@ -18,9 +18,7 @@
  */
 package org.structr.xmpp;
 
-
 /**
- *
  *
  */
 public interface XMPPInfo {

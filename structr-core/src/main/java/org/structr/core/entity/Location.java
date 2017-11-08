@@ -22,22 +22,19 @@ import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
 import org.structr.common.View;
 import org.structr.common.error.ErrorBuffer;
-import org.structr.common.error.FrameworkException;
 import org.structr.core.entity.relationship.NodeHasLocation;
-import org.structr.core.graph.ModificationQueue;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.RelationshipInterface;
 import org.structr.core.property.DoubleProperty;
 import org.structr.core.property.Property;
-
-//~--- classes ----------------------------------------------------------------
+import org.structr.schema.SchemaService;
 
 /**
  * The Location entity.
- *
- *
  */
-public class Location extends AbstractNode {
+public interface Location extends NodeInterface {
+
+	static class Impl { static { SchemaService.registerMixinType(Location.class); }}
 
 	public static final Property<Double> latitude  = new DoubleProperty("latitude").cmis().passivelyIndexed();	// these need to be indexed at the end
 	public static final Property<Double> longitude = new DoubleProperty("longitude").cmis().passivelyIndexed();	// of the transaction so the spatial
@@ -52,30 +49,21 @@ public class Location extends AbstractNode {
 	);
 
 	@Override
-	public boolean onCreation(SecurityContext securityContext, ErrorBuffer errorBuffer) throws FrameworkException {
-		return isValid(errorBuffer);
-	}
-
-	@Override
-	public boolean onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
-		return isValid(errorBuffer);
-	}
-
-	@Override
-	public void afterCreation(SecurityContext securityContext) {
+	default void afterCreation(SecurityContext securityContext) {
+		NodeInterface.super.afterCreation(securityContext);
 		notifyLocatables();
 	}
 
 	@Override
-	public void afterModification(SecurityContext securityContext) {
+	default void afterModification(SecurityContext securityContext) {
+		NodeInterface.super.afterModification(securityContext);
 		notifyLocatables();
-
 	}
 
 	@Override
-	public boolean isValid(ErrorBuffer errorBuffer) {
+	default boolean isValid(ErrorBuffer errorBuffer) {
 
-		boolean valid = super.isValid(errorBuffer);
+		boolean valid = NodeInterface.super.isValid(errorBuffer);
 
 		valid &= notifyLocatables();
 
@@ -83,7 +71,7 @@ public class Location extends AbstractNode {
 
 	}
 
-	private boolean notifyLocatables() {
+	default boolean notifyLocatables() {
 
 		// FIXME: LocationRelationship has a direction. but it is ignored here
 

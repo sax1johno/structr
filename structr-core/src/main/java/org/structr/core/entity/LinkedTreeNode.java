@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.structr.api.util.Iterables;
+import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
@@ -39,6 +40,11 @@ import org.structr.core.property.PropertyMap;
 public interface LinkedTreeNode<R extends AbstractChildren<T, T>, S extends AbstractListSiblings<T, T>, T extends LinkedTreeNode> extends LinkedListNode<S, T> {
 
 	public Class<R> getChildLinkType();
+
+	@Override
+	default boolean isValid(final ErrorBuffer errorBuffer) {
+		return LinkedListNode.super.isValid(errorBuffer);
+	}
 
 	default public T treeGetParent() {
 

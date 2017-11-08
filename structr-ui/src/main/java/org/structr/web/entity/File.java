@@ -250,6 +250,11 @@ public interface File extends AbstractFile, Indexable, Linkable, JavaScriptSourc
 	}
 
 	@Override
+	default public boolean isValid(final ErrorBuffer errorBuffer) {
+		return AbstractFile.super.isValid(errorBuffer);
+	}
+
+	@Override
 	default String getPath() {
 		return FileHelper.getFolderPath(this);
 	}

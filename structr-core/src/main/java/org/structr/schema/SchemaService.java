@@ -28,7 +28,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -51,6 +50,7 @@ import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.SchemaNode;
 import org.structr.core.entity.SchemaRelationshipNode;
+import org.structr.core.graph.NodeAttribute;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.Tx;
 import org.structr.core.graph.search.SearchCommand;
@@ -87,11 +87,11 @@ public class SchemaService implements Service {
 	}
 
 	public static void registerMixinType(final Class<? extends NodeInterface> iface) {
-		registerMixinType(iface.getSimpleName(), AbstractNode.class, iface);
+		registerMixinType(iface.getSimpleName(), (Class)null, iface);
 	}
 
 	public static void registerMixinType(final String type, final Class<? extends AbstractNode> baseClass, final Class... interfaces) {
-		registerMixinType(type, baseClass.getName(), interfaces);
+		registerMixinType(type, baseClass != null ?  baseClass.getName() : null, interfaces);
 	}
 
 	public static void registerMixinType(final String type, final String baseClass, final Class... interfaces) {
@@ -115,14 +115,12 @@ public class SchemaService implements Service {
 				try (final Tx tx = StructrApp.getInstance().tx()) {
 
 					// collect auto-generated schema nodes
-					final List<SchemaInfo> schemaInfoList = SchemaService.ensureBuiltinTypesExist();
+					SchemaService.ensureBuiltinTypesExist();
 
 					// add schema nodes from database
-					schemaInfoList.addAll(StructrApp.getInstance().nodeQuery(SchemaNode.class).getAsList());
+					for (final SchemaNode schemaInfo : StructrApp.getInstance().nodeQuery(SchemaNode.class).getAsList()) {
 
-					for (final SchemaInfo schemaInfo : schemaInfoList) {
-
-						nodeExtender.addClass(schemaInfo.getName(), SchemaHelper.getSource(schemaInfo, errorBuffer));
+						nodeExtender.addClass(schemaInfo.getClassName(), SchemaHelper.getSource(schemaInfo, errorBuffer));
 
 						dynamicViews.addAll(schemaInfo.getDynamicViews());
 					}
@@ -196,6 +194,8 @@ public class SchemaService implements Service {
 
 				} catch (Throwable t) {
 
+					t.printStackTrace();
+
 					logger.error("Unable to compile dynamic schema: {}", t.getMessage());
 					success = false;
 				}
@@ -229,10 +229,9 @@ public class SchemaService implements Service {
 		return true;
 	}
 
-	public static List<SchemaInfo> ensureBuiltinTypesExist() throws FrameworkException {
+	public static void ensureBuiltinTypesExist() throws FrameworkException {
 
-		final List<SchemaInfo> list = new LinkedList<>();
-		final App app               = StructrApp.getInstance();
+		final App app = StructrApp.getInstance();
 
 		for (final Entry<String, VirtualSchemaInfo> entry : mixinMap.entrySet()) {
 
@@ -242,13 +241,14 @@ public class SchemaService implements Service {
 			SchemaNode schemaNode = app.nodeQuery(SchemaNode.class).andName(typeName).getFirst();
 			if (schemaNode == null) {
 
-				// if no schema node exists (internal type is not overridden), add
-				// virtual schema info to list of types so it will be generated
-				list.add(type);
+				app.create(SchemaNode.class,
+					new NodeAttribute<>(SchemaNode.name, typeName),
+					new NodeAttribute<>(SchemaNode.extendsClass, type.baseClass),
+					new NodeAttribute<>(SchemaNode.implementsInterfaces, type.getImplementedInterfaces()),
+					new NodeAttribute<>(SchemaNode.isBuiltinType, true)
+				);
 			}
 		}
-
-		return list;
 	}
 
 	@Override
@@ -456,9 +456,8 @@ public class SchemaService implements Service {
 	}
 
 	// ----- nested classes -----
-	private static class VirtualSchemaInfo implements SchemaInfo {
+	private static class VirtualSchemaInfo {
 
-		private final Set<String> views = new LinkedHashSet<>();
 		private String name             = null;
 		private String baseClass        = null;
 		private String interfaces       = null;
@@ -467,37 +466,23 @@ public class SchemaService implements Service {
 
 			this.name       = name;
 			this.baseClass  = baseClass;
-			this.interfaces = StringUtils.join(Arrays.asList(interfaces).stream().map(i -> i.getSimpleName()).iterator(), ", ");
+			this.interfaces = StringUtils.join(Arrays.asList(interfaces).stream().map(i -> i.getName()).iterator(), ", ");
 		}
 
-		@Override
-		public String getName() {
+		public String getClassName() {
 			return name;
 		}
 
-		@Override
 		public String getBaseClass() {
 			return baseClass;
 		}
 
-		@Override
 		public String getImplementedInterfaces() {
 			return interfaces;
 		}
 
-		@Override
 		public SchemaNode getSchemaNode() {
 			return null;
-		}
-
-		@Override
-		public void addDynamicView(final String dynamicView) {
-			this.views.add(dynamicView);
-		}
-
-		@Override
-		public Set<String> getDynamicViews() {
-			return views;
 		}
 	}
 }

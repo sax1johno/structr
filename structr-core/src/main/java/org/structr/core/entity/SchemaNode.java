@@ -51,13 +51,12 @@ import org.structr.core.property.StartNode;
 import org.structr.core.property.StartNodes;
 import org.structr.core.property.StringProperty;
 import org.structr.schema.SchemaHelper;
-import org.structr.schema.SchemaInfo;
 
 /**
  *
  *
  */
-public class SchemaNode extends AbstractSchemaNode implements SchemaInfo {
+public class SchemaNode extends AbstractSchemaNode {
 
 	private static final Logger logger                   = LoggerFactory.getLogger(SchemaNode.class.getName());
 
@@ -91,8 +90,6 @@ public class SchemaNode extends AbstractSchemaNode implements SchemaInfo {
 	public static final View exportView = new View(SchemaNode.class, "export",
 		extendsClass, implementsInterfaces, defaultSortKey, defaultSortOrder, isBuiltinType, hierarchyLevel, relCount
 	);
-
-	private final Set<String> dynamicViews = new LinkedHashSet<>();
 
 	@Override
 	public boolean onCreation(SecurityContext securityContext, ErrorBuffer errorBuffer) throws FrameworkException {
@@ -143,7 +140,7 @@ public class SchemaNode extends AbstractSchemaNode implements SchemaInfo {
 		boolean valid = super.isValid(errorBuffer);
 
 		valid &= ValidationHelper.isValidUniqueProperty(this, name, errorBuffer);
-		valid &= ValidationHelper.isValidStringMatchingRegex(this, name, "[A-Z][a-zA-Z0-9_]+", errorBuffer);
+		valid &= ValidationHelper.isValidStringMatchingRegex(this, name, "[A-Z][a-zA-Z0-9_]*", errorBuffer);
 
 		return valid;
 	}
@@ -272,32 +269,6 @@ public class SchemaNode extends AbstractSchemaNode implements SchemaInfo {
 		}
 
 		return null;
-	}
-
-	// ----- interface SchemaInfo -----
-	@Override
-	public String getBaseClass() {
-		return getProperty(extendsClass);
-	}
-
-	@Override
-	public String getImplementedInterfaces() {
-		return getProperty(implementsInterfaces);
-	}
-
-	@Override
-	public SchemaNode getSchemaNode() {
-		return this;
-	}
-
-	@Override
-	public void addDynamicView(final String view) {
-		dynamicViews.add(view);
-	}
-
-	@Override
-	public Set<String> getDynamicViews() {
-		return dynamicViews;
 	}
 
 	// ----- private methods -----

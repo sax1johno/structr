@@ -23,11 +23,13 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.lang3.ArrayUtils;
+import org.structr.api.Predicate;
 import org.structr.common.AccessControllable;
 import org.structr.common.ValidationHelper;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.common.error.SemanticErrorToken;
+import org.structr.core.GraphObject;
 import org.structr.core.auth.HashHelper;
 import org.structr.core.entity.relationship.Groups;
 import org.structr.core.entity.relationship.PrincipalOwnsNode;
@@ -38,6 +40,7 @@ import org.structr.core.property.EndNodes;
 import org.structr.core.property.LowercaseStringProperty;
 import org.structr.core.property.PasswordProperty;
 import org.structr.core.property.Property;
+import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.core.property.StringProperty;
 
@@ -62,6 +65,26 @@ public interface Principal extends NodeInterface, AccessControllable {
 	public static final Property<String> proxyUrl                = new StringProperty("proxyUrl");
 	public static final Property<String> proxyUsername           = new StringProperty("proxyUsername");
 	public static final Property<String> proxyPassword           = new StringProperty("proxyPassword");
+
+	/**
+	 * Intentionally return a special value indicating that the real value is not being disclosed.
+	 *
+	 * @param key
+	 * @param predicate
+	 * @return null for password
+	 */
+	@Override
+	default <T> T getProperty(final PropertyKey<T> key, final Predicate<GraphObject> predicate) {
+
+		if (password.equals(key) || salt.equals(key)) {
+
+			return (T) HIDDEN;
+
+		} else {
+
+			return NodeInterface.super.getProperty(key, predicate);
+		}
+	}
 
 	default void addSessionId(final String sessionId) {
 

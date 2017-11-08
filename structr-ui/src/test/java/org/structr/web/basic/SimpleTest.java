@@ -998,6 +998,31 @@ public class SimpleTest extends StructrUiTest {
 
 	}
 
+	@Test
+	public void testInheritedValidation3() {
+
+		try (final Tx tx = app.tx()) {
+
+			// Create schema node type that extends existing Group interface
+			// but adds a validated string property to test the isValid()
+			// method.
+			app.create(SchemaNode.class,
+				new NodeAttribute<>(SchemaNode.name, "InheritanceTest"),
+				new NodeAttribute<>(SchemaNode.implementsInterfaces,
+					"org.structr.core.entity.Principal," +
+					"org.structr.core.entity.Location," +
+					"org.structr.core.entity.File"
+				)
+			);
+
+			tx.success();
+
+		} catch (FrameworkException fex) {
+			fex.printStackTrace();
+			fail("Unexpected exception.");
+		}
+	}
+
 	// ----- private methods -----
 	private void check() {
 
