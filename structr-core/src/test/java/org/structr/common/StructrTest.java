@@ -137,8 +137,6 @@ public class StructrTest {
 		Settings.SuperUserName.setValue("superadmin");
 		Settings.SuperUserPassword.setValue("sehrgeheim");
 
-		Settings.LogSchemaOutput.setValue(true);
-
 		final Services services = Services.getInstance();
 
 		// wait for service layer to be initialized

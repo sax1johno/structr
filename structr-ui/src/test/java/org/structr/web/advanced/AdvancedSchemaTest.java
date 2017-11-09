@@ -271,7 +271,8 @@ public class AdvancedSchemaTest extends FrontendTest {
 			final PropertyMap testFileProperties = new PropertyMap();
 			testFileProperties.put(SchemaProperty.name, "testFile");
 			testFileProperties.put(SchemaProperty.propertyType, "String");
-			testFileProperties.put(SchemaProperty.schemaNode, fileNodeDef);
+			testFileProperties.put(SchemaProperty.schemaNode, fileNodeDef)
+				;
 			testFileProperty.setProperties(testFileProperty.getSecurityContext(), testFileProperties);
 
 			tx.success();
@@ -325,10 +326,10 @@ public class AdvancedSchemaTest extends FrontendTest {
 					.statusCode(200)
 
 					.body("result",	                   hasSize(45))
-					.body("result[43].jsonName",       equalTo("testSubFile"))
-					.body("result[43].declaringClass", equalTo("SubFile"))
-					.body("result[44].jsonName",       equalTo("testFile"))
-					.body("result[44].declaringClass", equalTo("_FileHelper"))
+					.body("result[44].jsonName",       equalTo("testSubFile"))
+					.body("result[44].declaringClass", equalTo("SubFile"))
+					.body("result[10].jsonName",       equalTo("testFile"))
+					.body("result[10].declaringClass", equalTo("File"))
 
 				.when()
 					.get("/_schema/SubFile/ui");

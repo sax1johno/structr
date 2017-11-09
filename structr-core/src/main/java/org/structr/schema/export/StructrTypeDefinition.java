@@ -456,19 +456,22 @@ public abstract class StructrTypeDefinition<T extends AbstractSchemaNode> implem
 			serializedForm.put(JsonSchema.KEY_METHODS, methods);
 		}
 
-		final URI ext = getExtends();
+		final Set<String> baseTypesAndInterfaces = new TreeSet<>();
+		final URI ext                            = getExtends();
+
 		if (ext != null) {
-			serializedForm.put(JsonSchema.KEY_EXTENDS, root.toJsonPointer(ext));
+			baseTypesAndInterfaces.add(root.toJsonPointer(ext));
 		}
 
 		if (!implementedInterfaces.isEmpty()) {
 
-			final Set<String> impl = new TreeSet<>();
 			for (final URI uri : implementedInterfaces) {
-				impl.add(root.toJsonPointer(uri));
+				baseTypesAndInterfaces.add(root.toJsonPointer(uri));
 			}
+		}
 
-			serializedForm.put(JsonSchema.KEY_IMPLEMENTS, impl);
+		if (!baseTypesAndInterfaces.isEmpty()) {
+			serializedForm.put(JsonSchema.KEY_EXTENDS, baseTypesAndInterfaces);
 		}
 
 		return serializedForm;
@@ -478,26 +481,31 @@ public abstract class StructrTypeDefinition<T extends AbstractSchemaNode> implem
 
 		if (source.containsKey(JsonSchema.KEY_EXTENDS)) {
 
-			String jsonPointerFormat = (String)source.get(JsonSchema.KEY_EXTENDS);
-			if (jsonPointerFormat.startsWith("#")) {
+			final Object extendsValue = source.get(JsonSchema.KEY_EXTENDS);
+			if (extendsValue instanceof String) {
 
-				jsonPointerFormat = jsonPointerFormat.substring(1);
-			}
-
-			this.baseTypeReference = root.getId().relativize(URI.create(jsonPointerFormat));
-		}
-
-		if (source.containsKey(JsonSchema.KEY_IMPLEMENTS)) {
-
-			final List<String> impl = (List<String>)source.get(JsonSchema.KEY_IMPLEMENTS);
-			for (String jsonPointerFormat : impl) {
-			
+				// "old" schema
+				String jsonPointerFormat = (String)extendsValue;
 				if (jsonPointerFormat.startsWith("#")) {
 
 					jsonPointerFormat = jsonPointerFormat.substring(1);
 				}
 
-				this.implementedInterfaces.add(root.getId().relativize(URI.create(jsonPointerFormat)));
+				this.baseTypeReference = root.getId().relativize(URI.create(jsonPointerFormat));
+
+			} else if (extendsValue instanceof List) {
+
+				// "new" schema
+				final List<String> impl = (List<String>)extendsValue;
+				for (String jsonPointerFormat : impl) {
+
+					if (jsonPointerFormat.startsWith("#")) {
+
+						jsonPointerFormat = jsonPointerFormat.substring(1);
+					}
+
+					this.implementedInterfaces.add(root.getId().relativize(URI.create(jsonPointerFormat)));
+				}
 			}
 		}
 	}
@@ -666,7 +674,7 @@ public abstract class StructrTypeDefinition<T extends AbstractSchemaNode> implem
 		}
 
 		// implements
-		if (implementedInterfaces.isEmpty()) {
+		if (!implementedInterfaces.isEmpty()) {
 
 			final StringBuilder list = new StringBuilder();
 
@@ -680,6 +688,7 @@ public abstract class StructrTypeDefinition<T extends AbstractSchemaNode> implem
 					final String superclassName = "org.structr.dynamic." + jsonType.getName();
 
 					list.append(superclassName);
+					list.append(", ");
 
 				} else {
 
@@ -687,6 +696,7 @@ public abstract class StructrTypeDefinition<T extends AbstractSchemaNode> implem
 					if (superclass != null) {
 
 						list.append(superclass.getName());
+						list.append(", ");
 					}
 				}
 			}

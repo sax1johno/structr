@@ -49,7 +49,6 @@ import org.structr.web.property.ThumbnailProperty;
  */
 public interface Image extends org.structr.web.entity.File {
 
-
 	public static final Property<Integer> height                  = new IntProperty("height").cmis().indexed();
 	public static final Property<Integer> width                   = new IntProperty("width").cmis().indexed();
 

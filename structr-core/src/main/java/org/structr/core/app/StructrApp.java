@@ -499,6 +499,19 @@ public class StructrApp implements App {
 
 		if (schemaIdMap.isEmpty()) {
 
+			// add Structr interfaces here
+			for (final Class type :StructrApp.getConfiguration().getInterfaces().values()) {
+
+				// only register node types
+				if (NodeInterface.class.isAssignableFrom(type)) {
+
+					registerType(type);
+				}
+			}
+
+
+			/*
+
 			for (final Class type : StructrApp.getConfiguration().getNodeEntities().values()) {
 				registerType(type);
 			}
@@ -506,6 +519,7 @@ public class StructrApp implements App {
 			for (final Class type : StructrApp.getConfiguration().getRelationshipEntities().values()) {
 				registerType(type);
 			}
+			*/
 		}
 	}
 

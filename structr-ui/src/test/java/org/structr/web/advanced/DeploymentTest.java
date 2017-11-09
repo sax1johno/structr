@@ -34,6 +34,7 @@ import static org.junit.Assert.fail;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.config.Settings;
 import org.structr.common.AccessMode;
 import org.structr.common.Permission;
 import org.structr.common.PropertyView;
@@ -1716,6 +1717,8 @@ public class DeploymentTest extends StructrUiTest {
 	@Test
 	public void test36BuiltInTypesWithProperties() {
 
+		Settings.LogSchemaOutput.setValue(true);
+
 		// setup schema
 		try (final Tx tx = app.tx()) {
 
@@ -1754,13 +1757,26 @@ public class DeploymentTest extends StructrUiTest {
 			folder.setProperty(Folder.includeInFrontendExport, true);
 
 			// create test file with custom attributes
-			app.create(File.class,
+			final File file = app.create(File.class,
 				new NodeAttribute<>(File.name, "test.txt"),
 				new NodeAttribute<>(File.parent, folder),
 				new NodeAttribute<>(File.contentType, "text/plain"),
 				new NodeAttribute<>(StructrApp.getConfiguration().getPropertyKeyForDatabaseName(File.class, "test1"), 123),
 				new NodeAttribute<>(StructrApp.getConfiguration().getPropertyKeyForDatabaseName(File.class, "test2"), "testString")
 			);
+
+			/*
+			// write data, create file and directories
+			try (final OutputStream is = file.getOutputStream()){
+
+				is.write("Test".getBytes("utf-8"));
+				is.flush();
+
+			} catch (IOException ioex) {
+				ioex.printStackTrace();
+				fail("Unexpected exception.");
+			}
+			*/
 
 			tx.success();
 
@@ -1857,9 +1873,6 @@ public class DeploymentTest extends StructrUiTest {
 		doImportExportRoundtrip(deleteTestDirectory, cleanDatabase, null);
 
 		final String roundtripHash = calculateHash();
-
-			System.out.println("Expected: " + sourceHash);
-			System.out.println("Actual:   " + roundtripHash);
 
 		if (!sourceHash.equals(roundtripHash)) {
 

@@ -53,6 +53,7 @@ import org.structr.common.View;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.common.error.InvalidPropertySchemaToken;
+import org.structr.common.error.UnknownTypeToken;
 import org.structr.core.Export;
 import org.structr.core.GraphObject;
 import org.structr.core.GraphObjectMap;
@@ -651,16 +652,35 @@ public class SchemaHelper {
 		SchemaHelper.formatSaveActions(schemaNode, src, saveActions, implementedInterfaces);
 
 		// after-Methods
-		src.append("\n\t@Override\n\tpublic void afterCreation(final SecurityContext securityContext) {\n\t}\n\n");
-		src.append("\t@Override\n\tpublic void afterModification(final SecurityContext securityContext) {\n\t}\n\n");
-		src.append("\t@Override\n\tpublic void afterDeletion(final SecurityContext securityContext, final org.structr.core.property.PropertyMap properties) {\n\t}\n\n");
+		src.append("\n\t@Override\n\tpublic void afterCreation(final SecurityContext securityContext) {\n\n");
+		for (final Class iface : implementedInterfaces) {
+			if (hasMethod(iface, "afterCreation", SecurityContext.class)) {
+				src.append("\t\t").append(iface.getName()).append(".super.afterCreation(securityContext);\n");
+			}
+		}
+		src.append("\n\t}\n\n");
+
+		src.append("\t@Override\n\tpublic void afterModification(final SecurityContext securityContext) {\n\n");
+		for (final Class iface : implementedInterfaces) {
+			if (hasMethod(iface, "afterModification", SecurityContext.class)) {
+				src.append("\t\t").append(iface.getName()).append(".super.afterModification(securityContext);\n");
+			}
+		}
+		src.append("\n\t}\n\n");
+
+		src.append("\t@Override\n\tpublic void afterDeletion(final SecurityContext securityContext, final org.structr.core.property.PropertyMap properties) {\n\n");
+		for (final Class iface : implementedInterfaces) {
+			if (hasMethod(iface, "afterDeletion", SecurityContext.class, PropertyMap.class)) {
+				src.append("\t\t").append(iface.getName()).append(".super.afterDeletion(securityContext, properties);\n");
+			}
+		}
+		src.append("\n\t}\n\n");
 
 		// insert dynamic code here
 		src.append(mixinCodeBuffer);
 
 		// insert source code from module
 		for (final StructrModule module : modules) {
-
 			module.insertSourceCode(schemaNode, src);
 		}
 
@@ -1139,7 +1159,7 @@ public class SchemaHelper {
 
 					} else {
 
-						throw new FrameworkException(422, "Unknown type " + type);
+						throw new FrameworkException(422, "Unknown type "+ trimmed, new UnknownTypeToken(trimmed));
 					}
 				}
 			}

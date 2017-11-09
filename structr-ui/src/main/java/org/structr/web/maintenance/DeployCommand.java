@@ -712,6 +712,7 @@ public class DeployCommand extends NodeServiceCommand implements MaintenanceComm
 				Files.copy(src, targetPath, StandardCopyOption.REPLACE_EXISTING);
 
 			} catch (IOException ioex) {
+				ioex.printStackTrace();
 				logger.warn("Unable to write file {}: {}", targetPath.toString(), ioex.getMessage());
 			}
 		}

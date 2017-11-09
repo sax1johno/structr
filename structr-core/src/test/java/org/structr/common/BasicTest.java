@@ -1795,7 +1795,6 @@ public class BasicTest extends StructrTest {
 			logger.warn("", fex);
 			fail("Unexpected exception.");
 		}
-
 	}
 
 	// ----- private methods -----

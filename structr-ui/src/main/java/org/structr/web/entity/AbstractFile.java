@@ -31,7 +31,6 @@ import org.structr.common.error.UniqueToken;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.LinkedTreeNode;
 import org.structr.core.graph.ModificationQueue;
-import static org.structr.core.graph.NodeInterface.name;
 import org.structr.core.property.BooleanProperty;
 import org.structr.core.property.CollectionIdProperty;
 import org.structr.core.property.EndNode;
@@ -47,8 +46,6 @@ import org.structr.web.property.PathProperty;
 
 /**
  * Base class for filesystem objects in structr.
- *
- *
  */
 public interface AbstractFile extends LinkedTreeNode<FileChildren, FileSiblings, AbstractFile> {
 

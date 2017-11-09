@@ -32,7 +32,7 @@ public class ImageMixin extends FileMixin implements Image {
 
 	static {
 
-		SchemaService.registerMixinType("Image", "org.structr.dynamic.File", Image.class);
+		SchemaService.registerMixinType(Image.class);
 	}
 
 	// ----- BEGIN Structr Mixin -----
