@@ -291,9 +291,7 @@ public interface DOMElement extends DOMNode, Element, NamedNodeMap, NonIndexed {
 					String key = attribute.jsonName().substring(PropertyView.Html.length());
 
 					out.append(" ").append(key).append("=\"").append(value).append("\"");
-
 				}
-
 			}
 
 			// include arbitrary data-* attributes
@@ -561,8 +559,6 @@ public interface DOMElement extends DOMNode, Element, NamedNodeMap, NonIndexed {
 
 		return htmlProperty;
 	}
-
-	// ----- private methods -----
 
 	// ----- interface org.w3c.dom.Element -----
 	@Override

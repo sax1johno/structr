@@ -18,17 +18,14 @@
  */
 package org.structr.web.entity;
 
+import org.structr.core.entity.AbstractNode;
 import org.structr.core.property.Property;
 import org.structr.web.property.ThumbnailProperty;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
- * Image with a 200x100 thumbnail
- *
- *
+ * Image with a 200x100 thumbnail.
  */
-public class TestImage extends ImageMixin {
+public class TestImage extends AbstractNode implements Image {
 
 	public static final Property<Image> thumbnail = new ThumbnailProperty("thumbnail").format("200, 100, false");
 }

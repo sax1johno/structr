@@ -42,12 +42,15 @@ import org.structr.core.property.Property;
 import org.structr.core.property.PropertyMap;
 import org.structr.core.property.StartNode;
 import org.structr.files.cmis.config.StructrFolderActions;
+import org.structr.schema.SchemaService;
 import org.structr.web.entity.relation.Files;
 import org.structr.web.entity.relation.Folders;
 import org.structr.web.entity.relation.Images;
 import org.structr.web.entity.relation.UserHomeDir;
 
 public interface Folder extends AbstractFile, CMISInfo, CMISFolderInfo {
+
+	static class Impl { static { SchemaService.registerMixinType(Folder.class); }}
 
 	public static final Property<List<Folder>>   folders                 = new EndNodes<>("folders", Folders.class, new PropertySetNotion(id, name));
 	public static final Property<List<File>> files                       = new EndNodes<>("files", Files.class, new PropertySetNotion(id, name));
@@ -89,6 +92,11 @@ public interface Folder extends AbstractFile, CMISInfo, CMISFolderInfo {
 		}
 
 		return false;
+	}
+
+	@Override
+	default boolean isValid(final ErrorBuffer errorBuffer) {
+		return AbstractFile.super.isValid(errorBuffer);
 	}
 
 	// ----- CMIS support -----

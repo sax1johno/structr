@@ -653,6 +653,8 @@ public class SchemaHelper {
 
 		// after-Methods
 		src.append("\n\t@Override\n\tpublic void afterCreation(final SecurityContext securityContext) {\n\n");
+		src.append("\t\tsuper.afterCreation(securityContext);\n");
+
 		for (final Class iface : implementedInterfaces) {
 			if (hasMethod(iface, "afterCreation", SecurityContext.class)) {
 				src.append("\t\t").append(iface.getName()).append(".super.afterCreation(securityContext);\n");
@@ -661,6 +663,8 @@ public class SchemaHelper {
 		src.append("\n\t}\n\n");
 
 		src.append("\t@Override\n\tpublic void afterModification(final SecurityContext securityContext) {\n\n");
+		src.append("\t\tsuper.afterModification(securityContext);\n");
+
 		for (final Class iface : implementedInterfaces) {
 			if (hasMethod(iface, "afterModification", SecurityContext.class)) {
 				src.append("\t\t").append(iface.getName()).append(".super.afterModification(securityContext);\n");
@@ -669,6 +673,8 @@ public class SchemaHelper {
 		src.append("\n\t}\n\n");
 
 		src.append("\t@Override\n\tpublic void afterDeletion(final SecurityContext securityContext, final org.structr.core.property.PropertyMap properties) {\n\n");
+		src.append("\t\tsuper.afterDeletion(securityContext, properties);\n");
+
 		for (final Class iface : implementedInterfaces) {
 			if (hasMethod(iface, "afterDeletion", SecurityContext.class, PropertyMap.class)) {
 				src.append("\t\t").append(iface.getName()).append(".super.afterDeletion(securityContext, properties);\n");
@@ -869,32 +875,14 @@ public class SchemaHelper {
 
 					for (final String propertyName : nonGraphProperties.split("[, ]+")) {
 
-						final PropertyKey property  = config.getPropertyKeyForJSONName(superClass, propertyName, false);
-						String extendedPropertyName = propertyName;
+						if (SchemaHelper.isDynamic(entity.getClassName(), propertyName)) {
 
-						if (property != null) {
+							view.add(propertyName + "Property");
 
-							// property exists in superclass
-							if (property.isDynamic()) {
-								extendedPropertyName = extendedPropertyName + "Property";
-							}
+						} else {
 
-						} else if (entity instanceof AbstractSchemaNode) {
-
-							// try to find SchemaProperty
-							final SchemaProperty schemaProperty = StructrApp.getInstance().nodeQuery(SchemaProperty.class).and(SchemaProperty.schemaNode, (AbstractSchemaNode)entity).andName(propertyName).getFirst();
-							if (schemaProperty != null) {
-
-								extendedPropertyName = extendedPropertyName + "Property";
-
-							} else if (entity instanceof SchemaNode && hasRelationshipNode((SchemaNode)entity, propertyName)) {
-
-								extendedPropertyName = extendedPropertyName + "Property";
-
-							}
+							view.add(propertyName);
 						}
-
-						view.add(extendedPropertyName);
 					}
 				}
 
@@ -1631,6 +1619,56 @@ public class SchemaHelper {
 			.getFirst() != null) {
 
 			return true;
+		}
+
+		return false;
+	}
+
+	private static boolean isDynamic(final String typeName, final String propertyName) throws FrameworkException {
+
+		final ConfigurationProvider config = StructrApp.getConfiguration();
+		final Class type                   = config.getNodeEntityClass(typeName);
+
+		if (type != null) {
+
+			final PropertyKey property = config.getPropertyKeyForJSONName(type, propertyName, false);
+			if (property != null && property.isDynamic()) {
+
+				return true;
+			}
+
+		} else if (hasSchemaProperty(typeName, propertyName)) {
+
+			return true;
+		}
+
+		return false;
+	}
+
+	private static boolean hasSchemaProperty(final String typeName, final String propertyName) throws FrameworkException {
+
+		final App app        = StructrApp.getInstance();
+		String localTypeName = typeName;
+
+		while (StringUtils.isNotBlank(localTypeName) && !AbstractNode.class.getSimpleName().equals(localTypeName)) {
+
+			final SchemaNode schemaNode = app.nodeQuery(SchemaNode.class).andName(localTypeName).getFirst();
+			if (schemaNode != null) {
+
+				final SchemaProperty schemaProperty = app.nodeQuery(SchemaProperty.class).and(SchemaProperty.schemaNode, schemaNode).andName(propertyName).getFirst();
+				if (schemaProperty != null || hasRelationshipNode(schemaNode, propertyName)) {
+
+					return true;
+
+				} else {
+
+					localTypeName = schemaNode.getProperty(SchemaNode.extendsClass);
+					if (localTypeName != null) {
+
+						localTypeName = localTypeName.substring(localTypeName.lastIndexOf(".") + 1);
+					}
+				}
+			}
 		}
 
 		return false;

@@ -18,6 +18,7 @@
  */
 package org.structr.web.basic;
 
+import org.junit.Assert;
 import org.structr.web.StructrUiTest;
 import static org.junit.Assert.fail;
 import org.junit.Test;
@@ -27,6 +28,9 @@ import org.structr.core.entity.SchemaNode;
 import org.structr.core.graph.NodeAttribute;
 import org.structr.core.graph.Tx;
 import org.structr.core.property.StringProperty;
+import org.structr.schema.export.StructrSchema;
+import org.structr.schema.json.JsonSchema;
+import org.structr.schema.json.JsonType;
 
 
 public class SchemaTest extends StructrUiTest {
@@ -179,5 +183,71 @@ public class SchemaTest extends StructrUiTest {
 			fex.printStackTrace();
 			fail("Unexpected exception.");
 		}
+	}
+
+	@Test
+	public void testMultiLevelInheritance() {
+
+		String source = null;
+		String target = null;
+
+		try (final Tx tx = app.tx()) {
+
+			final JsonSchema schema = StructrSchema.createFromDatabase(app);
+			final JsonType type0    = schema.addType("Type0");
+			final JsonType type1    = schema.addType("Type1").setExtends(type0);
+			final JsonType type2    = schema.addType("Type2").setExtends(type1);
+			final JsonType type3    = schema.addType("Type3").setExtends(type2);
+
+			type0.addStringProperty("type0", "ui");
+			type1.addStringProperty("type1", "ui");
+			type2.addStringProperty("type2", "ui");
+			type3.addStringProperty("type3", "ui");
+
+			// add inherited properties to local view
+			type3.addViewProperty("public", "type0");
+			type3.addViewProperty("public", "type1");
+			type3.addViewProperty("public", "type2");
+			type3.addViewProperty("public", "type3");
+
+			source = schema.toString();
+
+			tx.success();
+
+		} catch (Throwable t) {
+			t.printStackTrace();
+			fail("Unexpected exception.");
+		}
+
+		try (final Tx tx = app.tx()) {
+
+			final JsonSchema schema = StructrSchema.createFromSource(source);
+			StructrSchema.extendDatabaseSchema(app, schema);
+
+			tx.success();
+
+		} catch (Throwable t) {
+			t.printStackTrace();
+			fail("Unexpected exception.");
+		}
+
+		try (final Tx tx = app.tx()) {
+
+			final JsonSchema schema = StructrSchema.createFromDatabase(app);
+
+			target = schema.toString();
+
+			tx.success();
+
+		} catch (Throwable t) {
+			t.printStackTrace();
+			fail("Unexpected exception.");
+		}
+
+		System.out.println(source);
+		System.out.println("####################################################");
+		System.out.println(target);
+
+		Assert.assertEquals(source, target);
 	}
 }

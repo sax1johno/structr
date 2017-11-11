@@ -81,6 +81,7 @@ import org.structr.core.property.StringProperty;
 import org.structr.core.script.Scripting;
 import org.structr.files.cmis.config.StructrFileActions;
 import org.structr.rest.common.XMLStructureAnalyzer;
+import org.structr.schema.SchemaService;
 import org.structr.schema.action.ActionContext;
 import org.structr.schema.action.Function;
 import org.structr.schema.action.JavaScriptSource;
@@ -98,6 +99,7 @@ import org.structr.web.property.FileDataProperty;
  */
 public interface File extends AbstractFile, Indexable, Linkable, JavaScriptSource, CMISInfo, CMISDocumentInfo, Favoritable {
 
+	static class Impl { static { SchemaService.registerMixinType(File.class); }}
 
 	public static final Property<String> relativeFilePath                        = new StringProperty("relativeFilePath").systemInternal();
 	public static final Property<Long> size                                      = new LongProperty("size").indexed().systemInternal();

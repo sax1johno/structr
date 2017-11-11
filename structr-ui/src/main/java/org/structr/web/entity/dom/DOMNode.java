@@ -292,23 +292,33 @@ public interface DOMNode extends LinkedTreeNode<DOMChildren, DOMSiblings, DOMNod
 	// ----- actual methods -----
 	@Override
 	default boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
-		return checkName(errorBuffer);
+
+		if (LinkedTreeNode.super.isValid(errorBuffer)) {
+			return checkName(errorBuffer);
+		}
+
+		return false;
 	}
 
 	@Override
 	default boolean onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
 
-		try {
+		if (LinkedTreeNode.super.onModification(securityContext, errorBuffer, modificationQueue)) {
 
-			increasePageVersion();
+			try {
 
-		} catch (FrameworkException ex) {
+				increasePageVersion();
 
-			logger.warn("Updating page version failed", ex);
+			} catch (FrameworkException ex) {
 
+				logger.warn("Updating page version failed", ex);
+
+			}
+
+			return checkName(errorBuffer);
 		}
 
-		return checkName(errorBuffer);
+		return false;
 	}
 
 	@Override

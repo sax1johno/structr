@@ -1011,7 +1011,7 @@ public class SimpleTest extends StructrUiTest {
 				new NodeAttribute<>(SchemaNode.implementsInterfaces,
 					"org.structr.core.entity.Principal," +
 					"org.structr.core.entity.Location," +
-					"org.structr.core.entity.File"
+					"org.structr.web.entity.File"
 				)
 			);
 

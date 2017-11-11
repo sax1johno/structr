@@ -73,8 +73,7 @@ public class UiTest extends StructrUiTest {
 			tx.success();
 
 		} catch (Exception ex) {
-
-			logger.error(ex.toString());
+			ex.printStackTrace();
 			fail("Unexpected exception");
 		}
 	}

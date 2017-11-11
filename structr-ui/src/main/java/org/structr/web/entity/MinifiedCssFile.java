@@ -18,16 +18,23 @@
  */
 package org.structr.web.entity;
 
+import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.io.FileUtils;
 import org.structr.common.PropertyView;
 import org.structr.common.View;
+import org.structr.common.error.FrameworkException;
+import org.structr.core.graph.ModificationEvent;
 import org.structr.core.property.IntProperty;
 import org.structr.core.property.Property;
+import org.structr.web.common.FileHelper;
 
 public interface MinifiedCssFile extends AbstractMinifiedFile {
 
@@ -36,16 +43,13 @@ public interface MinifiedCssFile extends AbstractMinifiedFile {
 	public static final View defaultView = new View(MinifiedJavaScriptFile.class, PropertyView.Public, minificationSources, lineBreak);
 	public static final View uiView      = new View(MinifiedJavaScriptFile.class, PropertyView.Ui, minificationSources, lineBreak);
 
-	/*
 	@Override
-	public boolean shouldModificationTriggerMinifcation(ModificationEvent modState) {
-
+	default boolean shouldModificationTriggerMinifcation(ModificationEvent modState) {
 		return modState.getModifiedProperties().containsKey(MinifiedCssFile.lineBreak);
-
 	}
 
 	@Override
-	public void minify() throws FrameworkException, IOException {
+	default void minify() throws FrameworkException, IOException {
 
 		logger.info("Running minify: {}", this.getUuid());
 
@@ -62,9 +66,6 @@ public interface MinifiedCssFile extends AbstractMinifiedFile {
 			FileHelper.setFileData(this, FileUtils.readFileToString(temp).getBytes(), null);
 		}
 	}
-	*/
-
-
 
 	/*
 		Because of a dependency conflict with different Rhino versions and because Structr only uses

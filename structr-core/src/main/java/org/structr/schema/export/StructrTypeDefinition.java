@@ -668,7 +668,12 @@ public abstract class StructrTypeDefinition<T extends AbstractSchemaNode> implem
 				final Class superclass = StructrApp.resolveSchemaId(baseTypeReference);
 				if (superclass != null) {
 
-					schemaNode.setProperty(SchemaNode.extendsClass, superclass.getName());
+					schemaNode.setProperty(SchemaNode.implementsInterfaces, superclass.getName());
+
+				} else if ("https://structr.org/v1.1/definitions/FileBase".equals(baseTypeReference.toString())) {
+
+					// FileBase doesn't exist any more, but we need to support it for some time..
+					schemaNode.setProperty(SchemaNode.implementsInterfaces, "org.structr.web.entity.File");
 				}
 			}
 		}
@@ -687,8 +692,7 @@ public abstract class StructrTypeDefinition<T extends AbstractSchemaNode> implem
 					final JsonType jsonType     = (JsonType)def;
 					final String superclassName = "org.structr.dynamic." + jsonType.getName();
 
-					list.append(superclassName);
-					list.append(", ");
+					schemaNode.setProperty(SchemaNode.extendsClass, superclassName);
 
 				} else {
 

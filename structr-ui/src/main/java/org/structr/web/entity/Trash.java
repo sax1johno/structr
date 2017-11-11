@@ -18,8 +18,34 @@
  */
 package org.structr.web.entity;
 
+import org.structr.common.SecurityContext;
+import org.structr.common.error.ErrorBuffer;
+import org.structr.common.error.FrameworkException;
+import org.structr.core.graph.ModificationQueue;
+import org.structr.core.property.PropertyMap;
+
 /**
  * Trash folder
  */
 public interface Trash extends Folder {
+
+	@Override
+	default boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
+		return Folder.super.onCreation(securityContext, errorBuffer);
+	}
+
+	@Override
+	default boolean onModification(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
+		return Folder.super.onModification(securityContext, errorBuffer, modificationQueue);
+	}
+
+	@Override
+	default boolean onDeletion(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final PropertyMap properties) throws FrameworkException {
+		return Folder.super.onDeletion(securityContext, errorBuffer, properties);
+	}
+
+	@Override
+	default boolean isValid(final ErrorBuffer errorBuffer) {
+		return Folder.super.isValid(errorBuffer);
+	}
 }

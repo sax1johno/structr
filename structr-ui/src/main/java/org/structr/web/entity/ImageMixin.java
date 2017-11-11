@@ -21,6 +21,7 @@ package org.structr.web.entity;
 import java.util.List;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
+import org.structr.core.entity.AbstractNode;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.schema.SchemaService;
@@ -28,11 +29,11 @@ import org.structr.schema.SchemaService;
 /**
  * An image whose binary data will be stored on disk.
  */
-public class ImageMixin extends FileMixin implements Image {
+public class ImageMixin extends AbstractNode implements Image {
 
 	static {
 
-		SchemaService.registerMixinType(Image.class);
+		SchemaService.registerMixinType("Image", "org.structr.dynamic.File", Image.class);
 	}
 
 	// ----- BEGIN Structr Mixin -----

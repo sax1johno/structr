@@ -71,12 +71,8 @@ public class AdvancedSchemaTest extends FrontendTest {
 		try (final Tx tx = app.tx()) {
 
 			// Add String property "testFile" to built-in File class
-			SchemaNode fileNodeDef = app.create(SchemaNode.class,
-				new NodeAttribute<>(SchemaNode.name, "File"),
-				new NodeAttribute<>(SchemaNode.implementsInterfaces, "File")
-			);
-
-			SchemaProperty testFileProperty = app.create(SchemaProperty.class);
+			final SchemaNode fileNodeDef          = app.nodeQuery(SchemaNode.class).andName("File").getFirst();
+			final SchemaProperty testFileProperty = app.create(SchemaProperty.class);
 
 			final PropertyMap testFileProperties = new PropertyMap();
 			testFileProperties.put(SchemaProperty.name, "testFile");
@@ -87,7 +83,8 @@ public class AdvancedSchemaTest extends FrontendTest {
 			tx.success();
 
 		} catch (Exception ex) {
-			logger.error("", ex);
+			ex.printStackTrace();
+			fail("Unexpected exception.");
 		}
 
 		try (final Tx tx = app.tx()) {
@@ -170,9 +167,8 @@ public class AdvancedSchemaTest extends FrontendTest {
 
 		try (final Tx tx = app.tx()) {
 
-			SchemaNode fileNodeDef = app.nodeQuery(SchemaNode.class).andName("File").getFirst();
-
-			SchemaProperty testFileProperty = app.create(SchemaProperty.class);
+			final SchemaNode fileNodeDef          = app.nodeQuery(SchemaNode.class).andName("File").getFirst();
+			final SchemaProperty testFileProperty = app.create(SchemaProperty.class);
 
 			final PropertyMap changedProperties = new PropertyMap();
 			changedProperties.put(SchemaProperty.name, "testFile");
@@ -231,10 +227,10 @@ public class AdvancedSchemaTest extends FrontendTest {
 					.statusCode(200)
 
 					.body("result",	                   hasSize(35))
-					.body("result[33].jsonName",       equalTo("testSubFile"))
-					.body("result[33].declaringClass", equalTo("SubFile"))
-					.body("result[34].jsonName",       equalTo("testFile"))
-					.body("result[34].declaringClass", equalTo("_FileHelper"))
+					.body("result[34].jsonName",       equalTo("testSubFile"))
+					.body("result[34].declaringClass", equalTo("SubFile"))
+					.body("result[11].jsonName",       equalTo("testFile"))
+					.body("result[11].declaringClass", equalTo("File"))
 
 				.when()
 					.get("/_schema/SubFile/ui");

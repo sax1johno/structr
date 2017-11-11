@@ -18,11 +18,23 @@
  */
 package org.structr.media;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import org.structr.common.PropertyView;
+import org.structr.common.SecurityContext;
+import org.structr.common.error.ErrorBuffer;
+import org.structr.common.error.FrameworkException;
+import org.structr.core.Export;
 import static org.structr.core.GraphObject.type;
+import org.structr.core.GraphObjectMap;
+import org.structr.core.JsonInput;
+import org.structr.core.app.StructrApp;
+import org.structr.core.graph.ModificationQueue;
 import static org.structr.core.graph.NodeInterface.name;
 import static org.structr.core.graph.NodeInterface.owner;
+import org.structr.core.graph.Tx;
 import org.structr.core.property.ConstantBooleanProperty;
 import org.structr.core.property.DoubleProperty;
 import org.structr.core.property.EndNode;
@@ -31,7 +43,9 @@ import org.structr.core.property.IntProperty;
 import org.structr.core.property.Property;
 import org.structr.core.property.StartNode;
 import org.structr.core.property.StringProperty;
+import org.structr.rest.RestMethodResult;
 import org.structr.schema.SchemaService;
+import org.structr.web.common.FileHelper;
 import static org.structr.web.entity.File.relativeFilePath;
 import static org.structr.web.entity.File.size;
 import org.structr.web.entity.Image;
@@ -73,8 +87,23 @@ public interface VideoFile extends File {
 		convertedVideos, posterImage
 	);
 
-	/*
-	public String getDiskFilePath(final SecurityContext securityContext) {
+	@Override
+	default boolean onCreation(SecurityContext securityContext, ErrorBuffer errorBuffer) throws FrameworkException {
+
+		updateVideoInfo();
+
+		return File.super.onCreation(securityContext, errorBuffer);
+	}
+
+	@Override
+	default boolean onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
+
+		updateVideoInfo();
+
+		return File.super.onModification(securityContext, errorBuffer, modificationQueue);
+	}
+
+	default String getDiskFilePath(final SecurityContext securityContext) {
 
 		try (final Tx tx = StructrApp.getInstance(securityContext).tx()) {
 
@@ -94,19 +123,19 @@ public interface VideoFile extends File {
 	}
 
 	@Export
-	public void convert(final String scriptName, final String newFileName) throws FrameworkException {
-		AVConv.newInstance(securityContext, this, newFileName).doConversion(scriptName);
+	default void convert(final String scriptName, final String newFileName) throws FrameworkException {
+		AVConv.newInstance(getSecurityContext(), this, newFileName).doConversion(scriptName);
 	}
 
 	@Export
-	public void grab(final String scriptName, final String imageName, final long timeIndex) throws FrameworkException {
-		AVConv.newInstance(securityContext, this, imageName).grabFrame(scriptName, imageName, timeIndex);
+	default void grab(final String scriptName, final String imageName, final long timeIndex) throws FrameworkException {
+		AVConv.newInstance(getSecurityContext(), this, imageName).grabFrame(scriptName, imageName, timeIndex);
 	}
 
 	@Export
-	public RestMethodResult getMetadata() throws FrameworkException {
+	default RestMethodResult getMetadata() throws FrameworkException {
 
-		final Map<String, String> metadata = AVConv.newInstance(securityContext, this).getMetadata();
+		final Map<String, String> metadata = AVConv.newInstance(getSecurityContext(), this).getMetadata();
 		final RestMethodResult result      = new RestMethodResult(200);
 		final GraphObjectMap map           = new GraphObjectMap();
 
@@ -120,12 +149,12 @@ public interface VideoFile extends File {
 	}
 
 	@Export
-	public void setMetadata(final String key, final String value) throws FrameworkException {
-		AVConv.newInstance(securityContext, this).setMetadata(key, value);
+	default void setMetadata(final String key, final String value) throws FrameworkException {
+		AVConv.newInstance(getSecurityContext(), this).setMetadata(key, value);
 	}
 
 	@Export
-	public void setMetadata(final JsonInput metadata) throws FrameworkException {
+	default void setMetadata(final JsonInput metadata) throws FrameworkException {
 
 		final Map<String, String> map = new LinkedHashMap<>();
 
@@ -133,12 +162,13 @@ public interface VideoFile extends File {
 			map.put(entry.getKey(), entry.getValue().toString());
 		}
 
-		AVConv.newInstance(securityContext, this).setMetadata(map);
+		AVConv.newInstance(getSecurityContext(), this).setMetadata(map);
 	}
 
 	@Export
-	public void updateVideoInfo() {
+	default void updateVideoInfo() {
 
+		final SecurityContext securityContext = getSecurityContext();
 		try (final Tx tx = StructrApp.getInstance(securityContext).tx()) {
 
 			final Map<String, Object> info = AVConv.newInstance(securityContext, this).getVideoInfo();
@@ -177,14 +207,14 @@ public interface VideoFile extends File {
 		}
 	}
 
-	private void setIfNotNull(final Property key, final Object value) throws FrameworkException {
+	default void setIfNotNull(final Property key, final Object value) throws FrameworkException {
 
 		if (value != null) {
 			setProperty(key, value);
 		}
 	}
 
-	private Integer toInt(final Object value) {
+	default Integer toInt(final Object value) {
 
 		if (value instanceof Number) {
 			return ((Number)value).intValue();
@@ -203,7 +233,7 @@ public interface VideoFile extends File {
 		return null;
 	}
 
-	private Double toDouble(final Object value) {
+	default Double toDouble(final Object value) {
 
 		if (value instanceof Number) {
 			return ((Number)value).doubleValue();
@@ -221,5 +251,4 @@ public interface VideoFile extends File {
 
 		return null;
 	}
-	*/
 }

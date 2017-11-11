@@ -24,9 +24,11 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.structr.common.SecurityContext;
+import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.Export;
 import org.structr.core.graph.ModificationEvent;
+import org.structr.core.graph.ModificationQueue;
 import org.structr.core.property.EndNodes;
 import org.structr.core.property.Property;
 import org.structr.core.property.PropertyMap;
@@ -40,9 +42,8 @@ public interface AbstractMinifiedFile extends File {
 
 	public static final Property<List<File>> minificationSources = new EndNodes<>("minificationSources", MinificationSource.class);
 
-	/*
 	@Override
-	public boolean onModification(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
+	default boolean onModification(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
 
 		boolean shouldMinify = false;
 		final String myUUID = getUuid();
@@ -68,9 +69,8 @@ public interface AbstractMinifiedFile extends File {
 
 		}
 
-		return super.onModification(securityContext, errorBuffer, modificationQueue);
+		return File.super.onModification(securityContext, errorBuffer, modificationQueue);
 	}
-	*/
 
 	@Export
 	public void minify() throws FrameworkException, IOException;

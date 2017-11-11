@@ -752,6 +752,11 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 
 			final Class localType = source.poll();
 
+			if (localType == null) {
+				Thread.dumpStack();
+				continue;
+			}
+
 			// skip (and remove) type Object
 			if (localType.equals(Object.class)) {
 				continue;
