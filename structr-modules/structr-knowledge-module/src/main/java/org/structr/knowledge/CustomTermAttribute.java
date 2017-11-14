@@ -19,9 +19,7 @@
 
 package org.structr.knowledge;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.structr.core.entity.AbstractNode;
+import org.structr.core.graph.NodeInterface;
 import org.structr.core.property.Property;
 import org.structr.core.property.StartNode;
 import org.structr.schema.SchemaService;
@@ -29,16 +27,9 @@ import org.structr.schema.SchemaService;
 /**
  * Base class of a custom term attribute as defined in ISO 25964
  */
+public interface CustomTermAttribute extends NodeInterface {
 
-public class CustomTermAttribute extends AbstractNode {
-	
-	private static final Logger logger = LoggerFactory.getLogger(CustomTermAttribute.class.getName());
-	
+	static class Impl { static { SchemaService.registerMixinType(CustomTermAttribute.class); }}
+
 	public static final Property<ThesaurusTerm> term = new StartNode<>("term", TermHasCustomAttributes.class);
-
-	static {
-
-		SchemaService.registerBuiltinTypeOverride("CustomTermAttribute", CustomTermAttribute.class.getName());
-	}	
-
 }

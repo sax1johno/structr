@@ -19,8 +19,6 @@
 
 package org.structr.knowledge;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.structr.core.property.EndNode;
 import org.structr.core.property.Property;
 import org.structr.schema.SchemaService;
@@ -29,15 +27,9 @@ import org.structr.schema.SchemaService;
  * Base class of a preferred term as defined in ISO 25964
  */
 
-public class PreferredTerm extends ThesaurusTerm {
-	
-	private static final Logger logger = LoggerFactory.getLogger(PreferredTerm.class.getName());
-	
+public interface PreferredTerm extends ThesaurusTerm {
+
+	static class Impl { static { SchemaService.registerMixinType(PreferredTerm.class); }}
+
 	public static final Property<ThesaurusConcept> preferredLabels = new EndNode<>("preferredLabels", TermHasLabel.class);
-
-	static {
-
-		SchemaService.registerBuiltinTypeOverride("PreferredTerm", PreferredTerm.class.getName());
-	}	
-
 }

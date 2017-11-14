@@ -20,10 +20,8 @@
 package org.structr.knowledge;
 
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.structr.common.PropertyView;
-import org.structr.core.entity.AbstractNode;
+import org.structr.core.graph.NodeInterface;
 import org.structr.core.property.EndNodes;
 import org.structr.core.property.Property;
 import org.structr.core.property.StartNode;
@@ -34,21 +32,19 @@ import org.structr.schema.SchemaService;
  * Base class of a thesaurus concept as defined in ISO 25964
  */
 
-public class ThesaurusConcept extends AbstractNode {
-	
-	private static final Logger logger = LoggerFactory.getLogger(ThesaurusConcept.class.getName());
-	
+public interface ThesaurusConcept extends NodeInterface {
+
+	static class Impl { static { SchemaService.registerMixinType(ThesaurusConcept.class); }}
+
 	public static final Property<Thesaurus> thesaurus                = new StartNode<>("thesaurus", ThesaurusContainsConcepts.class);
 	public static final Property<List<PreferredTerm>> preferredTerms = new EndNodes<>("preferredTerms", ConceptPreferredTerm.class);
 	public static final Property<List<ThesaurusTerm>> terms          = new EndNodes<>("terms", ConceptTerm.class);
-	
+
 	public static final Property<List<ThesaurusConcept>> broaderTerms = new EndNodes<>("broaderTerms", ConceptBTConcept.class);
 	public static final Property<List<ThesaurusConcept>> narrowerTerms = new StartNodes<>("narrowerTerms", ConceptBTConcept.class);
-	
+
 	public static final Property<List<ThesaurusConcept>> relatedTerms   = new EndNodes<>("relatedTerms", ConceptRTConcept.class);
 	public static final Property<List<ThesaurusConcept>> relatedTermsOf = new StartNodes<>("relatedTermsOf", ConceptRTConcept.class);
-	
-	
 
 	public static final org.structr.common.View uiView = new org.structr.common.View(ThesaurusConcept.class, PropertyView.Ui,
 		type, name, thesaurus, preferredTerms, terms, broaderTerms, narrowerTerms, relatedTerms, relatedTermsOf
@@ -57,9 +53,4 @@ public class ThesaurusConcept extends AbstractNode {
 	public static final org.structr.common.View publicView = new org.structr.common.View(ThesaurusConcept.class, PropertyView.Public,
 		type, name, thesaurus, preferredTerms, terms, broaderTerms, narrowerTerms, relatedTerms, relatedTermsOf
 	);
-
-	static {
-
-		SchemaService.registerBuiltinTypeOverride("ThesaurusConcept", ThesaurusConcept.class.getName());
-	}	
 }

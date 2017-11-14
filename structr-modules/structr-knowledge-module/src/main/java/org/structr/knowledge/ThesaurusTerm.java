@@ -20,10 +20,8 @@
 package org.structr.knowledge;
 
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.structr.common.PropertyView;
-import org.structr.core.entity.AbstractNode;
+import org.structr.core.graph.NodeInterface;
 import org.structr.core.property.ArrayProperty;
 import org.structr.core.property.EndNodes;
 import org.structr.core.property.Property;
@@ -35,18 +33,18 @@ import org.structr.schema.SchemaService;
  * Base class of a thesaurus term as defined in ISO 25964
  */
 
-public class ThesaurusTerm extends AbstractNode {
-	
-	private static final Logger logger = LoggerFactory.getLogger(ThesaurusTerm.class.getName());
-	
+public interface ThesaurusTerm extends NodeInterface {
+
+	static class Impl { static { SchemaService.registerMixinType(ThesaurusTerm.class); }}
+
 	public static final Property<ThesaurusConcept> concept = new StartNode<>("concept", ConceptTerm.class);
-	
+
 	public static final Property<String>   name            = new StringProperty("name").indexedWhenEmpty().cmis().notNull();
 	public static final Property<String[]> normalizedWords = new ArrayProperty("normalizedWords", String.class).indexedWhenEmpty();
 	public static final Property<String>   lang            = new StringProperty("lang");
 
 	public static final Property<List<CustomTermAttribute>> customAttributes = new EndNodes<>("customAttributes", TermHasCustomAttributes.class);
-	
+
 	public static final org.structr.common.View uiView = new org.structr.common.View(ThesaurusTerm.class, PropertyView.Ui,
 		type, name, normalizedWords, lang, concept, customAttributes
 	);
@@ -54,9 +52,4 @@ public class ThesaurusTerm extends AbstractNode {
 	public static final org.structr.common.View publicView = new org.structr.common.View(ThesaurusTerm.class, PropertyView.Public,
 		type, name, normalizedWords, lang, concept, customAttributes
 	);
-	
-	static {
-
-		SchemaService.registerBuiltinTypeOverride("ThesaurusTerm", ThesaurusTerm.class.getName());
-	}	
 }

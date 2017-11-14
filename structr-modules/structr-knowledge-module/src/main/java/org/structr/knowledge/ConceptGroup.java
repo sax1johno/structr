@@ -19,13 +19,13 @@
 
 package org.structr.knowledge;
 
-import org.structr.core.entity.AbstractNode;
+import org.structr.core.graph.NodeInterface;
+import org.structr.schema.SchemaService;
 
 /**
  * Base class of a concept group as defined in ISO 25964
  */
+public interface ConceptGroup extends NodeInterface {
 
-
-public class ConceptGroup extends AbstractNode {
-	
+	static class Impl { static { SchemaService.registerMixinType(ConceptGroup.class); }}
 }

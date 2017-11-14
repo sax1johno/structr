@@ -20,19 +20,18 @@
 package org.structr.knowledge;
 
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.structr.core.entity.AbstractNode;
+import org.structr.core.graph.NodeInterface;
 import org.structr.core.property.EndNodes;
 import org.structr.core.property.Property;
+import org.structr.schema.SchemaService;
 
 /**
  * Base class of a Thesaurus as defined in ISO 25964
  */
 
-public class Thesaurus extends AbstractNode {
-	
-	private static final Logger logger = LoggerFactory.getLogger(Thesaurus.class.getName());
-	
+public interface Thesaurus extends NodeInterface {
+
+	static class Impl { static { SchemaService.registerMixinType(Thesaurus.class); }}
+
 	public static final Property<List<ThesaurusConcept>> concepts = new EndNodes<>("concepts", ThesaurusContainsConcepts.class);
 }
