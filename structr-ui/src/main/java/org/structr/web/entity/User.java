@@ -29,28 +29,31 @@ import org.structr.common.error.SemanticErrorToken;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.Favoritable;
+import org.structr.core.entity.Group;
 import org.structr.core.entity.Principal;
 import org.structr.core.entity.relationship.Groups;
+import org.structr.core.graph.ModificationQueue;
 import org.structr.core.graph.NodeAttribute;
 import org.structr.core.property.BooleanProperty;
 import org.structr.core.property.ConstantBooleanProperty;
 import org.structr.core.property.EndNode;
 import org.structr.core.property.EndNodes;
 import org.structr.core.property.Property;
+import org.structr.core.property.PropertyMap;
 import org.structr.core.property.StartNode;
 import org.structr.core.property.StartNodes;
 import org.structr.core.property.StringProperty;
+import org.structr.schema.SchemaService;
 import org.structr.web.entity.relation.UserFavoriteFavoritable;
 import org.structr.web.entity.relation.UserHomeDir;
 import org.structr.web.entity.relation.UserImage;
 import org.structr.web.entity.relation.UserWorkDir;
 import org.structr.web.property.ImageDataProperty;
 import org.structr.web.property.UiNotion;
-import org.structr.core.entity.Group;
-import org.structr.core.graph.ModificationQueue;
-import org.structr.core.property.PropertyMap;
 
 public interface User extends Principal {
+
+	static class Impl { static { SchemaService.registerMixinType(User.class); }}
 
 	public static final Property<String>            confirmationKey           = new StringProperty("confirmationKey").indexed();
 	public static final Property<Boolean>           backendUser               = new BooleanProperty("backendUser").indexed();

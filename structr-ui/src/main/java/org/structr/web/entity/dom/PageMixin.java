@@ -30,7 +30,7 @@ public class PageMixin extends AbstractNode implements Page {
 
 	// register this type as an overridden builtin type
 	static {
-		SchemaService.registerMixinType("Page", AbstractNode.class, Page.class);
+		SchemaService.registerMixinType(Page.class);
 	}
 
 	// ----- BEGIN Structr Mixin -----

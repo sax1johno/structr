@@ -28,7 +28,7 @@ public class DocumentFragmentMixin extends AbstractNode implements DocumentFragm
 
 	static {
 
-		SchemaService.registerMixinType("DocumentFragment", AbstractNode.class, DocumentFragment.class);
+		SchemaService.registerMixinType(DocumentFragment.class);
 	}
 
 	// ----- BEGIN Structr Mixin -----

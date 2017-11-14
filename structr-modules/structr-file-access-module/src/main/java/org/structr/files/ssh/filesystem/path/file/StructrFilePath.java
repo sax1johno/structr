@@ -353,12 +353,12 @@ public class StructrFilePath extends StructrPath {
 
 		if (cachedActualFile == null) {
 
+			// remove /files from path since it is a virtual directory
 			final String filePath = toString().substring(StructrPath.FILES_DIRECTORY.length() + 1);
 			final App app         = StructrApp.getInstance(fs.getSecurityContext());
 
 			try (final Tx tx = app.tx()) {
 
-				// remove /files from path since it is a virtual directory
 				cachedActualFile = app.nodeQuery(AbstractFile.class).and(AbstractFile.path, filePath).getFirst();
 
 				tx.success();

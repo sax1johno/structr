@@ -34,9 +34,12 @@ import org.structr.common.error.FrameworkException;
 import org.structr.core.graph.ModificationEvent;
 import org.structr.core.property.IntProperty;
 import org.structr.core.property.Property;
+import org.structr.schema.SchemaService;
 import org.structr.web.common.FileHelper;
 
 public interface MinifiedCssFile extends AbstractMinifiedFile {
+
+	static class Impl { static { SchemaService.registerMixinType(MinifiedCssFile.class); }}
 
 	public static final Property<Integer> lineBreak = new IntProperty("lineBreak").defaultValue(-1);
 

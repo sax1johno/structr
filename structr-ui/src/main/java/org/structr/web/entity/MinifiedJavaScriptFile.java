@@ -39,10 +39,13 @@ import org.structr.core.property.EnumProperty;
 import org.structr.core.property.Property;
 import org.structr.core.property.PropertyMap;
 import org.structr.core.property.StringProperty;
+import org.structr.schema.SchemaService;
 import org.structr.web.common.FileHelper;
 import org.structr.web.entity.relation.MinificationSource;
 
 public interface MinifiedJavaScriptFile extends AbstractMinifiedFile {
+
+	static class Impl { static { SchemaService.registerMixinType(MinifiedJavaScriptFile.class); }}
 
 	public static final Property<CompilationLevel> optimizationLevel = new EnumProperty<>("optimizationLevel", CompilationLevel.class, CompilationLevel.WHITESPACE_ONLY);
 	public static final Property<String> warnings                    = new StringProperty("warnings");

@@ -126,7 +126,7 @@ public abstract class StructrUiTest {
 
 		basePath = "/tmp/structr-test-" + timestamp + "-" + System.nanoTime();
 
-		Settings.Services.setValue("NodeService FtpService SSHService");
+		Settings.Services.setValue("NodeService FtpService SchemaService SSHService");
 		Settings.ConnectionUrl.setValue(Settings.TestingConnectionUrl.getValue());
 
 		// example for new configuration setup
@@ -288,10 +288,16 @@ public abstract class StructrUiTest {
 
 	protected <T extends NodeInterface> List<T> createTestNodes(final Class<T> type, final int number, final PropertyMap props) throws FrameworkException {
 
-		List<T> nodes = new LinkedList<>();
+		Class localType = type;
+		if (localType.isInterface()) {
+
+			localType = StructrApp.getConfiguration().getNodeEntityClass(type.getSimpleName());
+		}
+
+		final List<T> nodes = new LinkedList<>();
 
 		for (int i = 0; i < number; i++) {
-			nodes.add(app.create(type, props));
+			nodes.add((T)app.create(localType, props));
 		}
 
 		return nodes;

@@ -503,23 +503,11 @@ public class StructrApp implements App {
 			for (final Class type :StructrApp.getConfiguration().getInterfaces().values()) {
 
 				// only register node types
-				if (NodeInterface.class.isAssignableFrom(type)) {
+				if (type.isInterface() && NodeInterface.class.isAssignableFrom(type)) {
 
 					registerType(type);
 				}
 			}
-
-
-			/*
-
-			for (final Class type : StructrApp.getConfiguration().getNodeEntities().values()) {
-				registerType(type);
-			}
-
-			for (final Class type : StructrApp.getConfiguration().getRelationshipEntities().values()) {
-				registerType(type);
-			}
-			*/
 		}
 	}
 

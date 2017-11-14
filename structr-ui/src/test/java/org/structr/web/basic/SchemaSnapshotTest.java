@@ -54,7 +54,6 @@ public class SchemaSnapshotTest extends StructrUiTest {
 
 			final JsonSchema sourceSchema = StructrSchema.createFromDatabase(app);
 
-
 			// a customer
 			final JsonObjectType customer = sourceSchema.addType("Customer");
 			customer.addStringProperty("name", "public", "ui").setRequired(true).setUnique(true);

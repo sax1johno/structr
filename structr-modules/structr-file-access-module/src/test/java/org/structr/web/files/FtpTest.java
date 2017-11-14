@@ -55,14 +55,14 @@ public abstract class FtpTest extends StructrUiTest {
 		PropertyMap props = new PropertyMap();
 		props.put(Principal.name, username);
 		props.put(Principal.password, password);
-		return (User) createTestNodes(User.class, 1, props).get(0);
+		return (User) createTestNodes(StructrApp.getConfiguration().getNodeEntityClass("User"), 1, props).get(0);
 	}
 
 	protected Folder createFTPDirectory(final String path, final String name) throws FrameworkException {
 		PropertyMap props = new PropertyMap();
 		props.put(Folder.name, name);
 		props.put(Folder.owner, ftpUser);
-		Folder dir = (Folder) createTestNodes(Folder.class, 1, props).get(0);
+		Folder dir = (Folder) createTestNodes(StructrApp.getConfiguration().getNodeEntityClass("Folder"), 1, props).get(0);
 
 		if (StringUtils.isNotBlank(path)) {
 			AbstractFile parent = FileHelper.getFileByAbsolutePath(securityContext, path);
@@ -83,7 +83,7 @@ public abstract class FtpTest extends StructrUiTest {
 		props.put(File.size, 0L);
 		props.put(File.owner, ftpUser);
 
-		final File file = createTestNodes(File.class, 1, props).get(0);
+		final File file = (File)createTestNodes(StructrApp.getConfiguration().getNodeEntityClass("File"), 1, props).get(0);
 
 		if (StringUtils.isNotBlank(path)) {
 
