@@ -25,6 +25,7 @@ var _Entities = {
 	numberAttrs: ['position', 'size'],
 	readOnlyAttrs: ['lastModifiedDate', 'createdDate', 'createdBy', 'id', 'checksum', 'size', 'version', 'relativeFilePath'],
 	pencilEditBlacklist: ['html', 'body', 'head', 'title', 'script',  'input', 'label', 'button', 'textarea', 'link', 'meta', 'noscript', 'tbody', 'thead', 'tr', 'td', 'caption', 'colgroup', 'tfoot', 'col', 'style'],
+	null_prefix: 'null_attr_',
 	changeBooleanAttribute: function(attrElement, value, activeLabel, inactiveLabel) {
 
 		_Logger.log(_LogType.ENTITIES, 'Change boolean attribute ', attrElement, ' to ', value);
@@ -50,22 +51,22 @@ var _Entities = {
 	deleteNodes: function(button, entities, recursive, callback) {
 		buttonClicked = button;
 		if ( !Structr.isButtonDisabled(button) ) {
-			
+
 			var confirmationText = '<p>Delete the following objects' + (recursive ? ' (all folders recursively) ' : '') + '?</p>\n';
-			
+
 			var nodeIds = [];
-			
+
 			entities.forEach(function(entity) {
-			
+
 				confirmationText += '' + entity.name + ' [' + entity.id + ']<br>';
 				nodeIds.push(entity.id);
 			});
-			
+
 			confirmationText += '<br>';
-			
+
 			Structr.confirmation(confirmationText,
 				function() {
-					
+
 					Command.deleteNodes(nodeIds, recursive);
 					$.unblockUI({
 						fadeOut: 25
@@ -127,49 +128,37 @@ var _Entities = {
 		});
 
 	},
-	dataBindingDialog: function(entity, el) {
+	dataBindingDialog: function(entity, el, typeInfo) {
 
 		el.append('<table class="props"></table>');
 		var t = $('.props', el);
 
 		// General
-		_Entities.appendRowWithInputField(entity, t, 'data-structr-id',                   'Element ID (set to ${this.id})');
-		_Entities.appendRowWithInputField(entity, t, 'data-structr-attr',                 'Attribute Key (if set, render input field in auto-edit mode)');
-		_Entities.appendRowWithInputField(entity, t, 'data-structr-type',                 'Data type (e.g. Date, Boolean; default: String)');
-		_Entities.appendRowWithInputField(entity, t, 'data-structr-placeholder',          'Placeholder text in edit mode');
-		_Entities.appendRowWithInputField(entity, t, 'data-structr-custom-options-query', 'Custom REST query for value options');
-		_Entities.appendRowWithInputField(entity, t, 'data-structr-options-key',          'Attribute key used to display option labels (default: name)');
-		_Entities.appendRowWithInputField(entity, t, 'data-structr-raw-value',            'Raw value (unformatted value for Date or Number fields)');
-		_Entities.appendRowWithInputField(entity, t, 'data-structr-hide',                 'Hide [edit|non-edit|edit,non-edit]');
-		_Entities.appendRowWithInputField(entity, t, 'data-structr-edit-class',           'Custom CSS class in edit mode');
+		_Entities.appendRowWithInputField(entity, t, 'data-structr-id',                   'Element ID', typeInfo);
+		_Entities.appendRowWithInputField(entity, t, 'data-structr-attr',                 'Attribute Key', typeInfo);
+		_Entities.appendRowWithInputField(entity, t, 'data-structr-type',                 'Data type', typeInfo);
+		_Entities.appendRowWithInputField(entity, t, 'data-structr-placeholder',          'Placeholder text', typeInfo);
+		_Entities.appendRowWithInputField(entity, t, 'data-structr-custom-options-query', 'Custom REST query', typeInfo);
+		_Entities.appendRowWithInputField(entity, t, 'data-structr-options-key',          'Attribute key', typeInfo);
+		_Entities.appendRowWithInputField(entity, t, 'data-structr-raw-value',            'Raw value', typeInfo);
+		_Entities.appendRowWithInputField(entity, t, 'data-structr-hide',                 'Hide mode(s)', typeInfo);
+		_Entities.appendRowWithInputField(entity, t, 'data-structr-edit-class',           'Edit mode CSS class', typeInfo);
 
 		if (entity.type === 'Button' || entity.type === 'A') {
 
-			// Buttons
-			_Entities.appendRowWithInputField(entity, t, 'data-structr-action',           'Action [create:&lt;Type&gt;|delete:&lt;Type&gt;|edit|login|logout]');
-			_Entities.appendRowWithInputField(entity, t, 'data-structr-attributes',       'Attributes (for create, edit/save, login or registration actions)');
-
-			t.append('<tr><td class="key">Reload</td><td class="value" id="reload"></td><td></td></tr>');
-			_Entities.appendBooleanSwitch($('#reload', t), entity, 'data-structr-reload', '', 'If active, the page will refresh after a successfull action.');
-
-			// Confirm action?
-			t.append('<tr><td class="key">Confirm action?</td><td class="value" id="confirmOnDel"></td><td></td></tr>');
-			_Entities.appendBooleanSwitch($('#confirmOnDel', t), entity, 'data-structr-confirm', '', 'If active, a user has to confirm the action.');
-
-			_Entities.appendRowWithInputField(entity, t, 'data-structr-return',            'Return URI after successful action');
-
-			t.append('<tr><td class="key">Append ID on create</td><td class="value" id="append-id"></td><td></td></tr>');
-			_Entities.appendBooleanSwitch($('#append-id', t), entity, 'data-structr-append-id', '', 'On create, append ID of first created object to the return URI.');
-
+			_Entities.appendRowWithInputField(entity, t, 'data-structr-action',           'Action', typeInfo);
+			_Entities.appendRowWithInputField(entity, t, 'data-structr-attributes',       'Attributes', typeInfo);
+			_Entities.appendRowWithBooleanSwitch(entity, t, 'data-structr-reload',        'Reload', '', typeInfo);
+			_Entities.appendRowWithBooleanSwitch(entity, t, 'data-structr-confirm',       'Confirm action?', '', typeInfo);
+			_Entities.appendRowWithInputField(entity, t, 'data-structr-return',           'Return URI', typeInfo);
+			_Entities.appendRowWithBooleanSwitch(entity, t, 'data-structr-append-id',     'Append ID on create', '', typeInfo);
 
 		} else if (entity.type === 'Input' || entity.type === 'Select' || entity.type === 'Textarea') {
-			// Input fields
-			_Entities.appendRowWithInputField(entity, t, 'data-structr-name',              'Field name (for create/save actions with custom form)');
+			_Entities.appendRowWithInputField(entity, t, 'data-structr-name',             'Field name', typeInfo);
 
 		}
-
 	},
-	appendRowWithInputField: function(entity, el, key, label) {
+	appendRowWithInputField: function(entity, el, key, label, typeInfo) {
 		el.append('<tr><td class="key">' + label + '</td><td class="value"><input class="' + key + '_" name="' + key + '" value="' + (entity[key] ? escapeForHtmlAttributes(entity[key]) : '') + '"></td><td><i id="null_' + key + '" class="nullIcon ' + _Icons.getFullSpriteClass(_Icons.grey_cross_icon) + '" /></td></tr>');
 		var inp = $('[name="' + key + '"]', el);
 		_Entities.activateInput(inp, entity.id, entity.pageId);
@@ -181,6 +170,25 @@ var _Entities = {
 				Structr.showAndHideInfoBoxMessage('Property "' + key + '" was set to null.', 'success', 2000, 1000);
 			});
 		});
+
+		_Entities.appendSchemaHint($('.key:last', el), key, typeInfo);
+	},
+	appendRowWithBooleanSwitch: function (entity, el, key, label, text, typeInfo) {
+		el.append('<tr><td class="key">' + label + '</td><td class="value"></td><td></td></tr>');
+
+		_Entities.appendBooleanSwitch($('tr:last .value', el), entity, key, '', text);
+
+		_Entities.appendSchemaHint($('.key:last', el), key, typeInfo);
+	},
+	appendSchemaHint: function (el, key, typeInfo) {
+
+		if (typeInfo[key] && typeInfo[key].hint) {
+			Structr.appendInfoTextToElement({
+				element: el,
+				text: typeInfo[key].hint,
+				css: { float: "right" }
+			});
+		}
 
 	},
 	queryDialog: function(entity, el) {
@@ -383,77 +391,70 @@ var _Entities = {
 	showProperties: function(obj, activeViewOverride) {
 
 		var handleGraphObject = function(entity) {
-			
-			var views, activeView = 'ui';
+
+			var views = ['ui'];
+			var activeView = 'ui';
 			var tabTexts = [];
 
 			if (activeViewOverride) {
 				activeView = activeViewOverride;
 			}
 
-			if (entity.hasOwnProperty('relType')) {
+			_Schema.getTypeInfo(entity.type, function(typeInfo) {
+				var dialogTitle;
 
-				views = ['ui'];//, 'sourceNode', 'targetNode'];
+				if (entity.hasOwnProperty('relType')) {
 
-				tabTexts.ui = 'Relationship Properties';
-				tabTexts.sourceNode = 'Source Node Properties';
-				tabTexts.targetNode = 'Target Node Properties';
+					tabTexts.ui = 'Relationship Properties';
+					tabTexts.sourceNode = 'Source Node Properties';
+					tabTexts.targetNode = 'Target Node Properties';
 
-				Structr.dialog('Edit Properties of ' + (entity.type ? entity.type : '') + ' relationship ' + (entity.name ? entity.name : entity.id), function() {
-					return true;
-				}, function() {
-					return true;
-				});
+					dialogTitle = 'Edit properties of ' + (entity.type ? entity.type : '') + ' relationship ' + (entity.name ? entity.name : entity.id);
 
-				var tabsdiv = dialogHead.append('<div id="tabs"></div>');
-				var mainTabs = tabsdiv.append('<ul></ul>');
-				var contentEl = dialog.append('<div></div>');
+				} else {
 
-				_Entities.appendViews(entity, views, tabTexts, mainTabs, contentEl, activeView);
+					views = views.concat(['in', 'out']);
 
-			} else {
-
-				views = ['ui', 'in', 'out'];
-
-				var hasHtmlAttributes = entity.isDOMNode;
-
-				if (hasHtmlAttributes && !entity.isContent) {
-					views.unshift('_html_');
-					if (Structr.isModuleActive(_Pages)) {
-						activeView = '_html_';
+					if (entity.isDOMNode && !entity.isContent) {
+						views.unshift('_html_');
+						if (Structr.isModuleActive(_Pages)) {
+							activeView = '_html_';
+						}
 					}
+
+					tabTexts._html_ = 'HTML Attributes';
+					tabTexts.ui = 'Node Properties';
+					tabTexts['in'] = 'Incoming Relationships';
+					tabTexts.out = 'Outgoing Relationships';
+
+					dialogTitle = 'Edit properties of ' + (entity.type ? entity.type : '') + ' node ' + (entity.name ? entity.name : entity.id);
+
 				}
 
-				tabTexts._html_ = 'HTML Attributes';
-				tabTexts.ui = 'Node Properties';
-				tabTexts['in'] = 'Incoming Relationships';
-				tabTexts.out = 'Outgoing Relationships';
-
-				Structr.dialog('Edit Properties of ' + (entity.type ? entity.type : '') + ' node ' + (entity.name ? entity.name : entity.id), function() {
-					return true;
-				}, function() {
-					return true;
-				});
+				Structr.dialog(dialogTitle, function() { return true; }, function() { return true; });
 
 				var tabsdiv = dialogHead.append('<div id="tabs"></div>');
 				var mainTabs = tabsdiv.append('<ul></ul>');
 				var contentEl = dialog.append('<div></div>');
 
-				if (hasHtmlAttributes) {
+				if (entity.isDOMNode) {
 
 					_Entities.appendPropTab(entity, mainTabs, contentEl, 'query', 'Query and Data Binding', true, function(c) {
-						_Entities.queryDialog(entity, c);
+						_Entities.queryDialog(entity, c, typeInfo);
 					});
 
 					_Entities.appendPropTab(entity, mainTabs, contentEl, 'editBinding', 'Edit Mode Binding', false, function(c) {
-						_Entities.dataBindingDialog(entity, c);
+						_Entities.dataBindingDialog(entity, c, typeInfo);
 					});
+
 				}
 
-				_Entities.appendViews(entity, views, tabTexts, mainTabs, contentEl, activeView, activeViewOverride);
-			}
+				_Entities.appendViews(entity, views, tabTexts, mainTabs, contentEl, activeView, activeViewOverride, typeInfo);
 
-			Structr.resize();			
+				Structr.resize();
+
+			});
+
 		};
 
 		if (obj.relType) {
@@ -497,7 +498,7 @@ var _Entities = {
 		}
 		return content;
 	},
-	appendViews: function(entity, views, texts, tabsEl, contentEl, activeView, activeViewOverride) {
+	appendViews: function(entity, views, texts, tabsEl, contentEl, activeView, activeViewOverride, typeInfo) {
 
 		var ul = tabsEl.children('ul');
 
@@ -522,21 +523,18 @@ var _Entities = {
 				tabView.show();
 				LSWrapper.setItem(_Entities.activeEditTabPrefix  + '_' + entity.id, view);
 
-				Command.getSchemaInfo(entity.type, function(schemaInfo) {
-					var typeInfo = {};
-					$(schemaInfo).each(function(i, prop) {
-						typeInfo[prop.jsonName] = prop;
-					});
-					_Entities.listProperties(entity, view, tabView, typeInfo);
-				});
+				_Entities.listProperties(entity, view, tabView, typeInfo);
 			});
 		});
 		activeView = activeViewOverride || LSWrapper.getItem(_Entities.activeEditTabPrefix  + '_' + entity.id) || activeView;
 		$('#tab-' + activeView).click();
 
 	},
+	getNullIconForKey: function (key) {
+		return '<i id="' + _Entities.null_prefix + key + '" class="nullIcon ' + _Icons.getFullSpriteClass(_Icons.grey_cross_icon) + '" />';
+	},
 	listProperties: function (entity, view, tabView, typeInfo) {
-		var null_prefix = 'null_attr_';
+
 		$.ajax({
 			url: rootUrl + entity.id + (view ? '/' + view : '') + '?pageSize=10', // TODO: Implement paging or scroll-into-view here
 			dataType: 'json',
@@ -555,248 +553,286 @@ var _Entities = {
 				$(data.result).each(function(i, res) {
 
 					// reset id for each object group
-					id = entity.id;
 					var keys = Object.keys(res);
-					tabView.append('<table class="props ' + view + ' ' + res['id'] + '_"></table>');
 
-					var props = $('.props.' + view + '.' + res['id'] + '_', tabView);
-					var focusAttr = 'class';
+					var noCategoryKeys = [];
+					var groupedKeys = {};
 
-					if (view === '_html_') {
-						keys.sort();
-					}
+					if (typeInfo) {
+						keys.forEach(function(key) {
+							if (typeInfo[key] && typeInfo[key].category) {
 
-					$(keys).each(function(i, key) {
-
-						if (view === '_html_') {
-
-							var display = false;
-							_Elements.mostUsedAttrs.forEach(function(mostUsed) {
-								if (isIn(entity.tag, mostUsed.elements) && isIn(key.substring(6), mostUsed.attrs)) {
-									display = true;
-									focusAttr = mostUsed.focus ? mostUsed.focus : focusAttr;
+								var category = typeInfo[key].category;
+								if (!groupedKeys[category]) {
+									groupedKeys[category] = [];
 								}
-							});
-
-							// Always show non-empty, non 'data-structr-' attributes
-							if (res[key] !== null && key.indexOf('data-structr-') !== 0) {
-								display = true;
-							}
-
-							var displayKey = key;
-							if (key.indexOf('data-') !== 0) {
-								if (key.indexOf('_html_') === 0) {
-									displayKey = displayKey.substring(6);
-								} else if (key.indexOf('_custom_html_') === 0) {
-									displayKey = displayKey.substring(13);
-								}
-							}
-
-							if (display || key === '_html_class' || key === '_html_id') {
-								props.append('<tr><td class="key">' + displayKey + '</td><td class="value ' + key + '_">' + formatValueInputField(key, res[key]) + '</td><td><i id="' + null_prefix + key + '" class="nullIcon ' + _Icons.getFullSpriteClass(_Icons.grey_cross_icon) + '" /></td></tr>');
-							} else if (key !== 'id') {
-								props.append('<tr class="hidden"><td class="key">' + displayKey + '</td><td class="value ' + key + '_">' + formatValueInputField(key, res[key]) + '</td><td><i id="' + null_prefix + key + '" class="nullIcon ' + _Icons.getFullSpriteClass(_Icons.grey_cross_icon) + '" /></td></tr>');
-							}
-						} else if (view === 'in' || view === 'out') {
-							if (key === 'id') {
-								// set ID to rel ID
-								id = res[key];
-							}
-							props.append('<tr><td class="key">' + key + '</td><td rel_id="' + id + '" class="value ' + key + '_">' + formatValueInputField(key, res[key]) + '</td><td><i id="' + null_prefix + key + '" class="nullIcon ' + _Icons.getFullSpriteClass(_Icons.grey_cross_icon) + '" /></td></tr>');
-						} else {
-
-							props.append('<tr><td class="key">' + formatKey(key) + '</td><td class="value ' + key + '_"></td><td><i id="' + null_prefix + key + '" class="nullIcon ' + _Icons.getFullSpriteClass(_Icons.grey_cross_icon) + '" /></td></tr>');
-							var cell = $('.value.' + key + '_', props);
-
-							if (!typeInfo[key]) {
-								cell.append(formatValueInputField(key, res[key], isPassword, isReadOnly, isMultiline));
-
+								groupedKeys[category].push(key);
 							} else {
-
-								var type = typeInfo[key].type;
-
-								var isReadOnly   = isIn(key, _Entities.readOnlyAttrs) || (typeInfo[key].readOnly);
-								var isSystem     = typeInfo[key].system;
-								var isBoolean    = false;
-								var isDate       = false;
-								var isPassword   = false;
-								var isRelated    = false;
-								var isCollection = false;
-								var isMultiline  = false;
-
-								if (type) {
-									isBoolean = (type === 'Boolean');
-									isDate = (type === 'Date');
-									isPassword = (typeInfo[key].className === 'org.structr.core.property.PasswordProperty');
-									isMultiline = (typeInfo[key].format === 'multi-line');
-
-									isRelated = typeInfo[key].relatedType;
-
-									if (isRelated) {
-										isCollection = typeInfo[key].isCollection;
-									}
-								}
-
-								if (!key.startsWith('_html_')) {
- 									if (isBoolean) {
-										cell.removeClass('value').append('<input type="checkbox" class="' + key + '_">');
-										var checkbox = $(props.find('input[type="checkbox"].' + key + '_'));
-
-										var val = res[key];
-										if (val) {
-											checkbox.prop('checked', true);
-										}
-										if ((!isReadOnly || isAdmin) && !isSystem) {
-											checkbox.on('change', function() {
-												var checked = checkbox.prop('checked');
-												_Entities.setProperty(id, key, checked, false, function(newVal) {
-													if (val !== newVal) {
-														blinkGreen(cell);
-													}
-													checkbox.prop('checked', newVal);
-													val = newVal;
-												});
-											});
-										} else {
-											checkbox.prop('disabled', 'disabled').addClass('readOnly').addClass('disabled');
-										}
-
-									} else if (isDate && !isReadOnly) {
-
-										_Entities.appendDatePicker(cell, res, key, typeInfo[key].format);
-
-									} else if (isRelated) {
-
-										if (res[key]) {
-
-											if (!isCollection) {
-
-												var nodeId = res[key].id || res[key];
-
-												tempNodeCache.registerCallbackForId(nodeId, function(node) {
-
-													_Entities.appendRelatedNode(cell, node, function(nodeEl) {
-														$('.remove', nodeEl).on('click', function(e) {
-															e.preventDefault();
-															_Entities.setProperty(id, key, null, false, function(newVal) {
-																if (!newVal) {
-																	nodeEl.remove();
-																	blinkGreen(cell);
-																	Structr.showAndHideInfoBoxMessage('Related node "' + (node.name || node.id) + '" was removed from property "' + key + '".', 'success', 2000, 1000);
-																} else {
-																	blinkRed(cell);
-																}
-															});
-															return false;
-														});
-													});
-												});
-
-											} else {
-
-												res[key].forEach(function(obj) {
-
-													var nodeId = obj.id || obj;
-
-													tempNodeCache.registerCallbackForId(nodeId, function(node) {
-
-														_Entities.appendRelatedNode(cell, node, function(nodeEl) {
-															$('.remove', nodeEl).on('click', function(e) {
-																e.preventDefault();
-																Command.removeFromCollection(id, key, node.id, function() {
-																	nodeEl.remove();
-																	blinkGreen(cell);
-																	Structr.showAndHideInfoBoxMessage('Related node "' + (node.name || node.id) + '" was removed from property "' + key + '".', 'success', 2000, 1000);
-																});
-																return false;
-															});
-														});
-													});
-
-												});
-											}
-										}
-
-										cell.append('<i class="add ' + _Icons.getFullSpriteClass(_Icons.add_grey_icon) + '" />');
-										$('.add', cell).on('click', function() {
-											Structr.dialog('Add ' + typeInfo[key].type, function() {
-											}, function() {
-												_Entities.showProperties(entity);
-											});
-											_Entities.displaySearch(id, key, typeInfo[key].type, dialogText, isCollection);
-										});
-
-									} else {
-										cell.append(formatValueInputField(key, res[key], isPassword, isReadOnly, isMultiline));
-									}
-
-								}
+								noCategoryKeys.push(key);
 							}
-						}
-
-						var nullIcon = $('#' + null_prefix + key);
-						nullIcon.on('click', function() {
-							var key = $(this).prop('id').substring(null_prefix.length);
-							var input    = $('.' + key + '_').find('input');
-							var textarea = $('.' + key + '_').find('textarea');
-							_Entities.setProperty(id, key, null, false, function(newVal) {
-								if (!newVal) {
-									blinkGreen(cell);
-									Structr.showAndHideInfoBoxMessage('Property "' + key + '" was set to null.', 'success', 2000, 1000);
-
-									if (key === 'name') {
-										var entity = StructrModel.objects[id];
-										if (entity.type !== 'Template' && entity.type !== 'Content') {
-											entity.name = entity.tag ? entity.tag : '[' + entity.type + ']';
-										}
-										StructrModel.refresh(id);
-									}
-									if (isRelated) {
-										cell.empty();
-									}
-									if (isBoolean) {
-										input.prop('checked', false);
-									}
-								} else {
-									blinkRed(input);
-								}
-								if (!isRelated) {
-									input.val(newVal);
-									textarea.val(newVal);
-								}
-							});
-						});
-					});
-
-					props.append('<tr class="hidden"><td class="key"><input type="text" class="newKey" name="key"></td><td class="value"><input type="text" value=""></td><td></td></tr>');
-					$('.props tr td.value input',    dialog).each(function(i, inputEl)    { _Entities.activateInput(inputEl,    id, entity.pageId); });
-					$('.props tr td.value textarea', dialog).each(function(i, textareaEl) { _Entities.activateInput(textareaEl, id, entity.pageId); });
-
-					Structr.appendInfoTextToElement({
-						element: $('.newKey', props),
-						text: "Any attribute name is allowed but 'data-' attributes are recommended.",
-						insertAfter: true,
-						css: {
-							marginLeft: "3px",
-							top: "-5px",
-							position: "relative"
-						}
-					});
-
-					if (view === '_html_') {
-						$('input[name="_html_' + focusAttr + '"]', props).focus();
-
-						tabView.append('<button class="show-all">Show all attributes</button>');
-						$('.show-all', tabView).on('click', function() {
-							$('tr.hidden').toggle();
-							$(this).remove();
 						});
 					}
 
-
+					_Entities.createPropertyTable(null, noCategoryKeys, res, entity, view, tabView, typeInfo, tempNodeCache);
+					Object.keys(groupedKeys).sort().forEach(function(categoryName) {
+						_Entities.createPropertyTable(categoryName, groupedKeys[categoryName], res, entity, view, tabView, typeInfo, tempNodeCache);
+					});
 				});
 			}
 		});
+
+	},
+	createPropertyTable: function (heading, keys, res, entity, view, tabView, typeInfo, tempNodeCache) {
+
+		if (heading) {
+			tabView.append('<h2>' + heading + '</h2>');
+		}
+		tabView.append('<table class="props ' + view + ' ' + res['id'] + '_"></table>');
+		var propsTable = $('table:last', tabView);
+		var focusAttr = 'class';
+		var id = entity.id;
+
+		if (view === '_html_') {
+			keys.sort();
+		}
+
+		$(keys).each(function(i, key) {
+
+			if (view === '_html_') {
+
+				var display = false;
+				_Elements.mostUsedAttrs.forEach(function(mostUsed) {
+					if (isIn(entity.tag, mostUsed.elements) && isIn(key.substring(6), mostUsed.attrs)) {
+						display = true;
+						focusAttr = mostUsed.focus ? mostUsed.focus : focusAttr;
+					}
+				});
+
+				// Always show non-empty, non 'data-structr-' attributes
+				if (res[key] !== null && key.indexOf('data-structr-') !== 0) {
+					display = true;
+				}
+
+				var displayKey = key;
+				if (key.indexOf('data-') !== 0) {
+					if (key.indexOf('_html_') === 0) {
+						displayKey = displayKey.substring(6);
+					} else if (key.indexOf('_custom_html_') === 0) {
+						displayKey = displayKey.substring(13);
+					}
+				}
+
+				if (display || key === '_html_class' || key === '_html_id') {
+					propsTable.append('<tr><td class="key">' + displayKey + '</td><td class="value ' + key + '_">' + formatValueInputField(key, res[key]) + '</td><td>' + _Entities.getNullIconForKey(key) + '</td></tr>');
+				} else if (key !== 'id') {
+					propsTable.append('<tr class="hidden"><td class="key">' + displayKey + '</td><td class="value ' + key + '_">' + formatValueInputField(key, res[key]) + '</td><td>' + _Entities.getNullIconForKey(key) + '</td></tr>');
+				}
+
+			} else if (view === 'in' || view === 'out') {
+				if (key === 'id') {
+					// set ID to rel ID
+					id = res[key];
+				}
+				propsTable.append('<tr><td class="key">' + key + '</td><td rel_id="' + id + '" class="value ' + key + '_">' + formatValueInputField(key, res[key]) + '</td></tr>');
+
+			} else {
+
+				var isReadOnly   = false;
+				var isSystem     = false;
+				var isBoolean    = false;
+				var isDate       = false;
+				var isPassword   = false;
+				var isRelated    = false;
+				var isCollection = false;
+				var isMultiline  = false;
+
+				var row = $('<tr><td class="key">' + formatKey(key) + '</td><td class="value ' + key + '_"></td><td>' + _Entities.getNullIconForKey(key) + '</td></tr>');
+				propsTable.append(row);
+				var cell = $('.value.' + key + '_', propsTable);
+
+				if (!typeInfo[key]) {
+					cell.append(formatValueInputField(key, res[key], isPassword, isReadOnly, isMultiline));
+
+				} else {
+
+					var type = typeInfo[key].type;
+
+					isReadOnly = isIn(key, _Entities.readOnlyAttrs) || (typeInfo[key].readOnly);
+					isSystem = typeInfo[key].system;
+					isPassword = (typeInfo[key].className === 'org.structr.core.property.PasswordProperty');
+					isMultiline = (typeInfo[key].format === 'multi-line');
+					isRelated = typeInfo[key].relatedType;
+					if (isRelated) {
+						isCollection = typeInfo[key].isCollection;
+					}
+
+					if (type) {
+						isBoolean = (type === 'Boolean');
+						isDate = (type === 'Date');
+					}
+
+					if (!key.startsWith('_html_')) {
+						if (isBoolean) {
+							cell.removeClass('value').append('<input type="checkbox" class="' + key + '_">');
+							var checkbox = $(propsTable.find('input[type="checkbox"].' + key + '_'));
+
+							var val = res[key];
+							if (val) {
+								checkbox.prop('checked', true);
+							}
+							if ((!isReadOnly || isAdmin) && !isSystem) {
+								checkbox.on('change', function() {
+									var checked = checkbox.prop('checked');
+									_Entities.setProperty(id, key, checked, false, function(newVal) {
+										if (val !== newVal) {
+											blinkGreen(cell);
+										}
+										checkbox.prop('checked', newVal);
+										val = newVal;
+									});
+								});
+							} else {
+								checkbox.prop('disabled', 'disabled').addClass('readOnly').addClass('disabled');
+							}
+
+						} else if (isDate && !isReadOnly) {
+
+							_Entities.appendDatePicker(cell, res, key, typeInfo[key].format);
+
+						} else if (isRelated) {
+
+							if (res[key]) {
+
+								if (!isCollection) {
+
+									var nodeId = res[key].id || res[key];
+
+									tempNodeCache.registerCallbackForId(nodeId, function(node) {
+
+										_Entities.appendRelatedNode(cell, node, function(nodeEl) {
+											$('.remove', nodeEl).on('click', function(e) {
+												e.preventDefault();
+												_Entities.setProperty(id, key, null, false, function(newVal) {
+													if (!newVal) {
+														nodeEl.remove();
+														blinkGreen(cell);
+														Structr.showAndHideInfoBoxMessage('Related node "' + (node.name || node.id) + '" was removed from property "' + key + '".', 'success', 2000, 1000);
+													} else {
+														blinkRed(cell);
+													}
+												});
+												return false;
+											});
+										});
+									});
+
+								} else {
+
+									res[key].forEach(function(obj) {
+
+										var nodeId = obj.id || obj;
+
+										tempNodeCache.registerCallbackForId(nodeId, function(node) {
+
+											_Entities.appendRelatedNode(cell, node, function(nodeEl) {
+												$('.remove', nodeEl).on('click', function(e) {
+													e.preventDefault();
+													Command.removeFromCollection(id, key, node.id, function() {
+														nodeEl.remove();
+														blinkGreen(cell);
+														Structr.showAndHideInfoBoxMessage('Related node "' + (node.name || node.id) + '" was removed from property "' + key + '".', 'success', 2000, 1000);
+													});
+													return false;
+												});
+											});
+										});
+
+									});
+								}
+							}
+
+							cell.append('<i class="add ' + _Icons.getFullSpriteClass(_Icons.add_grey_icon) + '" />');
+							$('.add', cell).on('click', function() {
+								Structr.dialog('Add ' + typeInfo[key].type, function() {
+								}, function() {
+									_Entities.showProperties(entity);
+								});
+								_Entities.displaySearch(id, key, typeInfo[key].type, dialogText, isCollection);
+							});
+
+						} else {
+							cell.append(formatValueInputField(key, res[key], isPassword, isReadOnly, isMultiline));
+						}
+
+					}
+				}
+
+				if (isSystem || isReadOnly || isBoolean) {
+					$('i.nullIcon', row).remove();
+				}
+			}
+
+			_Entities.appendSchemaHint($('.key:last', propsTable), key, typeInfo);
+
+			var nullIcon = $('#' + _Entities.null_prefix + key);
+			nullIcon.on('click', function() {
+				var key = $(this).prop('id').substring(_Entities.null_prefix.length);
+				var input    = $('.' + key + '_').find('input');
+				var textarea = $('.' + key + '_').find('textarea');
+				_Entities.setProperty(id, key, null, false, function(newVal) {
+					if (!newVal) {
+						blinkGreen(cell);
+						Structr.showAndHideInfoBoxMessage('Property "' + key + '" was set to null.', 'success', 2000, 1000);
+
+						if (key === 'name') {
+							var entity = StructrModel.objects[id];
+							if (entity.type !== 'Template' && entity.type !== 'Content') {
+								entity.name = entity.tag ? entity.tag : '[' + entity.type + ']';
+							}
+							StructrModel.refresh(id);
+						}
+						if (isRelated) {
+							cell.empty();
+						}
+						if (isBoolean) {
+							input.prop('checked', false);
+						}
+					} else {
+						blinkRed(input);
+					}
+					if (!isRelated) {
+						input.val(newVal);
+						textarea.val(newVal);
+					}
+				});
+			});
+		});
+
+
+		propsTable.append('<tr class="hidden"><td class="key"><input type="text" class="newKey" name="key"></td><td class="value"><input type="text" value=""></td><td></td></tr>');
+		$('.props tr td.value input',    dialog).each(function(i, inputEl)    { _Entities.activateInput(inputEl,    id, entity.pageId); });
+		$('.props tr td.value textarea', dialog).each(function(i, textareaEl) { _Entities.activateInput(textareaEl, id, entity.pageId); });
+
+		Structr.appendInfoTextToElement({
+			element: $('.newKey', propsTable),
+			text: "Any attribute name is allowed but 'data-' attributes are recommended.",
+			insertAfter: true,
+			css: {
+				marginLeft: "3px",
+				top: "-5px",
+				position: "relative"
+			}
+		});
+
+		if (view === '_html_') {
+			$('input[name="_html_' + focusAttr + '"]', propsTable).focus();
+
+			tabView.append('<button class="show-all">Show all attributes</button>');
+			$('.show-all', tabView).on('click', function() {
+				$('tr.hidden').toggle();
+				$(this).remove();
+			});
+		}
 
 	},
 	displaySearch: function(id, key, type, el, isCollection) {
@@ -1068,24 +1104,24 @@ var _Entities = {
 		Structr.dialog('Access Control and Visibility', function() {
 		}, function() {
 			if (Structr.isModuleActive(_Crud)) {
-				
+
 				var handleGraphObject = function(entity) {
 					if (!entity.owner || initialObj.ownerId !== entity.owner.id) {
 						_Crud.refreshCell(id, "owner", entity.owner, entity.type, initialObj.ownerId);
 					}
 
-					_Crud.refreshCell(id, "visibleToPublicUsers", entity.visibleToPublicUsers, entity.type, initialObj.visibleToPublicUsers);
-					_Crud.refreshCell(id, "visibleToAuthenticatedUsers", entity.visibleToAuthenticatedUsers, entity.type, initialObj.visibleToAuthenticatedUsers);					
+					_Crud.refreshCell(id, "visibleToPublicUsers",        entity.visibleToPublicUsers,        entity.type, initialObj.visibleToPublicUsers);
+					_Crud.refreshCell(id, "visibleToAuthenticatedUsers", entity.visibleToAuthenticatedUsers, entity.type, initialObj.visibleToAuthenticatedUsers);
 				};
-				
+
 				if (entity.targetId) {
-					Command.getRelationship(id, entity.targetId, "id,type,owner,visibleToPublicUsers,visibleToAuthenticatedUsers", function(entity) { handleGraphObject(entity) });
+					Command.getRelationship(id, entity.targetId, "id,type,owner,visibleToPublicUsers,visibleToAuthenticatedUsers", handleGraphObject);
 				} else {
-					Command.get(id, "id,type,owner,visibleToPublicUsers,visibleToAuthenticatedUsers", function(entity) { handleGraphObject(entity) });
+					Command.get(id, "id,type,owner,visibleToPublicUsers,visibleToAuthenticatedUsers", handleGraphObject);
 				}
 			}
 		});
-		
+
 		var handleGraphObject = function(entity) {
 
 			initialObj = {

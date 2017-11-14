@@ -1402,6 +1402,8 @@ public class SchemaHelper {
 		map.put("unique", property.isUnique());
 		map.put("notNull", property.isNotNull());
 		map.put("dynamic", property.isDynamic());
+		map.put("hint", property.hint());
+		map.put("category", property.category());
 
 		final Class<? extends GraphObject> relatedType = property.relatedType();
 		if (relatedType != null) {

@@ -180,6 +180,20 @@ $(function() {
 			e.preventDefault();
 			_Favorites.toggleFavorites();
 		}
+		// Ctrl-Alt-p
+		if (k === 80 && altKey && ctrlKey) {
+			e.preventDefault();
+			var uuid = prompt('Enter the UUID for which you want to open the properties dialog');
+			if (uuid) {
+				if (uuid.length === 32) {
+					Command.get(uuid, null, function(obj) {
+						_Entities.showProperties(obj);
+					});
+				} else {
+					alert('That does not look like a UUID! length != 32');
+				}
+			}
+		}
 	});
 
 	$(window).on('resize', function() {
@@ -1186,12 +1200,7 @@ var Structr = {
 					var version = ui.version;
 					var build = ui.build;
 					var date = ui.date;
-					var versionLink;
-					if (version.endsWith('SNAPSHOT')) {
-						versionLink = 'https://oss.sonatype.org/content/repositories/snapshots/org/structr/structr-ui/' + version;
-					} else {
-						versionLink = 'http://repo1.maven.org/maven2/org/structr/structr-ui/' + version;
-					}
+					var versionLink = 'https://structr.org/download';
 					var versionInfo = '<a target="_blank" href="' + versionLink + '">' + version + '</a>';
 					if (build && date) {
 						versionInfo += '<span> build </span><a target="_blank" href="https://github.com/structr/structr/commit/' + build + '">' + build + '</a><span> (' + date + ')</span>';

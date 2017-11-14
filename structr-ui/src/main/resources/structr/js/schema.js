@@ -67,13 +67,16 @@ var _Schema = {
 		+ '<option value="Enum">Enum</option>'
 		+ '<option value="Date">Date</option>'
 		+ '<option value="Count">Count</option>'
-		+ '<option value="Function">Function</option>'
+		+ '<option value="Function" data-indexed="false">Function</option>'
 		+ '<option value="Notion">Notion</option>'
 		+ '<option value="Join">Join</option>'
-		+ '<option value="Cypher">Cypher</option>'
+		+ '<option value="Cypher" data-indexed="false">Cypher</option>'
 		+ '<option value="Thumbnail">Thumbnail</option>',
 	currentNodeDialogId:null,
 	reload: function(callback) {
+
+		_Schema.clearTypeInfoCache();
+
 		if (reload) {
 			return;
 		}
@@ -426,6 +429,8 @@ var _Schema = {
 
 	},
 	processSchemaRecompileNotification: function () {
+
+		_Schema.clearTypeInfoCache();
 
 		if (Structr.isModuleActive(_Schema)) {
 
@@ -1182,6 +1187,21 @@ var _Schema = {
 					+ '<i title="Save changes" class="create-icon create-property ' + _Icons.getFullSpriteClass(_Icons.tick_icon) + '" />'
 					+ '<i title="Discard changes" class="remove-icon remove-property ' + _Icons.getFullSpriteClass(_Icons.cross_icon) + '" />'
 					+ '</td></div>');
+
+			$('.' + rowClass + ' .property-type', propertiesTable).on('change', function() {
+				var selectedOption = $('option:selected', this);
+				var shouldIndex = selectedOption.data('indexed');
+				if (shouldIndex === undefined) {
+					shouldIndex = true;
+				}
+				var indexedCb = $('.' + rowClass + ' .indexed');
+				if (indexedCb.prop('checked') !== shouldIndex) {
+					indexedCb.prop('checked', shouldIndex);
+
+					blink(indexedCb.closest('td'), '#fff', '#bde5f8');
+					Structr.showAndHideInfoBoxMessage('Automatically updated indexed flag to default behavior for property type (you can still override this)', 'info', 2000, 200);
+				}
+			});
 
 			$('.' + rowClass + ' .remove-property', propertiesTable).on('click', function() {
 				var self = $(this);
@@ -3507,10 +3527,6 @@ var _Schema = {
 
 		};
 
-		var actionsAvailableForClass = function(className) {
-			return (["AbstractNode", "ContentContainer", "ContentItem"].indexOf(className) === -1);
-		};
-
 		var printClassTree = function($elem, classTree) {
 			var classes = Object.keys(classTree).sort();
 
@@ -3519,17 +3535,15 @@ var _Schema = {
 				var $newUl = $('<ul></ul>').appendTo($elem);
 
 				classes.forEach(function(classname) {
+					var actionsAvailableForClass = !!(classnameToId[classname]);
 
-					var icons = (actionsAvailableForClass(classname) ? '<b class="delete_icon icon delete ' + _Icons.getFullSpriteClass(_Icons.delete_icon) + '" /><b class="edit_icon icon edit ' + _Icons.getFullSpriteClass(_Icons.edit_icon) + '" />' : '');
-					var classId = (actionsAvailableForClass(classname) ? ' data-id="' + classnameToId[classname] + '"' : '');
+					var icons = (actionsAvailableForClass ? '<b class="delete_icon icon delete ' + _Icons.getFullSpriteClass(_Icons.delete_icon) + '" /><b class="edit_icon icon edit ' + _Icons.getFullSpriteClass(_Icons.edit_icon) + '" />' : '');
+					var classId = (actionsAvailableForClass ? ' data-id="' + classnameToId[classname] + '"' : '');
 
 					var $newLi = $('<li data-jstree=\'{"opened":true}\'' + classId + '>' + classname + icons + '</li>').appendTo($newUl);
 					printClassTree($newLi, classTree[classname]);
-
 				});
-
 			}
-
 		};
 
 		schemaNodes.forEach(function(schemaNode) {
@@ -3756,5 +3770,35 @@ var _Schema = {
 			overlaps |= (Math.abs(position.left - offset.left) < 20 && Math.abs(position.top - offset.top) < 20);
 		});
 		return overlaps;
+	},
+
+	typeInfoCache: {},
+	clearTypeInfoCache: function () {
+		_Logger.log(_LogType.SCHEMA, 'Clear Schema Type Cache');
+		_Schema.typeInfoCache = {};
+	},
+	getTypeInfo: function (type, callback) {
+
+		if (_Schema.typeInfoCache[type] !== undefined) {
+
+			_Logger.log(_LogType.SCHEMA, 'Cache Hit: ', type);
+			callback(_Schema.typeInfoCache[type]);
+
+		} else {
+
+			_Logger.log(_LogType.SCHEMA, 'Cache MISS: ', type);
+
+			Command.getSchemaInfo(type, function(schemaInfo) {
+
+				var typeInfo = {};
+				$(schemaInfo).each(function(i, prop) {
+					typeInfo[prop.jsonName] = prop;
+				});
+
+				_Schema.typeInfoCache[type] = typeInfo;
+
+				callback(typeInfo);
+			});
+		}
 	}
 };
