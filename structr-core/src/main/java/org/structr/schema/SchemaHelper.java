@@ -53,7 +53,6 @@ import org.structr.common.View;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.common.error.InvalidPropertySchemaToken;
-import org.structr.common.error.UnknownTypeToken;
 import org.structr.core.Export;
 import org.structr.core.GraphObject;
 import org.structr.core.GraphObjectMap;
@@ -515,8 +514,21 @@ public class SchemaHelper {
 		final String superClass                                = _extendsClass != null ? _extendsClass : baseType.getSimpleName();
 		final boolean extendsAbstractNode                      = _extendsClass == null;
 
-		// import mixins
-		SchemaHelper.importMixins(schemaNode, implementedInterfaces, importStatements, mixinCodeBuffer);
+		// check superclass
+		if (!extendsAbstractNode && !SchemaHelper.hasType(superClass) && !superClass.startsWith("org.structr.dynamic.")) {
+
+			// we can only detect if a type is missing that is usually provided by a module; we
+			// can not detect whether a dynamic type is missing because those are only available
+			// after compiling the whole set of schema nodes
+			logger.warn("Dynamic type {} cannot be used, superclass {} not defined.", schemaNode.getName(), superClass);
+			return null;
+		}
+
+		// import mixins, check that all types exist and return null otherwise (causing this class to be ignored)
+		if (!SchemaHelper.importMixins(schemaNode, implementedInterfaces, importStatements, mixinCodeBuffer)) {
+			logger.warn("Dynamic type {} cannot be used, mixin type not defined.", schemaNode.getName());
+			return null;
+		}
 
 		// package name
 		src.append("package org.structr.dynamic;\n\n");
@@ -1086,7 +1098,7 @@ public class SchemaHelper {
 
 	}
 
-	public static void importMixins(final AbstractSchemaNode schemaInfo, final Set<Class> classes, final List<String> imports, final StringBuilder src) throws FrameworkException {
+	public static boolean importMixins(final AbstractSchemaNode schemaInfo, final Set<Class> classes, final List<String> imports, final StringBuilder src) throws FrameworkException {
 
 		final String _implementsInterfaces = schemaInfo.getProperty(SchemaNode.implementsInterfaces);
 		if (StringUtils.isNotBlank(_implementsInterfaces)) {
@@ -1147,11 +1159,14 @@ public class SchemaHelper {
 
 					} else {
 
-						throw new FrameworkException(422, "Unknown type "+ trimmed, new UnknownTypeToken(trimmed));
+						// ignore type
+						return false;
 					}
 				}
 			}
 		}
+
+		return true;
 	}
 
 	public static String cleanPropertyName(final String propertyName) {
@@ -1674,5 +1689,9 @@ public class SchemaHelper {
 		}
 
 		return false;
+	}
+
+	private static boolean hasType(final String fqcn) {
+		return SchemaHelper.classForName(fqcn) != null;
 	}
 }

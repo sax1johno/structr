@@ -120,9 +120,16 @@ public class SchemaService implements Service {
 					// add schema nodes from database
 					for (final SchemaNode schemaInfo : StructrApp.getInstance().nodeQuery(SchemaNode.class).getAsList()) {
 
-						nodeExtender.addClass(schemaInfo.getClassName(), SchemaHelper.getSource(schemaInfo, errorBuffer));
+						schemaInfo.handleMigration();
 
-						dynamicViews.addAll(schemaInfo.getDynamicViews());
+						final String sourceCode = SchemaHelper.getSource(schemaInfo, errorBuffer);
+						if (sourceCode != null) {
+
+							// only load dynamic node if there were no errors while generating
+							// the source code (missing modules etc.)
+							nodeExtender.addClass(schemaInfo.getClassName(), sourceCode);
+							dynamicViews.addAll(schemaInfo.getDynamicViews());
+						}
 					}
 
 					// collect relationship classes

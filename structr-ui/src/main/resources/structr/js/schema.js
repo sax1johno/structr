@@ -956,11 +956,28 @@ var _Schema = {
 			var result = data.result;
 			var classNames = [];
 			$.each(result, function(t, cls) {
-				var type = cls.type;
-				var fqcn = cls.className;
-				if ( cls.isRel || !type || type.startsWith('_') || fqcn.startsWith('org.structr.web.entity.html') || fqcn.endsWith('.' + entity.name) ) {
+
+				var type   = cls.type;
+				var fqcn   = cls.className;
+				var ignore = false;
+
+				if ( cls.isRel || !type || type.startsWith('_') || fqcn.endsWith('.' + entity.name)) {
 					return;
 				}
+				if (!fqcn.startsWith('org.structr.dynamic.') && !fqcn.endsWith('AbstractNode')) {
+					return;
+				}
+
+				cls.interfaces.forEach(function(i) {
+
+					if (i.startsWith('org.structr.web.entity.html.')) {
+						ignore = true;
+					}
+				});
+				if (ignore) {
+					return;
+				}
+
 				classNames.push(fqcn);
 			});
 

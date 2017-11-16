@@ -271,6 +271,31 @@ public class SchemaNode extends AbstractSchemaNode {
 		return null;
 	}
 
+	public void handleMigration() throws FrameworkException {
+
+		// we need to consider the following cases:
+		//  - class extends other dynamic class => no change
+		//  - class extends FileBase => make it extend AbstractNode and implement File
+		//  - class extends built-in type => make it extend AbstractNode and implement dynamic interface
+
+		final String _extendsClass = getProperty(extendsClass);
+		if (_extendsClass != null) {
+
+			// we need to migrate
+			if (_extendsClass.equals("org.structr.web.entity.FileBase")) {
+
+				removeProperty(extendsClass);
+				setProperty(implementsInterfaces, "org.structr.web.entity.File");
+
+			} else if (_extendsClass.startsWith("org.structr.") && !_extendsClass.startsWith("org.structr.dynamic.") && !AbstractNode.class.getName().equals(_extendsClass)) {
+
+				// move extendsClass to implementsInterfaces
+				setProperty(implementsInterfaces, _extendsClass);
+				removeProperty(extendsClass);
+			}
+		}
+	}
+
 	// ----- private methods -----
 	private String getRelatedType(final SchemaNode schemaNode, final String propertyNameToCheck) {
 

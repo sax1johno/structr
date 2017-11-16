@@ -677,8 +677,6 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 		Set<String> allSubtypes = subtypeMapForType.get(type);
 		if (allSubtypes == null) {
 
-			logger.debug("Subtype map cache miss.");
-
 			allSubtypes = new LinkedHashSet<>();
 			subtypeMapForType.put(type, allSubtypes);
 
@@ -698,10 +696,7 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 
 				for (final Class superClass : ancestors) {
 
-					final String superClasSimpleName = superClass.getSimpleName();
-					final String superClassFullName  = superClass.getName();
-
-					if ((superClassFullName.startsWith("org.structr.") || superClassFullName.startsWith("com.structr.")) && superClasSimpleName.equals(type)) {
+					if (doInclude(type, superClass)) {
 
 						allSubtypes.add(entityType.getSimpleName());
 					}
@@ -716,10 +711,7 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 
 				for (final Class superClass : ancestors) {
 
-					final String superClasSimpleName = superClass.getSimpleName();
-					final String superClassFullName  = superClass.getName();
-
-					if ((superClassFullName.startsWith("org.structr.") || superClassFullName.startsWith("com.structr.")) && superClasSimpleName.equals(type)) {
+					if (doInclude(type, superClass)) {
 
 						allSubtypes.add(entityType.getSimpleName());
 					}
@@ -762,6 +754,11 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 				continue;
 			}
 
+			// do not include classes that match org.structr.*Mixin
+			if (localType.getName().startsWith("org.structr.") &&localType.getSimpleName().endsWith("Mixin")) {
+				continue;
+			}
+
 			// record type
 			allSupertypes.add(localType);
 
@@ -784,6 +781,24 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 		allSupertypes.removeAll(baseTypes);
 
 		return allSupertypes;
+	}
+
+	private static boolean doInclude(final String type, final Class superClass) {
+
+		final String superClassName = superClass.getName();
+
+		if (superClass.getSimpleName().equals(type)) {
+
+			if (superClassName.startsWith("org.structr.")) {
+				return !type.endsWith("Mixin");
+			}
+
+			if (superClassName.startsWith("com.structr.")) {
+				return !type.endsWith("Mixin");
+			}
+		}
+
+		return false;
 	}
 
 	// ----- nested classes -----

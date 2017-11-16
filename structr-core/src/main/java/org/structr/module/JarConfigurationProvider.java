@@ -537,6 +537,11 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 		final String simpleName = type.getSimpleName();
 		final String fqcn       = type.getName();
 
+		// do not register types that match org.structr.*Mixin (helpers)
+		if (fqcn.startsWith("org.structr.") && simpleName.endsWith("Mixin")) {
+			return;
+		}
+
 		if (AbstractNode.class.isAssignableFrom(type)) {
 
 			nodeEntityClassCache.put(simpleName, type);

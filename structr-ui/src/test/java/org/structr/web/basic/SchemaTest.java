@@ -84,29 +84,6 @@ public class SchemaTest extends StructrUiTest {
 	}
 
 	@Test
-	public void testUnknowInterfaceError() {
-
-		try (final Tx tx = app.tx()) {
-
-			// Create schema node type that extends existing Group interface
-			// but adds a validated string property to test the isValid()
-			// method.
-			app.create(SchemaNode.class,
-				new NodeAttribute<>(SchemaNode.name, "InheritanceTest"),
-				new NodeAttribute<>(SchemaNode.implementsInterfaces,
-					"org.structr.core.entity.File"
-				)
-			);
-
-			tx.success();
-
-			fail("Unknown interface should throw an exception.");
-
-		} catch (FrameworkException fex) {
-		}
-	}
-
-	@Test
 	public void testInheritedValidationWithoutValidatedProperty() {
 
 		try (final Tx tx = app.tx()) {

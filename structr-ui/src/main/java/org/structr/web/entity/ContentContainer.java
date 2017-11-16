@@ -21,7 +21,7 @@ package org.structr.web.entity;
 import java.util.List;
 import org.structr.common.PropertyView;
 import org.structr.common.View;
-import org.structr.core.entity.AbstractNode;
+import org.structr.core.graph.NodeInterface;
 import org.structr.core.property.ConstantBooleanProperty;
 import org.structr.core.property.EndNodes;
 import org.structr.core.property.Property;
@@ -33,15 +33,15 @@ import org.structr.web.property.ContentPathProperty;
 /**
  * Base class for all content containers.
  */
-public abstract class ContentContainer extends AbstractNode {
+public interface ContentContainer extends NodeInterface {
 
 	public static final Property<List<ContentItem>>      items              = new EndNodes<>("items", ContainerContentItems.class);
 	public static final Property<ContentContainer>       parent             = new StartNode<>("parent", ContainerContentContainer.class);
 	public static final Property<List<ContentContainer>> childContainers    = new EndNodes<>("childContainers", ContainerContentContainer.class);
 	public static final Property<Boolean>                isContentContainer = new ConstantBooleanProperty("isContentContainer", true);
 	public static final Property<String>                 path               = new ContentPathProperty("path").indexed().readOnly();
-	
+
 	public static final View publicView = new View(Folder.class, PropertyView.Public, id, type, name, path, owner, items, parent, childContainers, isContentContainer);
 	public static final View uiView     = new View(Folder.class, PropertyView.Ui, id, type, name, path, owner, items, parent, childContainers, isContentContainer);
-	
+
 }

@@ -189,7 +189,7 @@ public class AdvancedSchemaTest extends FrontendTest {
 
 			final PropertyMap subFileProperties = new PropertyMap();
 			subFileProperties.put(SchemaNode.name, "SubFile");
-			subFileProperties.put(SchemaNode.extendsClass, "File");
+			subFileProperties.put(SchemaNode.extendsClass, "org.structr.dynamic.File");
 			subFile.setProperties(subFile.getSecurityContext(), subFileProperties);
 
 
@@ -267,8 +267,7 @@ public class AdvancedSchemaTest extends FrontendTest {
 			final PropertyMap testFileProperties = new PropertyMap();
 			testFileProperties.put(SchemaProperty.name, "testFile");
 			testFileProperties.put(SchemaProperty.propertyType, "String");
-			testFileProperties.put(SchemaProperty.schemaNode, fileNodeDef)
-				;
+			testFileProperties.put(SchemaProperty.schemaNode, fileNodeDef);
 			testFileProperty.setProperties(testFileProperty.getSecurityContext(), testFileProperties);
 
 			tx.success();
@@ -284,7 +283,7 @@ public class AdvancedSchemaTest extends FrontendTest {
 
 			final PropertyMap subFileProperties = new PropertyMap();
 			subFileProperties.put(SchemaNode.name, "SubFile");
-			subFileProperties.put(SchemaNode.extendsClass, "Image");
+			subFileProperties.put(SchemaNode.extendsClass, "org.structr.dynamic.Image");
 			subFile.setProperties(subFile.getSecurityContext(), subFileProperties);
 
 

@@ -18,6 +18,7 @@
  */
 package org.structr.rest.resource;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -39,6 +40,7 @@ import org.structr.core.entity.Relation;
 import org.structr.core.entity.Relation.Multiplicity;
 import org.structr.core.entity.relationship.SchemaRelationship;
 import org.structr.core.graph.search.SearchCommand;
+import org.structr.core.property.ArrayProperty;
 import org.structr.core.property.BooleanProperty;
 import org.structr.core.property.GenericProperty;
 import org.structr.core.property.LongProperty;
@@ -63,6 +65,7 @@ public class SchemaResource extends Resource {
 	private static final StringProperty nameProperty                     = new StringProperty("name");
 	private static final StringProperty classNameProperty                = new StringProperty("className");
 	private static final StringProperty extendsClassNameProperty         = new StringProperty("extendsClass");
+	private static final ArrayProperty interfacesProperty                = new ArrayProperty("interfaces", String.class);
 	private static final BooleanProperty isRelProperty                   = new BooleanProperty("isRel");
 	private static final LongProperty flagsProperty                      = new LongProperty("flags");
 	private static final GenericProperty relatedToProperty               = new GenericProperty("relatedTo");
@@ -175,6 +178,7 @@ public class SchemaResource extends Resource {
 				schema.setProperty(nameProperty, type.getSimpleName());
 				schema.setProperty(classNameProperty, type.getName());
 				schema.setProperty(extendsClassNameProperty, type.getSuperclass().getName());
+				schema.setProperty(interfacesProperty, getInterfaces(type));
 				schema.setProperty(isRelProperty, isRel);
 				schema.setProperty(flagsProperty, SecurityContext.getResourceFlags(rawType));
 
@@ -306,5 +310,16 @@ public class SchemaResource extends Resource {
 		}
 
 		return null;
+	}
+
+	private static String[] getInterfaces(final Class type) {
+
+		final List<String> interfaces = new ArrayList<>();
+
+		for (final Class iface : type.getInterfaces()) {
+			interfaces.add(iface.getName());
+		}
+
+		return interfaces.toArray(new String[0]);
 	}
 }
