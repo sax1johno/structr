@@ -26,11 +26,15 @@ import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.function.LocalizeFunction;
 import org.structr.core.graph.ModificationQueue;
+import org.structr.core.graph.NodeInterface;
 import org.structr.core.property.BooleanProperty;
 import org.structr.core.property.Property;
 import org.structr.core.property.StringProperty;
+import org.structr.schema.SchemaService;
 
-public class Localization extends AbstractNode {
+public interface Localization extends NodeInterface {
+
+	static class Impl { static { SchemaService.registerMixinType(Localization.class); }}
 
 	public static final Property<String>  localizedName = new StringProperty("localizedName").cmis().indexed();
 	public static final Property<String>  description   = new StringProperty("description");
@@ -47,9 +51,9 @@ public class Localization extends AbstractNode {
 	);
 
 	@Override
-	public boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
+	default boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
 
-		if (super.onCreation(securityContext, errorBuffer)) {
+		if (NodeInterface.super.onCreation(securityContext, errorBuffer)) {
 
 			setProperty(visibleToPublicUsers, true);
 			setProperty(visibleToAuthenticatedUsers, true);
@@ -63,9 +67,9 @@ public class Localization extends AbstractNode {
 	}
 
 	@Override
-	public boolean onModification(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
+	default boolean onModification(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
 
-		if (super.onModification(securityContext, errorBuffer, modificationQueue)) {
+		if (NodeInterface.super.onModification(securityContext, errorBuffer, modificationQueue)) {
 
 			LocalizeFunction.invalidateCache();
 			return true;
@@ -75,9 +79,9 @@ public class Localization extends AbstractNode {
 	}
 
 	@Override
-	public boolean isValid(final ErrorBuffer errorBuffer) {
+	default boolean isValid(final ErrorBuffer errorBuffer) {
 
-		boolean valid = super.isValid(errorBuffer);
+		boolean valid = NodeInterface.super.isValid(errorBuffer);
 
 		valid &= ValidationHelper.isValidStringNotBlank(this, Localization.name, errorBuffer);
 		valid &= ValidationHelper.isValidStringNotBlank(this, Localization.locale, errorBuffer);

@@ -403,13 +403,13 @@ public class SearchAndSortingTest extends StructrTest {
 
 				long t1 = System.currentTimeMillis();
 				logger.info("Query with inexact type took {} ms", t1-t0);
-				assertEquals(1009, result.size());
+				assertEquals(1012, result.size());
 
 				result = app.nodeQuery(NodeInterface.class).getResult();
 
 				long t2 = System.currentTimeMillis();
 				logger.info("Query with exact type took {} ms", t2-t1);
-				assertEquals(1009, result.size());
+				assertEquals(1012, result.size());
 
 				tx.success();
 			}
