@@ -279,7 +279,15 @@ public interface File extends AbstractFile, Indexable, Linkable, JavaScriptSourc
 
 		try {
 
-			FileHelper.updateMetadata(this, new PropertyMap());
+			try (final Tx tx = StructrApp.getInstance().tx()) {
+
+				synchronized (tx) {
+
+					FileHelper.updateMetadata(this, new PropertyMap());
+
+					tx.success();
+				}
+			}
 
 			final FulltextIndexer indexer = StructrApp.getInstance(getSecurityContext()).getFulltextIndexer();
 			indexer.addToFulltextIndex(this);
