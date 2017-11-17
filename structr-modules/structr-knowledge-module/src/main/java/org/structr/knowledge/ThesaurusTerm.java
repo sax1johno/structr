@@ -39,7 +39,6 @@ public interface ThesaurusTerm extends NodeInterface {
 
 	public static final Property<ThesaurusConcept> concept = new StartNode<>("concept", ConceptTerm.class);
 
-	public static final Property<String>   name            = new StringProperty("name").indexedWhenEmpty().cmis().notNull();
 	public static final Property<String[]> normalizedWords = new ArrayProperty("normalizedWords", String.class).indexedWhenEmpty();
 	public static final Property<String>   lang            = new StringProperty("lang");
 
