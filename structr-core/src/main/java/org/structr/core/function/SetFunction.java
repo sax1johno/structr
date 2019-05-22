@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,67 +20,109 @@ package org.structr.core.function;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import java.util.LinkedHashMap;
 import java.util.Map;
+import org.structr.api.config.Settings;
 import org.structr.common.SecurityContext;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
+import org.structr.core.GraphObjectMap;
+import org.structr.core.app.StructrApp;
+import org.structr.core.converter.PropertyConverter;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
+import org.structr.schema.ConfigurationProvider;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class SetFunction extends Function<Object, Object> {
+public class SetFunction extends CoreFunction {
 
-	public static final String ERROR_MESSAGE_SET = "Usage: ${set(entity, propertyKey, value)}. Example: ${set(this, \"email\", lower(this.email))}";
+	public static final String ERROR_MESSAGE_SET = "Usage: ${set(entity, propertyKey, value, ...)}. Example: ${set(this, \"email\", lower(this.email))}";
+	public static final String ERROR_MESSAGE_SET_JS = "Usage: ${{Structr.set(entity, propertyKey, value, ...)}}. Example: ${{Structr.set(this, \"email\", lower(this.email))}}";
 
 	@Override
 	public String getName() {
-		return "set()";
+		return "set";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
-		if (arrayHasMinLengthAndAllElementsNotNull(sources, 2)) {
+		try {
+
+			assertArrayHasMinLengthAndAllElementsNotNull(sources, 2);
+
+			final boolean useGenericPropertyForUnknownKeys = Settings.AllowUnknownPropertyKeys.getValue(false);
+			final SecurityContext securityContext          = ctx.getSecurityContext();
+			final ConfigurationProvider config             = StructrApp.getConfiguration();
+
+			Class type = null;
+			PropertyMap propertyMap = null;
 
 			if (sources[0] instanceof GraphObject) {
 
-				final GraphObject source = (GraphObject)sources[0];
-				
-				final Map<String, Object> properties = new LinkedHashMap<>();
-				final SecurityContext securityContext = ctx.getSecurityContext();
-				source.setSecurityContext(securityContext);
-				
+				final GraphObject source = (GraphObject) sources[0];
+				type = source.getEntityType();
+			}
+
+			if (type == null) {
+
+				throw new FrameworkException(422, "Can't get type of object '" + sources[0].toString() + "' in set() method!");
+			}
+
+			final GraphObject sourceObject = (GraphObject) sources[0];
+
+			if (sources.length == 2 && sources[1] instanceof Map) {
+
+				propertyMap = PropertyMap.inputTypeToJavaType(securityContext, type, (Map) sources[1]);
+
+			} else if (sources.length == 2 && sources[1] instanceof GraphObjectMap) {
+
+				propertyMap = PropertyMap.inputTypeToJavaType(securityContext, type, ((GraphObjectMap)sources[1]).toMap());
+
+			} else if (sources.length == 2 && sources[1] instanceof String) {
+
 				final Gson gson = new GsonBuilder().create();
-				final Class type = source.getClass();
-				final int sourceCount = sources.length;
 
-				if (sources.length == 3 && sources[2] != null && sources[1].toString().matches("[a-zA-Z0-9_]+")) {
+				final Map<String, Object> values = deserialize(gson, sources[1].toString());
+				if (values != null) {
 
-					properties.put(sources[1].toString(), sources[2]);
+					propertyMap = PropertyMap.inputTypeToJavaType(securityContext, type, values);
 
-				} else {
-
-					// we either have and odd number of items, or two multi-value items.
-					for (int i = 1; i < sourceCount; i++) {
-
-						final Map<String, Object> values = deserialize(gson, sources[i].toString());
-						if (values != null) {
-
-							properties.putAll(values);
-						}
-					}
 				}
 
-				// store values in entity
-				final PropertyMap map = PropertyMap.inputTypeToJavaType(securityContext, type, properties);
-				for (final Map.Entry<PropertyKey, Object> entry : map.entrySet()) {
+			} else if (sources.length > 2) {
 
-					source.setProperty(entry.getKey(), entry.getValue());
+				propertyMap               = new PropertyMap();
+				final int parameter_count = sources.length;
+
+				if (parameter_count % 2 == 0) {
+
+					throw new FrameworkException(400, "Invalid number of parameters: " + parameter_count + ". Should be uneven: " + (ctx.isJavaScriptContext() ? ERROR_MESSAGE_SET_JS : ERROR_MESSAGE_SET));
+				}
+
+				for (int c = 1; c < parameter_count; c += 2) {
+
+					final String keyName  = sources[c].toString();
+					final PropertyKey key = config.getPropertyKeyForJSONName(type, keyName, useGenericPropertyForUnknownKeys);
+
+					if (key != null) {
+
+						final PropertyConverter inputConverter = key.inputConverter(securityContext);
+						Object value = sources[c + 1];
+
+						if (inputConverter != null) {
+
+							value = inputConverter.convert(value);
+						}
+
+						propertyMap.put(key, value);
+
+					} else {
+
+						// key does not exist and generic property is not desired => log warning
+						logger.warn("Unknown property {}.{}, value will not be set.", type.getSimpleName(), keyName);
+					}
 				}
 
 			} else {
@@ -88,10 +130,18 @@ public class SetFunction extends Function<Object, Object> {
 				throw new FrameworkException(422, "Invalid use of builtin method set, usage: set(entity, params..)");
 			}
 
-		} else {
+			if (propertyMap != null) {
+				sourceObject.setProperties(securityContext, propertyMap);
+			}
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+		} catch (ArgumentNullException pe) {
 
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
+
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
+			return usage(ctx.isJavaScriptContext());
 		}
 
 		return "";
@@ -106,5 +156,4 @@ public class SetFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Sets a value on an entity";
 	}
-
 }

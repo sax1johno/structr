@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,10 +19,13 @@
 package org.structr.schema.export;
 
 import java.util.Map;
+import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
 import org.structr.core.entity.AbstractSchemaNode;
+import org.structr.core.entity.SchemaNode;
 import org.structr.core.entity.SchemaProperty;
+import org.structr.core.property.PropertyMap;
 import org.structr.schema.SchemaHelper.Type;
 import org.structr.schema.json.JsonSchema;
 import org.structr.schema.json.JsonScriptProperty;
@@ -123,9 +126,9 @@ public class StructrScriptProperty extends StructrPropertyDefinition implements 
 	}
 
 	@Override
-	void deserialize(final SchemaProperty property) {
+	void deserialize(final Map<String, SchemaNode> schemaNodes, final SchemaProperty property) {
 
-		super.deserialize(property);
+		super.deserialize(schemaNodes, property);
 
 		setContentType(property.getSourceContentType());
 		setSource(property.getFormat());
@@ -136,6 +139,7 @@ public class StructrScriptProperty extends StructrPropertyDefinition implements 
 	SchemaProperty createDatabaseSchema(final App app, final AbstractSchemaNode schemaNode) throws FrameworkException {
 
 		final SchemaProperty property = super.createDatabaseSchema(app, schemaNode);
+		final PropertyMap properties  = new PropertyMap();
 		final String contentType      = getContentType();
 
 		if (contentType != null) {
@@ -144,21 +148,24 @@ public class StructrScriptProperty extends StructrPropertyDefinition implements 
 
 				case "application/x-structr-javascript":
 				case "application/x-structr-script":
-					property.setProperty(SchemaProperty.propertyType, Type.Function.name());
+					properties.put(SchemaProperty.propertyType, Type.Function.name());
 					break;
 
 				case "application/x-cypher":
-					property.setProperty(SchemaProperty.propertyType, Type.Cypher.name());
+					properties.put(SchemaProperty.propertyType, Type.Cypher.name());
 
 			}
 
 		} else {
 
 			// default
-			property.setProperty(SchemaProperty.propertyType, Type.Function.name());
+			properties.put(SchemaProperty.propertyType, Type.Function.name());
 		}
 
-		property.setProperty(SchemaProperty.format, source);
+		properties.put(SchemaProperty.format, source);
+
+		// set properties in bulk
+		property.setProperties(SecurityContext.getSuperUserInstance(), properties);
 
 		return property;
 	}

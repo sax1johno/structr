@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -26,7 +26,7 @@ import org.apache.commons.lang3.StringUtils;
 
 /**
  * A helper class that provides methods for URL path splitting etc.
- * 
+ *
  *
  */
 public class PathHelper {
@@ -50,15 +50,15 @@ public class PathHelper {
 		// Remove leading and trailing /
 		return StringUtils.strip(path, PATH_SEP);
 	}
-	
+
 	public static String replaceWhitespaceByPlus(final String path) {
 		return StringUtils.replace(path, " ", "+");
 	}
-	
+
 	public static String replaceWhitespaceByPercentTwenty(final String path) {
 		return StringUtils.replace(path, " ", "%20");
 	}
-	
+
 
 	//~--- get methods ----------------------------------------------------
 
@@ -148,14 +148,14 @@ public class PathHelper {
 
 	/**
 	 * Return last part of the given path after separator or the path if no path separator was found.
-	 * 
+	 *
 	 * @param path
 	 * @return name
 	 */
 	public static String getName(final String path) {
 
 		String cleanedPath = clean(path);
-		
+
 		if (cleanedPath != null && cleanedPath.contains(PATH_SEP)) {
 
 			return StringUtils.substringAfterLast(cleanedPath, PATH_SEP);
@@ -169,14 +169,14 @@ public class PathHelper {
 
 	/**
 	 * Return part of the given path before the last separator or the root path ("/") if no separator was found
-	 * 
+	 *
 	 * @param path
 	 * @return name
 	 */
 	public static String getFolderPath(final String path) {
-		
+
 		String cleanedPath = clean(path);
-		
+
 		if (cleanedPath != null && cleanedPath.contains(PATH_SEP)) {
 
 			return PATH_SEP + StringUtils.substringBeforeLast(cleanedPath, PATH_SEP);
@@ -187,10 +187,10 @@ public class PathHelper {
 
 		}
 	}
-	
+
 	/**
 	 * Return array of path parts.
-	 * 
+	 *
 	 * @param path
 	 * @return path parts
 	 */
@@ -199,5 +199,28 @@ public class PathHelper {
 		String cleanedPath = clean(path);
 
 		return StringUtils.splitByWholeSeparator(cleanedPath, PATH_SEP);
+	}
+
+	/**
+	 * Simply removes all relative parts of a path (meaning ".." and ".")
+	 *
+	 * @param path
+	 * @return path without relative parts
+	 */
+	public static String removeRelativeParts(final String path) {
+
+		String partialPath = "";
+
+		for (String part : PathHelper.getParts(path)) {
+
+			// ignore ".." and "." in paths
+			if ("..".equals(part) || ".".equals(part)) {
+				continue;
+			}
+
+			partialPath += PathHelper.PATH_SEP + part;
+		}
+
+		return partialPath;
 	}
 }

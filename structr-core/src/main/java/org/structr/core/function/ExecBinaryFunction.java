@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -25,28 +25,28 @@ import java.util.concurrent.Executors;
 import org.structr.api.config.Setting;
 import org.structr.api.config.Settings;
 import org.structr.common.SecurityContext;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 import org.structr.util.AbstractBinaryProcess;
 
-/**
- *
- */
-public class ExecBinaryFunction extends Function<Object, Object> {
+public class ExecBinaryFunction extends AdvancedScriptingFunction {
 
 	public static final String ERROR_MESSAGE_EXEC    = "Usage: ${exec_binary(output, fileName [, parameters...]}";
 	public static final String ERROR_MESSAGE_EXEC_JS = "Usage: ${{Structr.exec_binary(output, fileName [, parameters...]}}";
 
 	@Override
 	public String getName() {
-		return "exec_binary()";
+		return "exec_binary";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
-		if (arrayHasMinLengthAndAllElementsNotNull(sources, 2)) {
+		try {
+
+			assertArrayHasMinLengthAndAllElementsNotNull(sources, 2);
 
 			final String scriptKey              = sources[1].toString();
 			final Setting<String> scriptSetting = Settings.getStringSetting(scriptKey);
@@ -87,15 +87,18 @@ public class ExecBinaryFunction extends Function<Object, Object> {
 				logger.warn("No script found for key \"{}\" in structr.conf, nothing executed.", scriptKey);
 			}
 
-		} else {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
+			return usage(ctx.isJavaScriptContext());
 		}
 
 		return "";
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {

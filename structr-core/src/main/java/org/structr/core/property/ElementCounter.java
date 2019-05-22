@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -35,6 +35,10 @@ import org.structr.core.converter.PropertyConverter;
 public class ElementCounter extends AbstractReadOnlyProperty<Integer> {
 
 	private Property<? extends Iterable> collectionProperty = null;
+
+	public ElementCounter(String name) {
+		this(name, null);
+	}
 
 	public ElementCounter(String name, Property<? extends Iterable> collectionProperty) {
 		super(name);

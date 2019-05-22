@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,9 +20,8 @@ package org.structr.core.function;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.structr.api.service.LicenseManager;
 import org.structr.common.error.FrameworkException;
-import org.structr.common.error.UnlicensedException;
+import org.structr.common.error.UnlicensedScriptException;
 import org.structr.schema.action.ActionContext;
 import org.structr.schema.action.Function;
 
@@ -34,22 +33,22 @@ public class UnlicensedFunction extends Function<Object, Object> {
 
 	private static final Logger logger = LoggerFactory.getLogger(UnlicensedFunction.class);
 
-	private String name = null;
-	private int edition = LicenseManager.Community;
+	private String name   = null;
+	private String module = null;
 
-	public UnlicensedFunction(final String name, final int edition) {
+	public UnlicensedFunction(final String name, final String module) {
 		this.name    = name;
-		this.edition = edition;
+		this.module = module;
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
-		throw new UnlicensedException(name, edition);
+		throw new UnlicensedScriptException(name, module);
 	}
 
 	@Override
 	public String usage(final boolean inJavaScriptContext) {
-		return new UnlicensedException(name, edition).buildLogMessage();
+		return new UnlicensedScriptException(name, module).buildLogMessage();
 	}
 
 	@Override
@@ -60,5 +59,10 @@ public class UnlicensedFunction extends Function<Object, Object> {
 	@Override
 	public String getName() {
 		return "unlicensed";
+	}
+
+	@Override
+	public String getRequiredModule() {
+		return module;
 	}
 }

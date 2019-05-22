@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -34,16 +34,12 @@ import org.structr.core.property.Property;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.StringProperty;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
-/**
- *
- */
-public class ImportGPXFunction extends Function<Object, Object> {
+public class ImportGPXFunction extends GeoFunction {
 
 	private static final Logger logger                                   = LoggerFactory.getLogger(ImportGPXFunction.class.getName());
 	public static final Property<List<GraphObjectMap>> waypointsProperty = new GenericProperty<>("waypoints");
@@ -83,9 +79,16 @@ public class ImportGPXFunction extends Function<Object, Object> {
 	}
 
 	@Override
+	public String getName() {
+		return "import_gpx";
+	}
+
+	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
-		if (arrayHasLengthAndAllElementsNotNull(sources, 1)) {
+		try {
+
+			assertArrayHasLengthAndAllElementsNotNull(sources, 1);
 
 			if (sources[0] instanceof String) {
 
@@ -153,9 +156,13 @@ public class ImportGPXFunction extends Function<Object, Object> {
 			}
 
 			return "Invalid parameters";
-		}
 
-		return usage(ctx != null ? ctx.isJavaScriptContext() : false);
+		} catch (IllegalArgumentException e) {
+
+			boolean isJs = ctx != null ? ctx.isJavaScriptContext() : false;
+			logParameterError(caller, sources, e.getMessage(), isJs);
+			return usage(isJs);
+		}
 	}
 
 	@Override
@@ -166,11 +173,6 @@ public class ImportGPXFunction extends Function<Object, Object> {
 	@Override
 	public String shortDescription() {
 		return "Imports a GPX file and creates a list of objects of a given type from it.";
-	}
-
-	@Override
-	public String getName() {
-		return "import_gpx";
 	}
 
 	// ----- private methods -----

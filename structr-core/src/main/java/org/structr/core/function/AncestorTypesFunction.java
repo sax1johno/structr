@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -24,51 +24,45 @@ import java.util.List;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.SchemaHelper;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-public class AncestorTypesFunction extends Function<Object, Object> {
+public class AncestorTypesFunction extends AdvancedScriptingFunction {
 
 	public static final String ERROR_MESSAGE_ANCESTOR_TYPES    = "Usage: ${ancestor_types(type[, blacklist])}. Example ${ancestor_types('User')}";
 	public static final String ERROR_MESSAGE_ANCESTOR_TYPES_JS = "Usage: ${Structr.ancestor_types(type[, blacklist])}. Example ${Structr.ancestor_types('User')}";
+
+	@Override
+	public String getName() {
+		return "ancestor_types";
+	}
 
 	@Override
 	public Object apply(ActionContext ctx, Object caller, Object[] sources) throws FrameworkException {
 
 		try {
 
-			if (arrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 1, 2)) {
+			assertArrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 1, 2);
 
-				final String typeName = sources[0].toString();
-				final ArrayList<String> ancestorTypes = new ArrayList();
+			final String typeName = sources[0].toString();
+			final ArrayList<String> ancestorTypes = new ArrayList();
 
-				Class type = SchemaHelper.getEntityClassForRawType(typeName);
+			Class type = SchemaHelper.getEntityClassForRawType(typeName);
 
-				while (type != null && !type.equals(Object.class)) {
+			while (type != null && !type.equals(Object.class)) {
 
-					ancestorTypes.add(type.getSimpleName());
-					type = type.getSuperclass();
-
-				}
-
-				final List<String> blackList = (sources.length == 2) ? (List)sources[1] : Arrays.asList("AbstractNode");
-				ancestorTypes.removeAll(blackList);
-
-				return ancestorTypes;
-
-			} else {
-
-				logParameterError(caller, sources, ctx.isJavaScriptContext());
-				return usage(ctx.isJavaScriptContext());
-
+				ancestorTypes.add(type.getSimpleName());
+				type = type.getSuperclass();
 			}
 
-		} catch (final IllegalArgumentException e) {
+			final List<String> blackList = (sources.length == 2) ? (List)sources[1] : Arrays.asList("AbstractNode");
+			ancestorTypes.removeAll(blackList);
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			return ancestorTypes;
+
+		} catch (IllegalArgumentException e) {
+
+			logParameterError(caller, sources, e.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
-
 	}
 
 	@Override
@@ -80,10 +74,4 @@ public class AncestorTypesFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Returns the names of the parent classes of the given type";
 	}
-
-	@Override
-	public String getName() {
-		return "ancestor_types()";
-	}
-
 }

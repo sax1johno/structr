@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,13 +19,13 @@
 package org.structr.files.ssh.shell;
 
 import java.io.IOException;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.Permission;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
+import org.structr.core.entity.AbstractNode;
 import org.structr.core.graph.Tx;
 import org.structr.files.ssh.StructrShellCommand;
 import org.structr.web.entity.AbstractFile;
@@ -49,11 +49,11 @@ public class LsCommand extends NonInteractiveShellCommand {
 			final Folder currentFolder = parent.getCurrentFolder();
 			if (currentFolder != null) {
 
-				listFolder(parent, currentFolder.getProperty(AbstractFile.children));
+				listFolder(parent, currentFolder.getChildren());
 
 			} else {
 
-				listFolder(parent, app.nodeQuery(AbstractFile.class).and(AbstractFile.parent, null).getAsList());
+				listFolder(parent, app.nodeQuery(AbstractFile.class).and(StructrApp.key(AbstractFile.class, "parent"), null).sort(AbstractNode.name).getAsList());
 			}
 
 			tx.success();
@@ -65,11 +65,15 @@ public class LsCommand extends NonInteractiveShellCommand {
 	}
 
 	// ----- private methods -----
-	private void listFolder(final StructrShellCommand parent, final List<AbstractFile> folder) throws FrameworkException, IOException {
+	private void listFolder(final StructrShellCommand parent, final Iterable<AbstractFile> folder) throws FrameworkException, IOException {
+
+		boolean hasContents = false;
 
 		for (final AbstractFile child : folder) {
 
 			if (parent.isAllowed(child, Permission.read, false)) {
+
+				hasContents = true;
 
 				if (child instanceof Folder) {
 
@@ -86,7 +90,7 @@ public class LsCommand extends NonInteractiveShellCommand {
 			}
 		}
 
-		if (!folder.isEmpty()) {
+		if (hasContents) {
 			term.println();
 		}
 	}

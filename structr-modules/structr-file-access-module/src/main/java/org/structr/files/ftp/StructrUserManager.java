@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,6 +19,7 @@
 package org.structr.files.ftp;
 
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import org.apache.ftpserver.ftplet.Authentication;
 import org.apache.ftpserver.ftplet.AuthenticationFailedException;
@@ -28,12 +29,12 @@ import org.apache.ftpserver.ftplet.UserManager;
 import org.apache.ftpserver.usermanager.UsernamePasswordAuthentication;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.util.Iterables;
 import org.structr.common.AccessMode;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.Result;
 import org.structr.core.app.StructrApp;
-import org.structr.core.entity.AbstractUser;
+import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.Principal;
 import org.structr.core.graph.Tx;
 import org.structr.rest.auth.AuthHelper;
@@ -69,13 +70,12 @@ public class StructrUserManager implements UserManager {
 
 		try (Tx tx = StructrApp.getInstance(securityContext).tx()) {
 
-			List<String> userNames = new ArrayList();
-
-			Result<Principal> result = Result.EMPTY_RESULT;
+			final List<String> userNames = new ArrayList();
+			final List<Principal> result = new LinkedList<>();
 
 			try {
 
-				result = StructrApp.getInstance(securityContext).nodeQuery(Principal.class).getResult();
+				Iterables.addAll(result, StructrApp.getInstance(securityContext).nodeQuery(Principal.class).sort(AbstractNode.name).getResultStream());
 
 			} catch (FrameworkException ex) {
 
@@ -85,23 +85,21 @@ public class StructrUserManager implements UserManager {
 
 			if (!result.isEmpty()) {
 
-				for (Principal p : result.getResults()) {
+				for (Principal p : result) {
 
-					userNames.add(p.getProperty(AbstractUser.name));
-
+					userNames.add(p.getProperty(Principal.name));
 				}
-
 			}
 
 			tx.success();
-			
-			
+
+
 			return (String[]) userNames.toArray(new String[userNames.size()]);
 
 		} catch (FrameworkException fex) {
 			logger.error("Unable to get user by its name", fex);
 		}
-		
+
 		return null;
 	}
 
@@ -117,7 +115,7 @@ public class StructrUserManager implements UserManager {
 
 	@Override
 	public boolean doesExist(String string) throws FtpException {
-		
+
 		try (Tx tx = StructrApp.getInstance(securityContext).tx()) {
 
 			boolean exists = (getStructrUser(string) != null);
@@ -152,8 +150,8 @@ public class StructrUserManager implements UserManager {
 				userName = authentication.getUsername();
 				password = authentication.getPassword();
 
-				user = (org.structr.web.entity.User) AuthHelper.getPrincipalForPassword(AbstractUser.name, userName, password);
-				
+				user = (org.structr.web.entity.User) AuthHelper.getPrincipalForPassword(Principal.name, userName, password);
+
 				securityContext = SecurityContext.getInstance(user, AccessMode.Backend);
 
 				tx.success();
@@ -187,10 +185,10 @@ public class StructrUserManager implements UserManager {
 
 		try (Tx tx = StructrApp.getInstance(securityContext).tx()) {
 
-			final org.structr.web.entity.User user = (org.structr.web.entity.User) AuthHelper.getPrincipalForCredential(AbstractUser.name, userName);
-			
+			final org.structr.web.entity.User user = (org.structr.web.entity.User) AuthHelper.getPrincipalForCredential(Principal.name, userName);
+
 			tx.success();
-			
+
 			return user;
 
 		} catch (FrameworkException fex) {

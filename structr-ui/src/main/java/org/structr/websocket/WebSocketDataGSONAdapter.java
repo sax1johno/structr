@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -25,9 +25,14 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
+import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
+import graphql.language.Document;
+import graphql.parser.Parser;
+import java.io.IOException;
+import java.io.StringWriter;
 import java.lang.reflect.Type;
 import java.util.LinkedList;
 import java.util.List;
@@ -35,18 +40,20 @@ import java.util.Map.Entry;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.util.Iterables;
 import org.structr.common.PropertyView;
+import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.StaticValue;
 import org.structr.core.Value;
+import org.structr.core.graphql.GraphQLRequest;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.rest.GraphObjectGSONAdapter;
 import org.structr.core.rest.JsonInputGSONAdapter;
 import static org.structr.core.rest.JsonInputGSONAdapter.fromPrimitive;
+import org.structr.rest.serialization.GraphQLWriter;
 import org.structr.websocket.message.WebSocketMessage;
-
-//~--- classes ----------------------------------------------------------------
 
 /**
  *
@@ -58,13 +65,9 @@ public class WebSocketDataGSONAdapter implements JsonSerializer<WebSocketMessage
 	private final Value<String> propertyView             = new StaticValue<>(PropertyView.Public);
 	private GraphObjectGSONAdapter graphObjectSerializer = null;
 
-	//~--- constructors ---------------------------------------------------
-
 	public WebSocketDataGSONAdapter(final int outputNestingDepth) {
 		graphObjectSerializer = new GraphObjectGSONAdapter(propertyView, outputNestingDepth);
 	}
-
-	//~--- methods --------------------------------------------------------
 
 	@Override
 	public JsonElement serialize(WebSocketMessage src, Type typeOfSrc, JsonSerializationContext context) {
@@ -201,13 +204,12 @@ public class WebSocketDataGSONAdapter implements JsonSerializer<WebSocketMessage
 
 				if (value != null) {
 
-					jsonNodeData.add(key, toJsonPrimitive(value));
+					jsonNodeData.add(key, serialize(value));
 				}
 
 			}
 
 			root.add("data", jsonNodeData);
-
 		}
 
 		// serialize relationship data
@@ -220,53 +222,116 @@ public class WebSocketDataGSONAdapter implements JsonSerializer<WebSocketMessage
 
 				if (value != null) {
 
-					jsonRelData.add(key, toJsonPrimitive(value));
+					jsonRelData.add(key, serialize(value));
 				}
 
 			}
 
 			root.add("relData", jsonRelData);
-
 		}
 
 		// serialize result list
 		if (src.getResult() != null) {
 
-			if (src.getView() != null) {
+			final List<? extends GraphObject> list = Iterables.toList(src.getResult());
+
+			if ("GRAPHQL".equals(src.getCommand())) {
 
 				try {
-					propertyView.set(null, src.getView());
 
-				} catch(FrameworkException fex) {
+					if (!list.isEmpty()) {
 
-					logger.warn("Unable to set property view", fex);
+						final GraphObject firstResultObject   = list.get(0);
+						final SecurityContext securityContext = firstResultObject.getSecurityContext();
+
+						final StringWriter output = new StringWriter();
+
+						final String query = (String) src.getNodeData().get("query");
+						final Document doc = GraphQLRequest.parse(new Parser(), query);
+
+						final GraphQLWriter graphQLWriter  = new GraphQLWriter(false);
+						graphQLWriter.stream(securityContext, output, new GraphQLRequest(securityContext, doc, query));
+
+						JsonElement graphQLResult = new JsonParser().parse(output.toString());
+						root.add("result", graphQLResult);
+
+					} else {
+
+						root.add("result", new JsonArray());
+					}
+
+				} catch (IOException | FrameworkException ex) {
+
+					logger.warn("Unable to set process GraphQL query", ex);
 				}
 
 			} else {
 
-				try {
-					propertyView.set(null, PropertyView.Ui);
+				if (src.getView() != null) {
 
-				} catch(FrameworkException fex) {
+					try {
+						propertyView.set(null, src.getView());
 
-					logger.warn("Unable to set property view", fex);
+					} catch (FrameworkException fex) {
+
+						logger.warn("Unable to set property view", fex);
+					}
+
+				} else {
+
+					try {
+						propertyView.set(null, PropertyView.Ui);
+
+					} catch (FrameworkException fex) {
+
+						logger.warn("Unable to set property view", fex);
+					}
+
 				}
 
+				JsonArray result = new JsonArray();
+
+				for (GraphObject obj : list) {
+
+					result.add(graphObjectSerializer.serialize(obj, System.currentTimeMillis()));
+				}
+
+				root.add("result", result);
+
 			}
-
-			JsonArray result = new JsonArray();
-
-			for (GraphObject obj : src.getResult()) {
-
-				result.add(graphObjectSerializer.serialize(obj, System.currentTimeMillis()));
-			}
-
-			root.add("result", result);
 			root.add("rawResultCount", toJsonPrimitive(src.getRawResultCount()));
 
 		}
 
 		return root;
+
+	}
+
+	private JsonElement serialize(final Object value) {
+
+			final JsonArray resultArray = new JsonArray();
+
+			if (value.getClass().isArray()) {
+
+					final Object[] array = (Object[]) value;
+
+					for (final Object val : array) {
+						resultArray.add(toJsonPrimitive(val));
+					}
+
+					return resultArray;
+
+			} else if (value instanceof Iterable) {
+
+					for (final Object val : (Iterable) value) {
+						resultArray.add(toJsonPrimitive(val));
+					}
+
+					return resultArray;
+
+			} else {
+					return toJsonPrimitive(value);
+			}
 
 	}
 
@@ -277,18 +342,23 @@ public class WebSocketDataGSONAdapter implements JsonSerializer<WebSocketMessage
 		if (value instanceof PropertyKey) {
 
 			jp = new JsonPrimitive(((PropertyKey)value).jsonName());
+
 		} else if (value instanceof String) {
 
 			jp = new JsonPrimitive((String) value);
+
 		} else if (value instanceof Number) {
 
 			jp = new JsonPrimitive((Number) value);
+
 		} else if (value instanceof Boolean) {
 
 			jp = new JsonPrimitive((Boolean) value);
+
 		} else if (value instanceof Character) {
 
 			jp = new JsonPrimitive((Character) value);
+
 		} else {
 
 			jp = new JsonPrimitive(value.toString());
@@ -374,10 +444,10 @@ public class WebSocketDataGSONAdapter implements JsonSerializer<WebSocketMessage
 			if (nodeData != null) {
 
 				JsonInputGSONAdapter adapter = new JsonInputGSONAdapter();
-				
+
 
 				for (Entry<String, JsonElement> entry : nodeData.entrySet()) {
-					
+
 					final JsonElement obj = entry.getValue();
 					Object value          = null;
 

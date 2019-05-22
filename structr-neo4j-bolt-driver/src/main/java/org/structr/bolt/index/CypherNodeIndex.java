@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,10 +18,10 @@
  */
 package org.structr.bolt.index;
 
-import org.structr.api.QueryResult;
 import org.structr.api.graph.Node;
-import org.structr.api.util.QueryUtils;
+import org.structr.api.util.Iterables;
 import org.structr.bolt.BoltDatabaseService;
+import org.structr.bolt.SessionTransaction;
 import org.structr.bolt.mapper.NodeNodeMapper;
 
 /**
@@ -29,28 +29,64 @@ import org.structr.bolt.mapper.NodeNodeMapper;
  */
 public class CypherNodeIndex extends AbstractCypherIndex<Node> {
 
-	public CypherNodeIndex(final BoltDatabaseService db, final int queryCacheSize) {
-
-		super(db, queryCacheSize);
+	public CypherNodeIndex(final BoltDatabaseService db) {
+		super(db);
 	}
 
 	@Override
 	public String getQueryPrefix(final String typeLabel, final String sourceTypeLabel, final String targetTypeLabel) {
 
-		if (typeLabel != null) {
-			return "MATCH (n:" + typeLabel + ")";
+		final StringBuilder buf = new StringBuilder("MATCH (n:NodeInterface");
+		final String tenantId   = db.getTenantIdentifier();
+
+		if (tenantId != null) {
+
+			buf.append(":");
+			buf.append(tenantId);
 		}
 
-		return "MATCH (n:NodeInterface)";
+		if (typeLabel != null) {
+
+			buf.append(":");
+			buf.append(typeLabel);
+		}
+
+		buf.append(")");
+
+		return buf.toString();
 	}
 
 	@Override
-	public String getQuerySuffix() {
-		return " RETURN DISTINCT n";
+	public String getQuerySuffix(final AdvancedCypherQuery query) {
+
+		final StringBuilder buf = new StringBuilder();
+		final String sortKey    = query.getSortKey();
+
+		buf.append(" RETURN n");
+
+		if (sortKey != null) {
+
+			buf.append(", n.`");
+			buf.append(sortKey);
+			buf.append("` AS sortKey");
+		}
+
+		return buf.toString();
 	}
 
 	@Override
-	public QueryResult<Node> getResult(final PageableQuery query) {
-		return QueryUtils.map(new NodeNodeMapper(db), new NodeResultStream(db, query));
+	public Iterable<Node> getResult(final AdvancedCypherQuery query) {
+
+		try {
+			final SessionTransaction tx = db.getCurrentTransaction();
+
+			tx.setIsPing(query.getQueryContext().isPing());
+
+			return Iterables.map(new NodeNodeMapper(db), tx.getNodes(query.getStatement(), query.getParameters()));
+
+		} finally {
+
+			query.nextPage();
+		}
 	}
 }

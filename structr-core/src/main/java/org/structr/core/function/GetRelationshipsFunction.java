@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,23 +20,21 @@ package org.structr.core.function;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.entity.AbstractRelationship;
 import org.structr.core.graph.NodeInterface;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class GetRelationshipsFunction extends Function<Object, Object> {
+public class GetRelationshipsFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_GET_RELATIONSHIPS    = "Usage: ${get_relationships(entity1, entity2 [, relType])}. Example: ${get_relationships(me, user, 'FOLLOWS')}  (ignores direction of the relationship)";
 	public static final String ERROR_MESSAGE_GET_RELATIONSHIPS_JS = "Usage: ${{Structr.get_relationships(entity1, entity2 [, relType])}}. Example: ${{Structr.get_relationships(Structr.get('me'), user, 'FOLLOWS')}}  (ignores direction of the relationship)";
 
 	@Override
 	public String getName() {
-		return "get_relationships()";
+		return "get_relationships";
 	}
 
 	@Override
@@ -44,7 +42,9 @@ public class GetRelationshipsFunction extends Function<Object, Object> {
 
 		final List<AbstractRelationship> list = new ArrayList<>();
 
-		if (arrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 2, 3)) {
+		try {
+
+			assertArrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 2, 3);
 
 			final Object source = sources[0];
 			final Object target = sources[1];
@@ -61,7 +61,6 @@ public class GetRelationshipsFunction extends Function<Object, Object> {
 
 				logger.warn("Error: entities are not nodes. Parameters: {}", getParametersAsString(sources));
 				return "Error: Entities are not nodes.";
-
 			}
 
 			if (sources.length == 2) {
@@ -98,15 +97,18 @@ public class GetRelationshipsFunction extends Function<Object, Object> {
 
 			}
 
-		} else {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
+			return usage(ctx.isJavaScriptContext());
 		}
 
 		return list;
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {
@@ -117,5 +119,4 @@ public class GetRelationshipsFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Returns the relationships of the given entity with an optional relationship type";
 	}
-
 }

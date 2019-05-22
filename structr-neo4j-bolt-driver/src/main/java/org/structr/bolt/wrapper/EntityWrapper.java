@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,7 +19,10 @@
 package org.structr.bolt.wrapper;
 
 import java.lang.reflect.Array;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -30,6 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.api.NotFoundException;
 import org.structr.api.NotInTransactionException;
+import org.structr.api.graph.Identity;
 import org.structr.api.graph.PropertyContainer;
 import org.structr.api.util.Cachable;
 import org.structr.bolt.BoltDatabaseService;
@@ -40,23 +44,37 @@ public abstract class EntityWrapper<T extends Entity> implements PropertyContain
 
 	private static final Logger logger = LoggerFactory.getLogger(EntityWrapper.class.getName());
 
-	protected final Map<String, Object> data = new ConcurrentHashMap<>();
-	protected BoltDatabaseService db         = null;
-	protected boolean stale                  = false;
-	protected long id                        = -1L;
+	private final Map<Long, Map<String, Object>> txData = new ConcurrentHashMap<>();
+	private final Map<String, Object> entityData        = new LinkedHashMap<>();
+
+	protected BoltDatabaseService db                    = null;
+	protected boolean deleted                           = false;
+	protected boolean stale                             = false;
+	protected long id                                   = -1L;
+
+	protected EntityWrapper() {
+		// nop constructor for cache access
+	}
 
 	public EntityWrapper(final BoltDatabaseService db, final T entity) {
 
-		this.data.putAll(entity.asMap());
+		this.entityData.putAll(entity.asMap());
 		this.id   = entity.id();
 		this.db   = db;
 	}
 
 	protected abstract String getQueryPrefix();
+	protected abstract boolean isNode();
+	public abstract void removeFromCache();
 	public abstract void clearCaches();
+	public abstract void onClose();
 
 	@Override
-	public long getId() {
+	public Identity getId() {
+		return new BoltIdentity(id);
+	}
+
+	public long getDatabaseId() {
 		return id;
 	}
 
@@ -65,7 +83,7 @@ public abstract class EntityWrapper<T extends Entity> implements PropertyContain
 
 		assertNotStale();
 
-		return data.containsKey(name);
+		return accessData().containsKey(name);
 	}
 
 	@Override
@@ -73,7 +91,7 @@ public abstract class EntityWrapper<T extends Entity> implements PropertyContain
 
 		assertNotStale();
 
-		final Object value = data.get(name);
+		final Object value = accessData().get(name);
 		if (value instanceof List) {
 
 			try {
@@ -121,10 +139,10 @@ public abstract class EntityWrapper<T extends Entity> implements PropertyContain
 		final SessionTransaction tx = db.getCurrentTransaction();
 
 		// only update values if actually different from what is stored
-		if (differentValue(key, value)) {
+		if (needsUpdate(key, value)) {
 
 			final Map<String, Object> map = new HashMap<>();
-			final String query            = getQueryPrefix() + " WHERE ID(n) = {id} SET n.`" + key + "` = {value}";
+			final String query            = getQueryPrefix() + " WHERE ID(n) = $id SET n.`" + key + "` = $value";
 
 			map.put("id", id);
 			map.put("value", value);
@@ -133,11 +151,11 @@ public abstract class EntityWrapper<T extends Entity> implements PropertyContain
 			tx.set(query, map);
 
 			// update data
-			update(key, value);
-		}
+			accessData().put(key, value);
 
-		// mark node as modified
-		tx.modified(this);
+			// mark node as modified
+			setModified();
+		}
 	}
 
 	@Override
@@ -145,21 +163,28 @@ public abstract class EntityWrapper<T extends Entity> implements PropertyContain
 
 		assertNotStale();
 
-		final Map<String, Object> map = new HashMap<>();
-		final SessionTransaction tx   = db.getCurrentTransaction();
-		final String query            = getQueryPrefix() + " WHERE ID(n) = {id} SET n += {properties}";
+		// remove properties that are already present
+		filter(values);
 
-		// overwrite a potential "id" property
-		map.put("id", id);
-		map.put("properties", values);
+		// only update values if actually different from what is stored
+		if (!values.isEmpty()) {
 
-		// execute query
-		tx.set(query, map);
+			final Map<String, Object> map = new HashMap<>();
+			final SessionTransaction tx   = db.getCurrentTransaction();
+			final String query            = getQueryPrefix() + " WHERE ID(n) = $id SET n += $properties";
 
-		// update data
-		update(values);
+			// overwrite a potential "id" property
+			map.put("id", id);
+			map.put("properties", values);
 
-		tx.modified(this);
+			// execute query
+			tx.set(query, map);
+
+			// update data
+			update(values);
+
+			setModified();
+		}
 	}
 
 	@Override
@@ -169,7 +194,7 @@ public abstract class EntityWrapper<T extends Entity> implements PropertyContain
 
 		final SessionTransaction tx   = db.getCurrentTransaction();
 		final Map<String, Object> map = new HashMap<>();
-		final String query            = getQueryPrefix() + " WHERE ID(n) = {id} SET n.`" + key + "` = Null";
+		final String query            = getQueryPrefix() + " WHERE ID(n) = $id SET n.`" + key + "` = Null";
 
 		map.put("id", id);
 
@@ -177,9 +202,9 @@ public abstract class EntityWrapper<T extends Entity> implements PropertyContain
 		tx.set(query, map);
 
 		// remove key from data
-		data.remove(key);
+		accessData().put(key, null);
 
-		tx.modified(this);
+		setModified();
 	}
 
 	@Override
@@ -187,28 +212,40 @@ public abstract class EntityWrapper<T extends Entity> implements PropertyContain
 
 		assertNotStale();
 
-		return data.keySet();
+		return accessData().keySet();
 	}
 
 	@Override
-	public void delete() throws NotInTransactionException {
+	public void delete(final boolean deleteRelationships) throws NotInTransactionException {
 
 		assertNotStale();
 
 		final SessionTransaction tx   = db.getCurrentTransaction();
 		final Map<String, Object> map = new HashMap<>();
+		final StringBuilder buf       = new StringBuilder();
 
 		map.put("id", id);
 
-		tx.set(getQueryPrefix() + " WHERE ID(n) = {id} DELETE n", map);
-		tx.modified(this);
+		buf.append(getQueryPrefix());
+		buf.append(" WHERE ID(n) = $id");
 
-		stale = true;
+		if (deleteRelationships) {
+
+			buf.append(" DETACH");
+		}
+
+		buf.append(" DELETE n");
+
+		tx.set(buf.toString(), map);
+		setModified();
+
+		stale   = true;
+		deleted = true;
 	}
 
 	@Override
-	public boolean isSpatialEntity() {
-		return false;
+	public boolean isDeleted() {
+		return deleted;
 	}
 
 	public boolean isStale() {
@@ -217,6 +254,49 @@ public abstract class EntityWrapper<T extends Entity> implements PropertyContain
 
 	public void stale() {
 		this.stale = true;
+	}
+
+	public void setModified() {
+		db.getCurrentTransaction().modified(this);
+	}
+
+	public void rollback(final long transactionId) {
+
+		synchronized (this) {
+
+			txData.remove(transactionId);
+
+			stale = false;
+		}
+	}
+
+	public void commit(final long transactionId) {
+
+		synchronized (this) {
+
+			final Map<String, Object> changes = txData.get(transactionId);
+			if (changes != null) {
+
+				for (final Entry<String, Object> entry : changes.entrySet()) {
+
+					final String key   = entry.getKey();
+					final Object value = entry.getValue();
+
+					if (value != null) {
+
+						entityData.put(key, value);
+
+					} else {
+
+						entityData.remove(key);
+					}
+				}
+
+				txData.remove(transactionId);
+			}
+
+			stale = false;
+		}
 	}
 
 	// ----- protected methods -----
@@ -238,8 +318,7 @@ public abstract class EntityWrapper<T extends Entity> implements PropertyContain
 			try {
 
 				// update data
-				data.clear();
-				update(tx.getEntity(getQueryPrefix() + " WHERE ID(n) = {id} RETURN n", map).asMap());
+				update(tx.getEntity(getQueryPrefix() + " WHERE ID(n) = $id RETURN n", map).asMap());
 
 			} catch (NoSuchRecordException nex) {
 				throw new NotFoundException(nex);
@@ -251,35 +330,97 @@ public abstract class EntityWrapper<T extends Entity> implements PropertyContain
 
 	// ----- private methods -----
 	private void update(final Map<String, Object> values) {
+		accessData().putAll(values);
+	}
 
-		for (final Entry<String, Object> entry : values.entrySet()) {
+	private void filter(final Map<String, Object> data) {
 
-			update(entry.getKey(), entry.getValue());
+		final Iterator<Entry<String, Object>> it = data.entrySet().iterator();
+
+		while (it.hasNext()) {
+
+			final Entry<String, Object> entry = it.next();
+
+			// remove all keys that are already present
+			if (!needsUpdate(entry.getKey(), entry.getValue())) {
+
+				it.remove();
+			}
 		}
 	}
 
-	private void update(final String key, final Object value) {
+	private boolean needsUpdate(final String key, final Object newValue) {
 
-		if (value != null) {
+		final Object existingValue = accessData().get(key);
 
-			data.put(key, value);
+		if (existingValue == null && newValue == null) {
+			return false;
+		}
+
+		if (existingValue == null && newValue != null) {
+			return true;
+		}
+
+		if (existingValue != null && newValue == null) {
+			return true;
+		}
+
+		if (existingValue != null && newValue != null) {
+			return !equal(existingValue, newValue);
+		}
+
+		return false;
+	}
+
+	private boolean equal(final Object existingValue, final Object newValue) {
+
+		if (existingValue instanceof List) {
+
+			final List list1 = (List)existingValue;
+			final List list2 = Arrays.asList((Object[])newValue);
+
+			return list1.equals(list2);
+		}
+
+		// special handling for the case that Neo4j always returns long values for both int and long
+		if ((existingValue instanceof Long && newValue instanceof Integer) || (existingValue instanceof Integer && newValue instanceof Long)) {
+
+			final long v1 = ((Number)existingValue).longValue();
+			final long v2 = ((Number)newValue).longValue();
+
+			return v1 == v2;
+		}
+
+		return existingValue.equals(newValue);
+	}
+
+	// ----- private methods -----
+	private Map<String, Object> accessData() {
+
+		// read-only access does not need a transaction
+		final SessionTransaction tx = db.getCurrentTransaction(false);
+		if (tx != null) {
+
+			if (deleted || tx.isDeleted(this)) {
+				throw new NotFoundException("Entity with ID " + id + " not found.");
+			}
+
+			final long transactionId = tx.getTransactionId();
+			Map<String, Object> copy = txData.get(transactionId);
+
+			if (copy == null) {
+
+				copy = new LinkedHashMap<>(entityData);
+				txData.put(transactionId, copy);
+
+				tx.accessed(this);
+			}
+
+			return copy;
 
 		} else {
 
-			data.remove(key);
+			return entityData;
 		}
-	}
-
-	private boolean differentValue(final String key, final Object value) {
-
-		if (value == null && !data.containsKey(key)) {
-			return false;
-		}
-
-		if (value != null && value.equals(data.get(key))) {
-			return false;
-		}
-
-		return true;
 	}
 }

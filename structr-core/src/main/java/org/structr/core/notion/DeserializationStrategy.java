@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,11 +18,11 @@
  */
 package org.structr.core.notion;
 
-import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.Map.Entry;
 import java.util.Set;
+import org.structr.api.util.Iterables;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
@@ -50,31 +50,41 @@ public abstract class DeserializationStrategy<S, T extends NodeInterface> {
 		final Boolean allowed = (Boolean)securityContext.getAttribute("setNestedProperties");
 		if (allowed != null && allowed == true) {
 
-			final PropertyMap mergedProperties = new PropertyMap();
+			if (securityContext.forceMergeOfNestedProperties()) {
 
-			for (final Entry<PropertyKey, Object> entry : properties.entrySet()) {
+				final PropertyMap mergedProperties = new PropertyMap();
 
-				final PropertyKey key = entry.getKey();
-				final Object newValue  = entry.getValue();
-				final Object oldValue = obj.getProperty(key);
+				for (final Entry<PropertyKey, Object> entry : properties.entrySet()) {
 
-				mergedProperties.put(key, merge(oldValue, newValue));
+					final PropertyKey key = entry.getKey();
+					final Object newValue  = entry.getValue();
+					final Object oldValue = obj.getProperty(key);
+
+					if (newValue != null && !newValue.equals(oldValue)) {
+
+						mergedProperties.put(key, merge(oldValue, newValue));
+					}
+				}
+
+				obj.setProperties(securityContext, mergedProperties);
+
+			} else {
+
+				obj.setProperties(securityContext, properties);
 			}
-
-			obj.setProperties(securityContext, mergedProperties);
 		}
 	}
 
 	protected Object merge(final Object oldValue, final Object newValue) {
 
-		if (oldValue instanceof Collection && newValue instanceof Collection) {
+		if (oldValue instanceof Iterable && newValue instanceof Iterable) {
 
-			final Collection oldCollection = (Collection)oldValue;
-			final Collection newCollection = (Collection)newValue;
+			final Iterable oldCollection = (Iterable)oldValue;
+			final Iterable newCollection = (Iterable)newValue;
 			final Set merged               = new LinkedHashSet<>();
 
-			merged.addAll(oldCollection);
-			merged.addAll(newCollection);
+			Iterables.addAll(merged, newCollection);
+			Iterables.addAll(merged, oldCollection);
 
 			return new LinkedList<>(merged);
 		};

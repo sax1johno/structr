@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -149,7 +149,7 @@ public class HttpHelper {
 	private static String skipBOMIfPresent (final String content) {
 
 		// Skip BOM to workaround this Jsoup bug: https://github.com/jhy/jsoup/issues/348
-		if (content.charAt(0) == 65279) {
+		if (content != null && content.length() > 1 && content.charAt(0) == 65279) {
 			return content.substring(1);
 		}
 
@@ -247,11 +247,19 @@ public class HttpHelper {
 		return post(address, requestBody, username, password, null, null, null, null, headers);
 	}
 
+	public static Map<String, String> post(final String address, final String requestBody, final String username, final String password, final Map<String, String> headers, final String charset) {
+		return post(address, requestBody, username, password, null, null, null, null, headers, charset);
+	}
+
 	public static Map<String, String> post(final String address, final String requestBody, final String proxyUrl, final String proxyUsername, final String proxyPassword, final String cookie, final Map<String, String> headers) {
 		return post(address, requestBody, null, null, proxyUrl, proxyUsername, proxyPassword, cookie, headers);
 	}
 
 	public static Map<String, String> post(final String address, final String requestBody, final String username, final String password, final String proxyUrl, final String proxyUsername, final String proxyPassword, final String cookie, final Map<String, String> headers) {
+		return post(address, requestBody, username, password, proxyUrl, proxyUsername, proxyPassword, cookie, headers, "UTF-8");
+	}
+
+	public static Map<String, String> post(final String address, final String requestBody, final String username, final String password, final String proxyUrl, final String proxyUsername, final String proxyPassword, final String cookie, final Map<String, String> headers, final String charset) {
 
 		final Map<String, String> responseData = new HashMap<>();
 
@@ -262,7 +270,7 @@ public class HttpHelper {
 
 			configure(req, username, password, proxyUrl, proxyUsername, proxyPassword, cookie, headers, true);
 
-			req.setEntity(new StringEntity(requestBody));
+			req.setEntity(new StringEntity(requestBody, charset));
 
 			final CloseableHttpResponse response = client.execute(req);
 
@@ -294,11 +302,19 @@ public class HttpHelper {
 		return put(address, requestBody, username, password, null, null, null, null, headers);
 	}
 
+	public static Map<String, String> put(final String address, final String requestBody, final String username, final String password, final Map<String, String> headers, final String charset) {
+		return put(address, requestBody, username, password, null, null, null, null, headers, charset);
+	}
+
 	public static Map<String, String> put(final String address, final String requestBody, final String proxyUrl, final String proxyUsername, final String proxyPassword, final String cookie, final Map<String, String> headers) {
 		return put(address, requestBody, null, null, proxyUrl, proxyUsername, proxyPassword, cookie, headers);
 	}
 
 	public static Map<String, String> put(final String address, final String requestBody, final String username, final String password, final String proxyUrl, final String proxyUsername, final String proxyPassword, final String cookie, final Map<String, String> headers) {
+		return put(address, requestBody, username, password, proxyUrl, proxyUsername, proxyPassword, cookie, headers, "UTF-8");
+	}
+
+	public static Map<String, String> put(final String address, final String requestBody, final String username, final String password, final String proxyUrl, final String proxyUsername, final String proxyPassword, final String cookie, final Map<String, String> headers, final String charset) {
 
 		final Map<String, String> responseData = new HashMap<>();
 
@@ -309,7 +325,7 @@ public class HttpHelper {
 
 			configure(req, username, password, proxyUrl, proxyUsername, proxyPassword, cookie, headers, true);
 
-			req.setEntity(new StringEntity(requestBody));
+			req.setEntity(new StringEntity(requestBody, charset));
 
 			final CloseableHttpResponse response = client.execute(req);
 

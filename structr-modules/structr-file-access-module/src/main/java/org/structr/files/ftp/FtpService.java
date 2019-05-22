@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -26,12 +26,15 @@ import org.slf4j.LoggerFactory;
 import org.structr.api.config.Settings;
 import org.structr.api.service.Command;
 import org.structr.api.service.RunnableService;
+import org.structr.api.service.ServiceDependency;
 import org.structr.api.service.StructrServices;
+import org.structr.schema.SchemaService;
 
 /**
  *
  *
  */
+@ServiceDependency(SchemaService.class)
 public class FtpService implements RunnableService {
 
 	private static final Logger logger = LoggerFactory.getLogger(FtpService.class.getName());
@@ -85,7 +88,7 @@ public class FtpService implements RunnableService {
 
 	@Override
 	public boolean initialize(final StructrServices services) throws ClassNotFoundException, InstantiationException, IllegalAccessException {
-		
+
 		port = Settings.FtpPort.getValue();
 
 		return true;
@@ -112,6 +115,11 @@ public class FtpService implements RunnableService {
 
 	@Override
 	public boolean isVital() {
+		return false;
+	}
+
+	@Override
+	public boolean waitAndRetry() {
 		return false;
 	}
 

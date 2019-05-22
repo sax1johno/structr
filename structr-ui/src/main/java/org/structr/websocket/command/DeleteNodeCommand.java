@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -27,9 +27,9 @@ import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
-import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.LinkedTreeNode;
 import org.structr.core.graph.NodeInterface;
+import org.structr.core.graph.TransactionCommand;
 import org.structr.core.graph.Tx;
 import org.structr.web.entity.dom.DOMNode;
 import org.structr.websocket.StructrWebSocket;
@@ -37,7 +37,6 @@ import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
 import org.w3c.dom.DOMException;
 
-//~--- classes ----------------------------------------------------------------
 /**
  * Websocket command to delete a single node.
  */
@@ -51,30 +50,32 @@ public class DeleteNodeCommand extends AbstractCommand {
 
 	}
 
-	//~--- methods --------------------------------------------------------
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
-		final Boolean recursive = (Boolean) webSocketData.getNodeData().get("recursive");
-		final NodeInterface obj = getNode(webSocketData.getId());
+		setDoTransactionNotifications(true);
+		
+		try {
+			
+			final Boolean recursive = webSocketData.getNodeDataBooleanValue("recursive");
+			final NodeInterface obj = getNode(webSocketData.getId());
 
-		if (obj != null) {
+			if (obj != null) {
 
-			deleteNode(getWebSocket(), obj, recursive);
+				TransactionCommand.registerNodeCallback((NodeInterface) obj, callback);
 
-		} else {
-			// Don't throw a 404. If node doesn't exist, it doesn't need to be removed,
-			// and everything is fine!.
-			//logger.warn("Node with id {} not found.", webSocketData.getId());
-			//getWebSocket().send(MessageBuilder.status().code(404).build(), true);
-
+				deleteNode(getWebSocket(), obj, recursive);
+			}
+		} catch (FrameworkException ex) {
+			logger.warn("Exception occured", ex);
+			getWebSocket().send(MessageBuilder.status().code(ex.getStatus()).message(ex.getMessage()).build(), true);
 		}
 	}
 
 	protected static void deleteNode(final StructrWebSocket ws, final NodeInterface obj, final Boolean recursive) {
 
 		final SecurityContext securityContext = ws.getSecurityContext();
-		
+
 		final App app = StructrApp.getInstance(securityContext);
 
 		try (final Tx tx = app.tx()) {
@@ -98,7 +99,7 @@ public class DeleteNodeCommand extends AbstractCommand {
 			// Remove all child nodes first
 			try {
 
-				final List<AbstractNode> filteredResults = new LinkedList();
+				final List<NodeInterface> filteredResults = new LinkedList<>();
 				if (obj instanceof DOMNode) {
 
 					DOMNode node = (DOMNode) obj;
@@ -110,7 +111,6 @@ public class DeleteNodeCommand extends AbstractCommand {
 					LinkedTreeNode node = (LinkedTreeNode) obj;
 
 					filteredResults.addAll(node.getAllChildNodes());
-
 				}
 
 				for (NodeInterface node : filteredResults) {
@@ -138,7 +138,7 @@ public class DeleteNodeCommand extends AbstractCommand {
 			logger.warn("Unable to delete node(s)", fex);
 		}
 	}
-	
+
 	//~--- get methods ----------------------------------------------------
 	@Override
 	public String getCommand() {

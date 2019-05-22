@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,28 +19,26 @@
 package org.structr.web.function;
 
 import java.io.StringWriter;
-import java.util.List;
+import java.util.Arrays;
 import java.util.Map;
+import org.mozilla.javascript.Wrapper;
+import org.structr.api.util.PagingIterable;
 import org.structr.common.SecurityContext;
 import org.structr.core.GraphObject;
 import org.structr.core.GraphObjectMap;
-import org.structr.core.Result;
 import org.structr.core.StaticValue;
 import org.structr.core.Value;
 import org.structr.rest.serialization.StreamingJsonWriter;
 import org.structr.schema.action.ActionContext;
 
-/**
- *
- */
-public class ToJsonFunction extends UiFunction {
+public class ToJsonFunction extends UiCommunityFunction {
 
 	public static final String ERROR_MESSAGE_TO_JSON    = "Usage: ${to_json(obj [, view[, depth = 3]])}. Example: ${to_json(this, 'public', 4)}";
 	public static final String ERROR_MESSAGE_TO_JSON_JS = "Usage: ${{Structr.to_json(obj [, view[, depth = 3]])}}. Example: ${{Structr.to_json(Structr.get('this'), 'public', 4)}}";
 
 	@Override
 	public String getName() {
-		return "to_json()";
+		return "to_json";
 	}
 
 	@Override
@@ -51,6 +49,7 @@ public class ToJsonFunction extends UiFunction {
 			try {
 
 				final SecurityContext securityContext = ctx.getSecurityContext();
+				final StringWriter writer             = new StringWriter();
 
 				final Value<String> view = new StaticValue<>("public");
 				if (sources.length > 1) {
@@ -63,28 +62,29 @@ public class ToJsonFunction extends UiFunction {
 					outputDepth = ((Number)sources[2]).intValue();
 				}
 
-				final StreamingJsonWriter jsonStreamer = new StreamingJsonWriter(view, true, outputDepth);
-				final StringWriter writer = new StringWriter();
+				final Object obj = (sources[0] instanceof Wrapper) ? ((Wrapper)sources[0]).unwrap() : sources[0];
 
+				if (obj instanceof GraphObject) {
 
-				if (sources[0] instanceof GraphObject) {
+					final StreamingJsonWriter jsonStreamer = new StreamingJsonWriter(view, true, outputDepth, false);
 
-					jsonStreamer.streamSingle(securityContext, writer, (GraphObject)sources[0]);
+					jsonStreamer.streamSingle(securityContext, writer, (GraphObject)obj);
 
-				} else if (sources[0] instanceof List) {
+				} else if (obj instanceof Iterable) {
 
-					final List list = (List)sources[0];
+					final StreamingJsonWriter jsonStreamer = new StreamingJsonWriter(view, true, outputDepth, true);
+					final Iterable list                    = (Iterable)obj;
 
-					jsonStreamer.stream(securityContext, writer, new Result(list, list.size(), true, false), null);
+					jsonStreamer.stream(securityContext, writer, new PagingIterable<>(list), null, false);
 
-				} else if (sources[0] instanceof Map) {
+				} else if (obj instanceof Map) {
 
-					final GraphObjectMap map  = new GraphObjectMap();
+					final StreamingJsonWriter jsonStreamer = new StreamingJsonWriter(view, true, outputDepth, false);
+					final GraphObjectMap map               = new GraphObjectMap();
 
-					this.recursivelyConvertMapToGraphObjectMap(map, (Map)sources[0], outputDepth);
+					UiFunction.recursivelyConvertMapToGraphObjectMap(map, (Map)obj, outputDepth);
 
-					jsonStreamer.stream(securityContext, writer, new Result(map, false), null);
-
+					jsonStreamer.stream(securityContext, writer, new PagingIterable<>(Arrays.asList(map)), null, false);
 				}
 
 				return writer.getBuffer().toString();

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -22,6 +22,7 @@ import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.autocomplete.AbstractHintProvider;
+import org.structr.autocomplete.JavaHintProvider;
 import org.structr.autocomplete.JavascriptHintProvider;
 import org.structr.autocomplete.PlaintextHintProvider;
 import org.structr.common.error.FrameworkException;
@@ -34,12 +35,8 @@ import org.structr.core.property.Property;
 import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.message.WebSocketMessage;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
- * Websocket command to return the children of the given node
- *
- *
+ * Websocket command to support autocompletion in the backend ui.
  */
 public class AutocompleteCommand extends AbstractCommand {
 
@@ -51,30 +48,32 @@ public class AutocompleteCommand extends AbstractCommand {
 
 		StructrWebSocket.addCommand(AutocompleteCommand.class);
 
-		hintProviders.put("text/plain",             new PlaintextHintProvider());
-		hintProviders.put("text/javascript",        new JavascriptHintProvider());
-		hintProviders.put("application/javascript", new JavascriptHintProvider());
+		hintProviders.put("text/javascript",  new JavascriptHintProvider());
+		hintProviders.put("text/x-java",      new JavaHintProvider());
+		hintProviders.put("text",             new PlaintextHintProvider());
 	}
 
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
+		setDoTransactionNotifications(false);
+
 		final Map<String, Object> data    = webSocketData.getNodeData();
 		final String id                   = webSocketData.getId();
 		final List<GraphObject> result    = new LinkedList<>();
-		final String contentType          = getOrDefault(data.get("contentType"), "text/plain");
+		final String contentType          = webSocketData.getNodeDataStringValueTrimmedOrDefault("contentType", "text/plain");
 
 		if (contentType != null) {
 
 			final AbstractHintProvider hintProvider = hintProviders.get(contentType);
 			if (hintProvider != null) {
 
-				final String currentToken  = getAndTrim(data.get("currentToken"));
-				final String previousToken = getAndTrim(data.get("previousToken"));
-				final String thirdToken    = getAndTrim(data.get("thirdToken"));
-				final String type          = getAndTrim(data.get("type"));
-				final int cursorPosition   = getInt(data.get("cursorPosition"));
-				final int line             = getInt(data.get("line"));
+				final String currentToken  = webSocketData.getNodeDataStringValueTrimmed("currentToken");
+				final String previousToken = webSocketData.getNodeDataStringValueTrimmed("previousToken");
+				final String thirdToken    = webSocketData.getNodeDataStringValueTrimmed("thirdToken");
+				final String type          = webSocketData.getNodeDataStringValueTrimmed("type");
+				final int cursorPosition   = webSocketData.getNodeDataIntegerValue("cursorPosition");
+				final int line             = webSocketData.getNodeDataIntegerValue("line");
 
 				try {
 
@@ -103,42 +102,6 @@ public class AutocompleteCommand extends AbstractCommand {
 
 	@Override
 	public String getCommand() {
-
 		return "AUTOCOMPLETE";
-	}
-
-	// ----- private methods -----
-	private String getAndTrim(final Object source) {
-
-		if (source != null && source instanceof String) {
-			return ((String)source).trim();
-		}
-
-		return "";
-	}
-
-	private String getOrDefault(final Object source, final String defaultValue) {
-
-		if (source != null && source instanceof String) {
-			return ((String)source).trim();
-		}
-
-		return defaultValue;
-	}
-
-	private int getInt(final Object source) {
-
-		if (source != null) {
-
-			if (source instanceof Number) {
-				return ((Number)source).intValue();
-			}
-
-			if (source instanceof String) {
-				try { return Integer.parseInt(source.toString()); } catch (Throwable t) {}
-			}
-		}
-
-		return -1;
 	}
 }

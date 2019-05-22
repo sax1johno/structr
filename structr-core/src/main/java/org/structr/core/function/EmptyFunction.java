@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -23,18 +23,17 @@ import org.apache.commons.lang3.StringUtils;
 import org.mozilla.javascript.Undefined;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
 /**
  *
  */
-public class EmptyFunction extends Function<Object, Object> {
+public class EmptyFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_EMPTY = "Usage: ${empty(string|array|collection)}. Example: ${if(empty(possibleEmptyString), \"empty\", \"non-empty\")}";
 
 	@Override
 	public String getName() {
-		return "empty()";
+		return "empty";
 	}
 
 	@Override
@@ -54,6 +53,10 @@ public class EmptyFunction extends Function<Object, Object> {
 		} else if (sources[0] instanceof Collection) {
 
 			return ((Collection) sources[0]).isEmpty();
+
+		} else if (sources[0] instanceof Iterable) {
+
+			return !((Iterable) sources[0]).iterator().hasNext();
 
 		} else if (sources[0].getClass().isArray()) {
 

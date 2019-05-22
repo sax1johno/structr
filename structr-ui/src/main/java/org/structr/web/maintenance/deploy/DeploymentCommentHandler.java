@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -79,15 +79,22 @@ public class DeploymentCommentHandler implements CommentHandler {
 			node.setProperties(node.getSecurityContext(), changedProperties);
 		});
 
+		handlers.put("hidden", (Page page, DOMNode node, final String parameters) -> {
+			final PropertyMap changedProperties = new PropertyMap();
+			changedProperties.put(AbstractNode.hidden, true);
+			node.setProperties(node.getSecurityContext(), changedProperties);
+		});
+
 		handlers.put("link", (Page page, DOMNode node, final String parameters) -> {
 
 			if (node instanceof LinkSource) {
 
-				final Linkable file = StructrApp.getInstance().nodeQuery(Linkable.class).and(AbstractFile.path, parameters).getFirst();
+				final Linkable file = StructrApp.getInstance().nodeQuery(Linkable.class).and(StructrApp.key(AbstractFile.class, "path"), parameters).getFirst();
 				if (file != null) {
 
 					final LinkSource linkSource = (LinkSource)node;
-					linkSource.setProperties(linkSource.getSecurityContext(), new PropertyMap(LinkSource.linkable, file));
+
+					linkSource.setLinkable(file);
 				}
 			}
 		});
@@ -100,15 +107,19 @@ public class DeploymentCommentHandler implements CommentHandler {
 		});
 
 		handlers.put("content", (Page page, DOMNode node, final String parameters) -> {
-			node.setProperties(node.getSecurityContext(), new PropertyMap(Content.contentType, parameters));
+			node.setProperty(StructrApp.key(Content.class, "contentType"), parameters);
+		});
+
+		handlers.put("name", (Page page, DOMNode node, final String parameters) -> {
+			node.setProperty(StructrApp.key(DOMNode.class, "name"), DOMNode.unescapeForHtmlAttributes(DOMNode.unescapeForHtmlAttributes(parameters)));
 		});
 
 		handlers.put("show", (Page page, DOMNode node, final String parameters) -> {
-			node.setProperties(node.getSecurityContext(), new PropertyMap(DOMNode.showConditions, DOMNode.unescapeForHtmlAttributes(DOMNode.unescapeForHtmlAttributes(parameters))));
+			node.setProperty(StructrApp.key(DOMNode.class, "showConditions"), DOMNode.unescapeForHtmlAttributes(DOMNode.unescapeForHtmlAttributes(parameters)));
 		});
 
 		handlers.put("hide", (Page page, DOMNode node, final String parameters) -> {
-			node.setProperties(node.getSecurityContext(), new PropertyMap(DOMNode.hideConditions, DOMNode.unescapeForHtmlAttributes(DOMNode.unescapeForHtmlAttributes(parameters))));
+			node.setProperty(StructrApp.key(DOMNode.class, "hideConditions"), DOMNode.unescapeForHtmlAttributes(DOMNode.unescapeForHtmlAttributes(parameters)));
 		});
 
 		handlers.put("owner", (Page page, DOMNode node, final String parameters) -> {
@@ -121,6 +132,7 @@ public class DeploymentCommentHandler implements CommentHandler {
 			} else {
 
 				logger.warn("Unknown owner {}, ignoring.", parameters);
+				DeployCommand.addMissingPrincipal(parameters);
 			}
 		});
 
@@ -160,6 +172,7 @@ public class DeploymentCommentHandler implements CommentHandler {
 				} else {
 
 					logger.warn("Unknown grantee {}, ignoring.", parts[0]);
+					DeployCommand.addMissingPrincipal(parts[0]);
 				}
 
 			} else {

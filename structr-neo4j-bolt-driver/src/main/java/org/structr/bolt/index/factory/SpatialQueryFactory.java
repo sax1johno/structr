@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,6 +18,8 @@
  */
 package org.structr.bolt.index.factory;
 
+import org.structr.api.index.AbstractIndex;
+import org.structr.api.index.AbstractQueryFactory;
 import org.structr.api.search.QueryPredicate;
 import org.structr.api.search.SpatialQuery;
 import org.structr.bolt.index.AdvancedCypherQuery;
@@ -25,10 +27,14 @@ import org.structr.bolt.index.AdvancedCypherQuery;
 /**
  *
  */
-public class SpatialQueryFactory extends AbstractQueryFactory {
+public class SpatialQueryFactory extends AbstractQueryFactory<AdvancedCypherQuery> {
+
+	public SpatialQueryFactory(final AbstractIndex index) {
+		super(index);
+	}
 
 	@Override
-	public boolean createQuery(final QueryFactory parent, final QueryPredicate predicate, final AdvancedCypherQuery query, final boolean isFirst) {
+	public boolean createQuery(final QueryPredicate predicate, final AdvancedCypherQuery query, final boolean isFirst) {
 
 		if (predicate instanceof SpatialQuery) {
 
@@ -37,7 +43,7 @@ public class SpatialQueryFactory extends AbstractQueryFactory {
 			final SpatialQuery spatial = (SpatialQuery)predicate;
 			final StringBuilder buf    = new StringBuilder();
 			final Double[] coords      = spatial.getCoords();
-			
+
 			if (coords == null || coords.length != 2)  {
 				return false;
 			}
@@ -46,7 +52,7 @@ public class SpatialQueryFactory extends AbstractQueryFactory {
 			buf.append(coords[0]);
 			buf.append(",longitude:");
 			buf.append(coords[1]);
-			buf.append("}), point(n))");
+			buf.append("}), point({latitude: n.latitude, longitude: n.longitude}))");
 
 			// do not include nodes that have no lat/lon properties
 			query.beginGroup();

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -22,6 +22,10 @@ package org.structr.api;
  *
  */
 public class RetryException extends RuntimeException {
+
+	public RetryException(final String message) {
+		super(message);
+	}
 
 	public RetryException(final Throwable cause) {
 		super(cause);

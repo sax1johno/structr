@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,6 +18,7 @@
  */
 package org.structr.odf.entity;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -25,17 +26,20 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.odftoolkit.simple.TextDocument;
+import org.structr.api.util.Iterables;
+import org.structr.api.util.ResultStream;
+import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.Export;
 import org.structr.core.GraphObject;
 import org.structr.core.GraphObjectMap;
-import org.structr.core.Result;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.schema.SchemaService;
+import org.structr.schema.json.JsonObjectType;
+import org.structr.schema.json.JsonSchema;
 import org.structr.transform.VirtualType;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -44,26 +48,41 @@ import org.w3c.dom.NodeList;
  * Reads a nodes attributes and tries to replace matching attributes in the
  * given ODT-File template.
  */
-public class ODTExporter extends ODFExporter {
+public interface ODTExporter extends ODFExporter {
 
-	private final String ODT_FIELD_TAG_NAME        = "text:user-field-decl";
-	private final String ODT_FIELD_ATTRIBUTE_NAME  = "text:name";
-	private final String ODT_FIELD_ATTRIBUTE_VALUE = "office:string-value";
+	static class Impl { static {
 
-	@Export
-	public void exportAttributes(String uuid) throws FrameworkException {
+		final JsonSchema schema   = SchemaService.getDynamicSchema();
+		final JsonObjectType type = schema.addType("ODTExporter");
 
-		FileBase output = getProperty(resultDocument);
-		VirtualType transformation = getProperty(transformationProvider);
+		type.setImplements(URI.create("https://structr.org/v1.1/definitions/ODTExporter"));
+		type.setExtends(URI.create("#/definitions/ODFExporter"));
+
+		type.addMethod("exportAttributes")
+			.addParameter("uuid", String.class.getName())
+			.setSource(ODTExporter.class.getName() + ".exportAttributes(this, uuid);")
+			.addException(FrameworkException.class.getName())
+			.setDoExport(true);
+	}}
+
+	static final String ODT_FIELD_TAG_NAME        = "text:user-field-decl";
+	static final String ODT_FIELD_ATTRIBUTE_NAME  = "text:name";
+	static final String ODT_FIELD_ATTRIBUTE_VALUE = "office:string-value";
+
+	static void exportAttributes(final ODTExporter thisNode, final String uuid) throws FrameworkException {
+
+		final SecurityContext securityContext = thisNode.getSecurityContext();
+		final File output                     = thisNode.getResultDocument();
+		final VirtualType transformation      = thisNode.getTransformationProvider();
 
 		try {
 
 			final App app = StructrApp.getInstance();
-			final Result result = app.nodeQuery(AbstractNode.class).and(GraphObject.id, uuid).getResult();
-			final Result transformedResult = transformation.transformOutput(securityContext, AbstractNode.class, result);
+			final ResultStream result = app.nodeQuery(AbstractNode.class).and(GraphObject.id, uuid).getResultStream();
+			final ResultStream transformedResult = transformation.transformOutput(securityContext, AbstractNode.class, result);
 
 			Map<String, Object> nodeProperties = new HashMap<>();
-			GraphObjectMap node = (GraphObjectMap) transformedResult.get(0);
+			GraphObjectMap node = (GraphObjectMap) Iterables.first(transformedResult);
 			node.getPropertyKeys(null).forEach(
 				p -> nodeProperties.put(p.dbName(), node.getProperty(p))
 			);
@@ -117,9 +136,5 @@ public class ODTExporter extends ODFExporter {
 		} catch (Exception e) {
 			logger.error("Error while exporting to ODT", e);
 		}
-	}
-
-	static {
-		SchemaService.registerBuiltinTypeOverride("ODTExporter", ODTExporter.class.getName());
 	}
 }

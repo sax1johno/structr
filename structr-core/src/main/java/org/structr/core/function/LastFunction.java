@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,29 +19,32 @@
 package org.structr.core.function;
 
 import java.util.List;
+import org.structr.api.util.Iterables;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class LastFunction extends Function<Object, Object> {
+public class LastFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_LAST = "Usage: ${last(collection)}. Example: ${last(this.children)}";
 
 	@Override
 	public String getName() {
-		return "last()";
+		return "last";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
 		try {
-			if (!arrayHasLengthAndAllElementsNotNull(sources, 1)) {
-				
-				return null;
+
+			assertArrayHasLengthAndAllElementsNotNull(sources, 1);
+
+			if (sources[0] instanceof Iterable) {
+
+				final Iterable iterable = (Iterable)sources[0];
+				return Iterables.last(iterable);
 			}
 
 			if (sources[0] instanceof List && !((List)sources[0]).isEmpty()) {
@@ -59,17 +62,19 @@ public class LastFunction extends Function<Object, Object> {
 				}
 			}
 
-		} catch (final IllegalArgumentException e) {
+			return null;
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+		} catch (ArgumentNullException pe) {
 
+			// silently ignore null arguments
+			return null;
+
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
-
-		return null;
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {
@@ -80,5 +85,4 @@ public class LastFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Returns the last element of the given collection";
 	}
-
 }

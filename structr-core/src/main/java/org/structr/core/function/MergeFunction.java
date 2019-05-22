@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,22 +19,17 @@
 package org.structr.core.function;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class MergeFunction extends Function<Object, Object> {
+public class MergeFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_MERGE = "Usage: ${merge(list1, list2, list3, ...)}. Example: ${merge(this.children, this.siblings)}";
 
 	@Override
 	public String getName() {
-		return "merge()";
+		return "merge";
 	}
 
 	@Override
@@ -43,10 +38,10 @@ public class MergeFunction extends Function<Object, Object> {
 		final List list = new ArrayList();
 		for (final Object source : sources) {
 
-			if (source instanceof Collection) {
+			if (source instanceof Iterable) {
 
 				// filter null objects
-				for (Object obj : (Collection)source) {
+				for (Object obj : (Iterable)source) {
 
 					if (obj != null) {
 
@@ -62,7 +57,6 @@ public class MergeFunction extends Function<Object, Object> {
 
 		return list;
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,7 +19,6 @@
 package org.structr.websocket.command;
 
 import java.util.Arrays;
-import java.util.Map;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
@@ -47,10 +46,11 @@ public class CreateRelationshipCommand extends AbstractCommand {
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
-		final Map<String, Object> properties = webSocketData.getRelData();
-		final String sourceId                = (String) properties.get("sourceId");
-		final String targetId                = (String) properties.get("targetId");
-		final String relType                 = (String) properties.get("relType");
+		setDoTransactionNotifications(true);
+
+		final String sourceId                = webSocketData.getRelDataStringValue("sourceId");
+		final String targetId                = webSocketData.getRelDataStringValue("targetId");
+		final String relType                 = webSocketData.getRelDataStringValue("relType");
 		final AbstractNode sourceNode        = getNode(sourceId);
 		final AbstractNode targetNode        = getNode(targetId);
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -21,7 +21,11 @@ package org.structr.core.function;
 import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
+import org.structr.api.config.Settings;
+import org.structr.api.util.Iterables;
 import org.structr.common.SecurityContext;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.GraphObjectMap;
@@ -29,34 +33,29 @@ import org.structr.core.app.StructrApp;
 import org.structr.core.converter.PropertyConverter;
 import org.structr.core.property.PropertyKey;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class GetFunction extends Function<Object, Object> {
+public class GetFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_GET        = "Usage: ${get(entity, propertyKey)}. Example: ${get(this, \"children\")}";
 	public static final String ERROR_MESSAGE_GET_ENTITY = "Cannot evaluate first argument to entity, must be entity or single element list of entities.";
 
 	@Override
 	public String getName() {
-		return "get()";
+		return "get";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
-		final SecurityContext securityContext = ctx.getSecurityContext();
-		
+		final SecurityContext securityContext    = ctx.getSecurityContext();
+
 		try {
-			if (!arrayHasLengthAndAllElementsNotNull(sources, 2)) {
-				
-				return "";
-			}
-		
-			final String keyName = sources[1].toString();
-			GraphObject dataObject = null;
+
+			assertArrayHasLengthAndAllElementsNotNull(sources, 2);
+
+			final boolean useGenericPropertyForUnknownKeys = Settings.AllowUnknownPropertyKeys.getValue(false);
+			final String keyName                           = sources[1].toString();
+			GraphObject dataObject                         = null;
 
 			// handle GraphObject
 			if (sources[0] instanceof GraphObject) {
@@ -64,10 +63,10 @@ public class GetFunction extends Function<Object, Object> {
 			}
 
 			// handle first element of a list of graph objects
-			if (sources[0] instanceof List) {
+			if (sources[0] instanceof Iterable) {
 
-				final List list = (List)sources[0];
-				final int size = list.size();
+				final List list = Iterables.toList((Iterable)sources[0]);
+				final int size  = list.size();
 
 				if (size == 1) {
 
@@ -106,7 +105,9 @@ public class GetFunction extends Function<Object, Object> {
 
 			if (dataObject != null) {
 
-				final PropertyKey key = StructrApp.getConfiguration().getPropertyKeyForJSONName(dataObject.getClass(), keyName);
+				final Class type = dataObject.getClass();
+
+				final PropertyKey key = StructrApp.getConfiguration().getPropertyKeyForJSONName(type, keyName, useGenericPropertyForUnknownKeys);
 				if (key != null) {
 
 					final PropertyConverter inputConverter = key.inputConverter(securityContext);
@@ -117,6 +118,11 @@ public class GetFunction extends Function<Object, Object> {
 					}
 
 					return dataObject.getProperty(key);
+
+				} else {
+
+					// key does not exist and generic property is not desired => log warning
+					logger.warn("get(): Unknown property {}.{}, value will not be returned. [{}]", type.getSimpleName(), keyName, dataObject.getUuid());
 				}
 
 				return "";
@@ -126,13 +132,16 @@ public class GetFunction extends Function<Object, Object> {
 				return ERROR_MESSAGE_GET_ENTITY;
 			}
 
-		} catch (final IllegalArgumentException e) {
-			
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+		} catch (ArgumentNullException pe) {
 
+			// silently ignore null arguments
+			return "";
+
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
 		}
-
 	}
 
 	@Override
@@ -144,5 +153,4 @@ public class GetFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Returns the value with the given name of the given entity, or an empty string";
 	}
-
 }

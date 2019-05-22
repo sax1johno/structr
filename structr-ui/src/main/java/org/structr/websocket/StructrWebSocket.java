@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -35,6 +35,7 @@ import org.structr.common.SecurityContext;
 import org.structr.common.error.DatabaseServiceNotAvailableException;
 import org.structr.common.error.FrameworkException;
 import org.structr.console.Console;
+import org.structr.console.Console.ConsoleMode;
 import org.structr.core.GraphObject;
 import org.structr.core.Services;
 import org.structr.core.app.App;
@@ -44,9 +45,7 @@ import org.structr.core.entity.Principal;
 import org.structr.core.graph.Tx;
 import org.structr.rest.auth.AuthHelper;
 import org.structr.rest.auth.SessionHelper;
-import org.structr.rest.service.HttpService;
-import org.structr.web.entity.FileBase;
-import org.structr.web.entity.User;
+import org.structr.web.entity.File;
 import org.structr.websocket.command.AbstractCommand;
 import org.structr.websocket.command.FileUploadHandler;
 import org.structr.websocket.command.LoginCommand;
@@ -54,42 +53,35 @@ import org.structr.websocket.command.PingCommand;
 import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
 
-//~--- classes ----------------------------------------------------------------
 /**
- *
- *
- *
  */
 public class StructrWebSocket implements WebSocketListener {
 
 	private static final Logger logger = LoggerFactory.getLogger(StructrWebSocket.class.getName());
 	private static final Map<String, Class> commandSet = new LinkedHashMap<>();
 
-	//~--- fields ---------------------------------------------------------
-	private Session session = null;
-	private Gson gson = null;
-	private HttpServletRequest request = null;
-	private SecurityContext securityContext = null;
-	private WebsocketController syncController = null;
+	private Session session                        = null;
+	private Gson gson                              = null;
+	private HttpServletRequest request             = null;
+	private SecurityContext securityContext        = null;
+	private WebsocketController syncController     = null;
 	private Map<String, FileUploadHandler> uploads = null;
-	private Authenticator authenticator = null;
-	private String pagePath = null;
-	private Console console = null;
-	private Boolean timedOut = false;
+	private Authenticator authenticator            = null;
+	private String pagePath                        = null;
+	private Console console                        = null;
+	private Boolean timedOut                       = false;
 
-	//~--- constructors ---------------------------------------------------
 	public StructrWebSocket() {}
 
 	public StructrWebSocket(final WebsocketController syncController, final Gson gson, final Authenticator authenticator) {
 
-		this.uploads = new LinkedHashMap<>();
+		this.uploads        = new LinkedHashMap<>();
 		this.syncController = syncController;
-		this.gson = gson;
-		this.authenticator = authenticator;
+		this.gson           = gson;
+		this.authenticator  = authenticator;
 
 	}
 
-	//~--- methods --------------------------------------------------------
 	public void setRequest(final HttpServletRequest request) {
 		this.request = request;
 	}
@@ -140,6 +132,11 @@ public class StructrWebSocket implements WebSocketListener {
 	@Override
 	public void onWebSocketText(final String data) {
 
+		if (!Services.getInstance().isInitialized()) {
+			// send 401 Authentication Required
+			send(MessageBuilder.status().code(503).message("System is not initialized yet").build(), true);
+		}
+
 		final Services servicesInstance = Services.getInstance();
 
 		// wait for service layer to be initialized
@@ -166,12 +163,12 @@ public class StructrWebSocket implements WebSocketListener {
 
 		if (type != null) {
 
-			try (final Tx tx = app.tx()) {
+			try (final Tx tx = StructrApp.getInstance().tx()) {
 
 				if (sessionIdFromMessage != null) {
 
 					// try to authenticated this connection by sessionId
-					authenticate(Services.getInstance().getService(HttpService.class).getSessionCache().getSessionHandler().getSessionIdManager().getId(sessionIdFromMessage));
+					authenticate(SessionHelper.getShortSessionId(sessionIdFromMessage), command.equals("PING"));
 				}
 
 				// we only permit LOGIN commands if authentication based on sessionId was not successful
@@ -234,7 +231,7 @@ public class StructrWebSocket implements WebSocketListener {
 				// transactions in case of bulk processing commands etc.
 				if (abstractCommand.requiresEnclosingTransaction()) {
 
-					try (final Tx tx = app.tx()) {
+					try (final Tx tx = app.tx(true, true, true)) {
 
 						// store authenticated-Flag in webSocketData
 						// so the command can access it
@@ -248,7 +245,7 @@ public class StructrWebSocket implements WebSocketListener {
 
 				} else {
 
-					try (final Tx tx = app.tx()) {
+					try (final Tx tx = app.tx(true, true, true)) {
 
 						// store authenticated-Flag in webSocketData
 						// so the command can access it
@@ -265,7 +262,7 @@ public class StructrWebSocket implements WebSocketListener {
 
 			} catch (FrameworkException | InstantiationException | IllegalAccessException t) {
 
-				try (final Tx tx = app.tx()) {
+				try (final Tx tx = app.tx(true, true, true)) {
 
 					// send 400 Bad Request
 					if (t instanceof FrameworkException) {
@@ -307,7 +304,7 @@ public class StructrWebSocket implements WebSocketListener {
 
 		boolean isAuthenticated = false;
 
-		try (final Tx tx = StructrApp.getInstance(securityContext).tx()) {
+		try (final Tx tx = StructrApp.getInstance(securityContext).tx(true, true, true)) {
 
 			isAuthenticated = isAuthenticated();
 
@@ -334,7 +331,7 @@ public class StructrWebSocket implements WebSocketListener {
 			//logger.warn("NOT sending message to unauthenticated client.");
 		}
 
-		try (final Tx tx = StructrApp.getInstance(securityContext).tx()) {
+		try (final Tx tx = StructrApp.getInstance(securityContext).tx(true, true, true)) {
 
 			if (message.getCode() == 0) {
 				// default is: 200 OK
@@ -357,13 +354,13 @@ public class StructrWebSocket implements WebSocketListener {
 
 		} catch (Throwable t) {
 			// ignore
-			logger.debug("Unable to send websocket message to remote client");
+			logger.warn("Unable to send websocket message to remote client: {}", t);
 		}
 
 	}
 
 	// ----- file handling -----
-	public void createFileUploadHandler(FileBase file) {
+	public void createFileUploadHandler(File file) {
 
 		final String uuid = file.getProperty(GraphObject.id);
 
@@ -383,7 +380,7 @@ public class StructrWebSocket implements WebSocketListener {
 
 		try {
 
-			FileBase file = (FileBase) StructrApp.getInstance(securityContext).getNodeById(uuid);
+			File file = (File) StructrApp.getInstance(securityContext).getNodeById(uuid);
 
 			if (file != null) {
 
@@ -419,32 +416,37 @@ public class StructrWebSocket implements WebSocketListener {
 
 	}
 
-	private void authenticate(final String sessionId) {
+	private void authenticate(final String sessionId, final boolean isPing) {
 
-		final Principal user = AuthHelper.getPrincipalForSessionId(sessionId);
+		final Principal user = AuthHelper.getPrincipalForSessionId(sessionId, isPing);
 
 		if (user != null) {
 
 			try {
 
-				final boolean sessionValid = !SessionHelper.isSessionTimedOut(SessionHelper.getSessionBySessionId(sessionId));
+				synchronized (this) {
 
-				if (sessionValid) {
-					this.setAuthenticated(sessionId, user);
-				} else {
+					final boolean sessionValid = !SessionHelper.isSessionTimedOut(SessionHelper.getSessionBySessionId(sessionId));
 
-					logger.warn("Session {} timed out - last accessed by {} ({})", sessionId, user.getName(), user.getUuid());
+					if (sessionValid) {
 
-					SessionHelper.clearSession(sessionId);
+						logger.debug("Valid session: " + sessionId);
+						setAuthenticated(sessionId, user);
 
-					SessionHelper.invalidateSession(SessionHelper.getSessionBySessionId(sessionId));
+					} else {
 
-					AuthHelper.sendLogoutNotification(user);
+						logger.warn("Session {} timed out - last accessed by {} ({})", sessionId, user.getName(), user.getUuid());
 
-                    invalidateConsole();
+						SessionHelper.clearSession(sessionId);
+						SessionHelper.invalidateSession(sessionId);
 
-					this.timedOut = true;
+						AuthHelper.sendLogoutNotification(user);
 
+						invalidateConsole();
+
+						timedOut = true;
+
+					}
 				}
 
 			} catch (FrameworkException ex) {
@@ -510,7 +512,7 @@ public class StructrWebSocket implements WebSocketListener {
 
 	public boolean isPrivilegedUser(Principal user) {
 
-		return (user != null && (user.getProperty(Principal.isAdmin) || user.getProperty(User.backendUser)));
+		return (user != null && user.isAdmin());
 
 	}
 
@@ -532,7 +534,7 @@ public class StructrWebSocket implements WebSocketListener {
 
 	}
 
-	public Console getConsole() {
+	public Console getConsole(final ConsoleMode mode) {
 
 		if (this.securityContext != null) {
 
@@ -542,22 +544,27 @@ public class StructrWebSocket implements WebSocketListener {
 
 			} else {
 
-				this.console = new Console(securityContext, null);
+				this.console = new Console(securityContext, mode, null);
 				return this.console;
 
 			}
-
 		}
 
 		return null;
-
 	}
 
-	//~--- set methods ----------------------------------------------------
 	public void setAuthenticated(final String sessionId, final Principal user) {
-		this.securityContext = SecurityContext.getInstance(user, AccessMode.Backend);
-		this.securityContext.setSessionId(sessionId);
-		this.timedOut = false;
+
+		securityContext = SecurityContext.getInstance(user, AccessMode.Backend);
+		securityContext.setSessionId(sessionId);
+
+		if (securityContext.getRequest() == null) {
+			securityContext.setRequest(request);
+		}
+
+		logger.debug("Session ID of security context " + securityContext + " set to " + sessionId);
+
+		timedOut = false;
 	}
 
 	@Override

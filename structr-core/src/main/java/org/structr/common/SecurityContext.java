@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -35,8 +35,8 @@ import org.apache.commons.lang3.LocaleUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.util.Iterables;
 import org.structr.core.GraphObject;
-import org.structr.core.Services;
 import org.structr.core.auth.Authenticator;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.Principal;
@@ -48,24 +48,32 @@ import org.structr.schema.SchemaHelper;
  * Encapsulates the current user and access path and provides methods to query
  * permission flags for a given node. This is the place where HttpServletRequest
  * and Authenticator get together.
- *
- *
  */
 public class SecurityContext {
 
-	public static final String LOCALE_KEY = "locale";
+	public static final String JSON_PARALLELIZATION_REQUEST_PARAMETER_NAME = "parallelizeJsonOutput";
+	public static final String LOCALE_KEY                                  = "locale";
+
+	public enum MergeMode {
+		Add, Remove, Toggle, Replace
+	}
 
 	private static final Logger logger                   = LoggerFactory.getLogger(SecurityContext.class.getName());
 	private static final Map<String, Long> resourceFlags = new ConcurrentHashMap<>();
-	private static final Pattern customViewPattern       = Pattern.compile(".*properties=([a-zA-Z_,]+)");
+	private static final Pattern customViewPattern       = Pattern.compile(".*properties=([a-zA-Z_,-]+)");
+	private MergeMode remoteCollectionMergeMode          = MergeMode.Replace;
 	private boolean uuidWasSetManually                   = false;
-	private boolean doTransactionNotifications           = true;
+	private boolean doTransactionNotifications           = false;
+	private boolean forceMergeOfNestedProperties         = false;
+	private boolean doCascadingDelete                    = true;
 	private boolean modifyAccessTime                     = true;
 	private boolean ignoreResultCount                    = false;
 	private boolean ensureCardinality                    = true;
+	private boolean doInnerCallbacks                     = true;
+	private boolean isReadOnlyTransaction                = false;
+	private boolean doMultiThreadedJsonOutput            = false;
 	private int serializationDepth                       = -1;
 
-	//~--- fields ---------------------------------------------------------
 	private final Map<String, QueryRange> ranges = new ConcurrentHashMap<>();
 	private final Map<String, Object> attrs      = new ConcurrentHashMap<>();
 	private AccessMode accessMode                = AccessMode.Frontend;
@@ -77,8 +85,8 @@ public class SecurityContext {
 	private String cachedUserName                = null;
 	private String cachedUserId                  = null;
 	private String sessionId                     = null;
+	private ContextStore contextStore            = null;
 
-	//~--- constructors ---------------------------------------------------
 	private SecurityContext() {
 	}
 
@@ -119,8 +127,24 @@ public class SecurityContext {
 				this.doTransactionNotifications = false;
 			}
 
+			if ("enabled".equals(request.getHeader("Structr-Websocket-Broadcast"))) {
+				this.doTransactionNotifications = true;
+			}
+
+			if ("disabled".equals(request.getHeader("Structr-Cascading-Delete"))) {
+				this.doCascadingDelete = false;
+			}
+
+			if ("enabled".equals(request.getHeader("Structr-Force-Merge-Of-Nested-Properties"))) {
+				this.forceMergeOfNestedProperties = true;
+			}
+
 			if (request.getParameter("ignoreResultCount") != null) {
 				this.ignoreResultCount = true;
+			}
+
+			if (request.getParameter(SecurityContext.JSON_PARALLELIZATION_REQUEST_PARAMETER_NAME) != null) {
+				this.doMultiThreadedJsonOutput = true;
 			}
 		}
 	}
@@ -132,7 +156,7 @@ public class SecurityContext {
 
 			try {
 				final String acceptedContentType = request.getHeader("Accept");
-				if (acceptedContentType != null && acceptedContentType.startsWith("application/json")) {
+				//if (acceptedContentType != null && acceptedContentType.startsWith("application/json")) {
 
 					final Matcher matcher = customViewPattern.matcher(acceptedContentType);
 					if (matcher.matches()) {
@@ -150,7 +174,7 @@ public class SecurityContext {
 							}
 						}
 					}
-				}
+				//}
 
 			} catch (Throwable ignore) {
 			}
@@ -233,7 +257,7 @@ public class SecurityContext {
 
 	}
 
-	public void removeForbiddenNodes(List<? extends GraphObject> nodes, final boolean includeDeletedAndHidden, final boolean publicOnly) {
+	public void removeForbiddenNodes(List<? extends GraphObject> nodes, final boolean includeHidden, final boolean publicOnly) {
 
 		boolean readableByUser = false;
 
@@ -247,7 +271,7 @@ public class SecurityContext {
 
 				readableByUser = n.isGranted(Permission.read, this);
 
-				if (!(readableByUser && (includeDeletedAndHidden || !n.isDeleted()) && (n.isVisibleToPublicUsers() || !publicOnly))) {
+				if (!(readableByUser && includeHidden && (n.isVisibleToPublicUsers() || !publicOnly))) {
 
 					it.remove();
 				}
@@ -281,30 +305,18 @@ public class SecurityContext {
 
 		if (request != null) {
 
-			final HttpSession session = request.getSession(false);
-			if (session != null) {
-
-				session.setMaxInactiveInterval(Services.getGlobalSessionTimeout());
-			}
-
-			return session;
-
+			return request.getSession(false);
 		}
 
 		return null;
-
 	}
 
 	public HttpServletRequest getRequest() {
-
 		return request;
-
 	}
 
 	public HttpServletResponse getResponse() {
-
 		return response;
-
 	}
 
 	public String getCachedUserId() {
@@ -404,13 +416,19 @@ public class SecurityContext {
 		uriBuilder.append("/");
 
 		return uriBuilder;
-
 	}
 
 	public Object getAttribute(String key) {
-
 		return attrs.get(key);
+	}
 
+	public <T> T getAttribute(String key, final T defaultValue) {
+
+		if (attrs.containsKey(key)) {
+			return (T)attrs.get(key);
+		}
+
+		return defaultValue;
 	}
 
 	public static long getResourceFlags(String resource) {
@@ -441,8 +459,12 @@ public class SecurityContext {
 
 		Principal user = getUser(false);
 
-		return ((user != null) && (user instanceof SuperUser || user.getProperty(Principal.isAdmin)));
+		return ((user != null) && (user instanceof SuperUser || user.isAdmin()));
 
+	}
+
+	public boolean isSuperUserSecurityContext () {
+		return false;
 	}
 
 	public boolean isVisible(AccessControllable node) {
@@ -457,19 +479,17 @@ public class SecurityContext {
 
 			default:
 				return false;
-
 		}
-
 	}
 
-	public boolean isReadable(final NodeInterface node, final boolean includeDeletedAndHidden, final boolean publicOnly) {
+	public boolean isReadable(final NodeInterface node, final boolean includeHidden, final boolean publicOnly) {
 
 		/**
 		 * The if-clauses in the following lines have been split for
 		 * performance reasons.
 		 */
 		// deleted and hidden nodes will only be returned if we are told to do so
-		if ((node.isDeleted() || node.isHidden()) && !includeDeletedAndHidden) {
+		if (node.isHidden() && !includeHidden) {
 
 			return false;
 		}
@@ -495,6 +515,10 @@ public class SecurityContext {
 		}
 
 		return node.isGranted(Permission.read, this);
+	}
+
+	public MergeMode getRemoteCollectionMergeMode() {
+		return remoteCollectionMergeMode;
 	}
 
 	// ----- private methods -----
@@ -566,7 +590,7 @@ public class SecurityContext {
 			final Principal owner = node.getOwnerNode();
 
 			// owner is always allowed to do anything with its nodes
-			if (user.equals(node) || user.equals(owner) || user.getParents().contains(owner)) {
+			if (user.equals(node) || user.equals(owner) || Iterables.toList(user.getParents()).contains(owner)) {
 
 				return true;
 			}
@@ -617,13 +641,15 @@ public class SecurityContext {
 
 	}
 
-	public void setAttribute(String key, Object value) {
+	public void setAttribute(final String key, final Object value) {
 
-		attrs.put(key, value);
+		if (value != null) {
+			attrs.put(key, value);
+		}
 
 	}
 
-	public void setAccessMode(AccessMode accessMode) {
+	public void setAccessMode(final AccessMode accessMode) {
 
 		this.accessMode = accessMode;
 
@@ -687,9 +713,9 @@ public class SecurityContext {
 		if (cachedUser != null) {
 
 			// Priority 2: User locale
-			final String userLocaleString = cachedUser.getProperty(Principal.locale);
-
+			final String userLocaleString = cachedUser.getLocale();
 			if (userLocaleString != null) {
+
 				userHasLocaleString = true;
 
 				try {
@@ -767,6 +793,14 @@ public class SecurityContext {
 		return "[No request available]";
 	}
 
+	public boolean doCascadingDelete() {
+		return doCascadingDelete;
+	}
+
+	public void setDoCascadingDelete(boolean doCascadingDelete) {
+		this.doCascadingDelete = doCascadingDelete;
+	}
+
 	public boolean doTransactionNotifications() {
 		return doTransactionNotifications;
 	}
@@ -807,6 +841,22 @@ public class SecurityContext {
 		ensureCardinality = false;
 	}
 
+	public void disableInnerCallbacks() {
+		doInnerCallbacks = false;
+	}
+
+	public void enableInnerCallbacks() {
+		doInnerCallbacks = false;
+	}
+
+	public boolean doInnerCallbacks() {
+		return doInnerCallbacks;
+	}
+
+	public boolean forceMergeOfNestedProperties() {
+		return forceMergeOfNestedProperties;
+	}
+
 	public boolean uuidWasSetManually() {
 		return uuidWasSetManually;
 	}
@@ -818,13 +868,13 @@ public class SecurityContext {
 	public String getSessionId() {
 
 		// return session id for HttpSession if present
-		if (getRequest() != null && getRequest().getSession() != null && getRequest().getSession().getId() != null) {
-			return getRequest().getSession().getId();
+		HttpSession session = getSession();
+		if (session != null) {
+			return session.getId();
 		}
 
 		// otherwise return cached session id if present (for websocket connections for example)
 		return sessionId;
-
 	}
 
 	public void setSessionId(String sessionId) {
@@ -843,6 +893,31 @@ public class SecurityContext {
 		return serializationDepth;
 	}
 
+	public ContextStore getContextStore() {
+
+		if (contextStore == null) {
+			setContextStore(new ContextStore());
+		}
+
+		return contextStore;
+	}
+
+	public void setContextStore(ContextStore contextStore) {
+		this.contextStore = contextStore;
+	}
+
+	public void setReadOnlyTransaction() {
+		this.isReadOnlyTransaction = true;
+	}
+
+	public boolean isReadOnlyTransaction() {
+		return isReadOnlyTransaction;
+	}
+
+	public boolean doMultiThreadedJsonOutput() {
+		return doMultiThreadedJsonOutput;
+	}
+
 	// ----- nested classes -----
 	private static class SuperUserSecurityContext extends SecurityContext {
 
@@ -854,8 +929,6 @@ public class SecurityContext {
 
 		public SuperUserSecurityContext() {
 		}
-
-		//~--- get methods --------------------------------------------
 
 		@Override
 		public Principal getUser(final boolean tryLogin) {
@@ -883,12 +956,10 @@ public class SecurityContext {
 		public AccessMode getAccessMode() {
 
 			return (AccessMode.Backend);
-
 		}
 
 		@Override
-		public boolean isReadable(final NodeInterface node, final boolean includeDeletedAndHidden, final boolean publicOnly) {
-
+		public boolean isReadable(final NodeInterface node, final boolean includeHidden, final boolean publicOnly) {
 			return true;
 		}
 
@@ -901,11 +972,12 @@ public class SecurityContext {
 
 		@Override
 		public boolean isSuperUser() {
-
 			return true;
-
 		}
 
+		@Override
+		public boolean isSuperUserSecurityContext () {
+			return true;
+		}
 	}
-
 }

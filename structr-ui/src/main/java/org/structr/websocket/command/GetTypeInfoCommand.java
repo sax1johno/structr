@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -49,7 +49,9 @@ public class GetTypeInfoCommand extends AbstractCommand {
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
-		final String type = (String) webSocketData.getNodeData().get("type");
+		setDoTransactionNotifications(false);
+
+		final String type = webSocketData.getNodeDataStringValue("type");
 
 		if (type == null) {
 			logger.warn("Node type given not found");

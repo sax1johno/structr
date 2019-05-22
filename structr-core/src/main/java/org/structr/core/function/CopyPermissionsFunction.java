@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -24,15 +24,23 @@ import org.structr.core.entity.Principal;
 import org.structr.core.entity.Security;
 import org.structr.core.graph.NodeInterface;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
+public class CopyPermissionsFunction extends CoreFunction {
 
-public class CopyPermissionsFunction extends Function<Object, Object> {
+	public static final String ERROR_MESSAGE    = "Usage: copy_permissions(this, this.child)";
+	public static final String ERROR_MESSAGE_JS = "Usage: Structr.copyPermissions(Structr.this, other);";
+
+	@Override
+	public String getName() {
+		return "copy_permissions";
+	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
-		if (arrayHasLengthAndAllElementsNotNull(sources, 2)) {
+		try {
+
+			assertArrayHasLengthAndAllElementsNotNull(sources, 2);
 
 			final Object source = sources[0];
 			final Object target = sources[1];
@@ -57,35 +65,23 @@ public class CopyPermissionsFunction extends Function<Object, Object> {
 				logParameterError(caller, sources, ctx.isJavaScriptContext());
 			}
 
-		} else {
+			return null;
 
+
+		} catch (IllegalArgumentException e) {
+
+			logParameterError(caller, sources, e.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
 		}
-
-		return null;
 	}
 
 	@Override
 	public String usage(final boolean inJavaScriptContext) {
-
-		if (inJavaScriptContext) {
-
-			return "Usage: Structr.copyPermissions(Structr.this, other);";
-
-		} else {
-
-			return "Usage: copy_permissions(this, this.child)";
-		}
+		return (inJavaScriptContext ? ERROR_MESSAGE_JS : ERROR_MESSAGE);
 	}
 
 	@Override
 	public String shortDescription() {
 		return "Copies the security configuration of an entity to another entity.";
 	}
-
-	@Override
-	public String getName() {
-		return "copy_permissions()";
-	}
-
 }

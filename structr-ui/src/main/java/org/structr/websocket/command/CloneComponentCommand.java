@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,8 +19,9 @@
 package org.structr.websocket.command;
 
 
-import java.util.Map;
 import org.structr.common.error.FrameworkException;
+import org.structr.core.app.StructrApp;
+import org.structr.core.graph.TransactionCommand;
 import org.structr.core.property.PropertyMap;
 import org.structr.web.entity.dom.DOMNode;
 import org.structr.web.entity.dom.Page;
@@ -47,9 +48,10 @@ public class CloneComponentCommand extends AbstractCommand {
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
-		String id				= webSocketData.getId();
-		Map<String, Object> nodeData		= webSocketData.getNodeData();
-		String parentId				= (String) nodeData.get("parentId");
+		setDoTransactionNotifications(true);
+
+		String id				      = webSocketData.getId();
+		String parentId				  = webSocketData.getNodeDataStringValue("parentId");
 
 		// check node to append
 		if (id == null) {
@@ -86,6 +88,8 @@ public class CloneComponentCommand extends AbstractCommand {
 		try {
 
 			cloneComponent(node, parentNode);
+			
+			TransactionCommand.registerNodeCallback(node, callback);
 
 		} catch (DOMException | FrameworkException ex) {
 
@@ -104,15 +108,17 @@ public class CloneComponentCommand extends AbstractCommand {
 
 	}
 
-	public DOMNode cloneComponent(final DOMNode node, final DOMNode parentNode) throws FrameworkException {
+	public static DOMNode cloneComponent(final DOMNode node, final DOMNode parentNode) throws FrameworkException {
 
 		final DOMNode clonedNode = (DOMNode) node.cloneNode(false);
 
 		parentNode.appendChild(clonedNode);
 
 		final PropertyMap changedProperties = new PropertyMap();
-		changedProperties.put(DOMNode.sharedComponent, node);
-		changedProperties.put(DOMNode.ownerDocument, (parentNode instanceof Page ? (Page) parentNode : parentNode.getProperty(DOMNode.ownerDocument)));
+
+		changedProperties.put(StructrApp.key(DOMNode.class, "sharedComponent"), node);
+		changedProperties.put(StructrApp.key(DOMNode.class, "ownerDocument"), (parentNode instanceof Page ? (Page) parentNode : parentNode.getOwnerDocument()));
+
 		clonedNode.setProperties(clonedNode.getSecurityContext(), changedProperties);
 
 		return clonedNode;

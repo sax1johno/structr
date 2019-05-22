@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,7 +18,6 @@
  */
 package org.structr.websocket.command;
 
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.SecurityContext;
@@ -30,10 +29,10 @@ import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.TransactionCommand;
 import org.structr.core.property.PropertyMap;
 import org.structr.schema.SchemaHelper;
-import org.structr.web.entity.FileBase;
 import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
+import org.structr.web.entity.File;
 
 //~--- classes ----------------------------------------------------------------
 
@@ -56,23 +55,23 @@ public class CreateCommand extends AbstractCommand {
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
+		setDoTransactionNotifications(true);
+
 		final SecurityContext securityContext = getWebSocket().getSecurityContext();
 		final App app = StructrApp.getInstance(securityContext);
 
-		Map<String, Object> nodeData = webSocketData.getNodeData();
-
 		try {
 
-			final PropertyMap properties = PropertyMap.inputTypeToJavaType(securityContext, nodeData);
+			final PropertyMap properties = PropertyMap.inputTypeToJavaType(securityContext, webSocketData.getNodeData());
 			Class type                   = SchemaHelper.getEntityClassForRawType(properties.get(AbstractNode.type));
 			final NodeInterface newNode  = app.create(type, properties);
 
 			TransactionCommand.registerNodeCallback(newNode, callback);
 
 			// check for File node and store in WebSocket to receive chunks
-			if (newNode instanceof FileBase) {
+			if (newNode instanceof File) {
 
-				getWebSocket().createFileUploadHandler((FileBase) newNode);
+				getWebSocket().createFileUploadHandler((File) newNode);
 
 			}
 

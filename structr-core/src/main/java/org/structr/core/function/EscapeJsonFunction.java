@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,41 +19,38 @@
 package org.structr.core.function;
 
 import org.apache.commons.lang3.StringEscapeUtils;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class EscapeJsonFunction extends Function<Object, Object> {
+public class EscapeJsonFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_ESCAPE_JSON = "Usage: ${escape_json(string)}. Example: ${escape_json(this.name)}";
 
 	@Override
 	public String getName() {
-		return "escape_json()";
+		return "escape_json";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
 		try {
-			if (!arrayHasMinLengthAndAllElementsNotNull(sources, 1)) {
-				
-				return null;
-			}
+			assertArrayHasMinLengthAndAllElementsNotNull(sources, 1);
 
 			return StringEscapeUtils.escapeJson(sources[0].toString());
 
-		} catch (final IllegalArgumentException e) {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			// silently ignore null arguments
+			return null;
 
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
-
 	}
 
 	@Override
@@ -65,5 +62,4 @@ public class EscapeJsonFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Escapes the given string for use within JSON";
 	}
-
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -22,34 +22,29 @@ import org.structr.common.AccessMode;
 import org.structr.common.Permission;
 import org.structr.common.Permissions;
 import org.structr.common.SecurityContext;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.Principal;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class IsAllowedFunction extends Function<Object, Object> {
+public class IsAllowedFunction extends AdvancedScriptingFunction {
 
 	public static final String ERROR_MESSAGE_IS_ALLOWED    = "Usage: ${is_allowed(principal, node, permissions)}. Example: ${is_allowed(me, this, 'write, delete'))}";
 	public static final String ERROR_MESSAGE_IS_ALLOWED_JS = "Usage: ${{Structr.is_allowed(principal, node, permissions)}}. Example: ${{Structr.is_allowed(Structr.('me'), Structr.this, 'write, delete'))}}";
 
 	@Override
 	public String getName() {
-		return "is_allowed()";
+		return "is_allowed";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
 		try {
-			
-			if (!arrayHasLengthAndAllElementsNotNull(sources, 3)) {
-				
-				return false;
-			}
+
+			assertArrayHasLengthAndAllElementsNotNull(sources, 3);
 
 			if (sources[0] instanceof Principal) {
 
@@ -102,12 +97,15 @@ public class IsAllowedFunction extends Function<Object, Object> {
 				return "Error: first argument is not of type Principal.";
 			}
 
-		} catch (final IllegalArgumentException e) {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			// silently ignore null arguments
+			return false;
 
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
 	}
 
@@ -120,5 +118,4 @@ public class IsAllowedFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Returns whether the principal has all of the permission(s) on the given node.";
 	}
-
 }

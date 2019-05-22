@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -30,8 +30,8 @@ import org.structr.core.Value;
  */
 public class StreamingHtmlWriter extends StreamingWriter {
 
-	public StreamingHtmlWriter(final Value<String> propertyView, final boolean indent, final int outputNestingDepth) {
-		super(propertyView, indent, outputNestingDepth);
+	public StreamingHtmlWriter(final Value<String> propertyView, final boolean indent, final int outputNestingDepth, final boolean wrapSingleResultInArray) {
+		super(propertyView, indent, outputNestingDepth, wrapSingleResultInArray);
 	}
 
 	@Override

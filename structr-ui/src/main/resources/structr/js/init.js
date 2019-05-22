@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -22,7 +22,7 @@ var lastMenuEntry, menuBlocked;
 var dmp;
 var editorCursor, ignoreKeyUp;
 var dialog, isMax = false;
-var dialogBox, dialogMsg, dialogBtn, dialogTitle, dialogMeta, dialogText, dialogHead, dialogCancelButton, dialogSaveButton, saveAndClose, loginButton, loginBox, dialogCloseButton;
+var dialogBox, dialogMsg, dialogBtn, dialogTitle, dialogMeta, dialogText, dialogHead, dialogCancelButton, dialogSaveButton, saveAndClose, loginBox, dialogCloseButton;
 var dialogId;
 var pagerType = {}, page = {}, pageSize = {}, sortKey = {}, sortOrder = {}, pagerFilters = {};
 var dialogMaximizedKey = 'structrDialogMaximized_' + port;
@@ -30,12 +30,12 @@ var expandedIdsKey = 'structrTreeExpandedIds_' + port;
 var lastMenuEntryKey = 'structrLastMenuEntry_' + port;
 var pagerDataKey = 'structrPagerData_' + port + '_';
 var autoRefreshDisabledKey = 'structrAutoRefreshDisabled_' + port;
-var detailsObjectId = 'structrDetailsObjectId_' + port;
+var detailsObjectIdKey = 'structrDetailsObjectId_' + port;
 var dialogDataKey = 'structrDialogData_' + port;
 var dialogHtmlKey = 'structrDialogHtml_' + port;
-var pushConfigKey = 'structrPushConfigKey_' + port;
 var scrollInfoKey = 'structrScrollInfoKey_' + port;
-
+var consoleModeKey = 'structrConsoleModeKey_' + port;
+var resizeFunction;
 var altKey = false, ctrlKey = false, shiftKey = false, eKey = false, cmdKey = false;
 
 $(function() {
@@ -58,25 +58,38 @@ $(function() {
 	dialogCancelButton = $('.closeButton', dialogBox);
 	dialogSaveButton   = $('.save', dialogBox);
 
-	loginButton = $('#loginButton');
-	loginButton.on('click', function(e) {
+	$('#loginButton').on('click', function(e) {
 		e.stopPropagation();
 		var username = $('#usernameField').val();
 		var password = $('#passwordField').val();
 		Structr.doLogin(username, password);
 		return false;
 	});
+	$('#loginButtonTFA').on('click', function(e) {
+		e.stopPropagation();
+		var tfaToken = $('#twoFactorTokenField').val();
+		var tfaCode  = $('#twoFactorCodeField').val();
+		Structr.doTFALogin(tfaCode, tfaToken);
+		return false;
+	});
+
 	$('#logout_').on('click', function(e) {
 		e.stopPropagation();
 		Structr.doLogout();
 	});
 
-	$(document).on('mouseenter', '[data-toggle="popup"]', function () {
+	$(window).on('hashchange', function(e) {
+		var anchor = getAnchorFromUrl(window.location.href);
+		if (anchor === 'logout' || loginBox.is(':visible')) return;
+		Structr.requestActivateModule(e, anchor);
+	});
+
+	$(document).on('mouseenter', '[data-toggle="popup"]', function() {
 		var target = $(this).data("target");
 		$(target).addClass('visible');
 	});
 
-	$(document).on('mouseleave', '[data-toggle="popup"]', function () {
+	$(document).on('mouseleave', '[data-toggle="popup"]', function() {
 		var target = $(this).data("target");
 		$(target).removeClass('visible');
 	});
@@ -84,7 +97,7 @@ $(function() {
 	$(document).on('click', '[data-activate-module]', function(e) {
 		var module = $(this).data('activateModule');
 		_Logger.log(_LogType.INIT, 'Activating module ' + module);
-		Structr.activateModule(e, module);
+		Structr.requestActivateModule(e, module);
 	});
 
 	Structr.connect();
@@ -100,17 +113,21 @@ $(function() {
 
 	$(window).keyup(function(e) {
 		var k = e.which;
-		if (k === 16)
+		if (k === 16) {
 			shiftKey = false;
-		if (k === 18)
+		}
+		if (k === 18) {
 			altKey = false;
-		if (k === 17)
+		}
+		if (k === 17) {
 			ctrlKey = false;
-		if (k === 69)
+		}
+		if (k === 69) {
 			eKey = false;
-		if (navigator.platform === 'MacIntel' && k === 91)
+		}
+		if (navigator.platform === 'MacIntel' && k === 91) {
 			cmdKey = false;
-
+		}
 		if (e.keyCode === 27) {
 			if (ignoreKeyUp) {
 				ignoreKeyUp = false;
@@ -162,8 +179,9 @@ $(function() {
 		if (k === 69) {
 			eKey = true;
 		}
-		if (navigator.platform === 'MacIntel' && k === 91)
+		if (navigator.platform === 'MacIntel' && k === 91) {
 			cmdKey = true;
+		}
 		if ((e.ctrlKey && (e.which === 83)) || (navigator.platform === 'MacIntel' && cmdKey && (e.which === 83))) {
 			e.preventDefault();
 			if (dialogSaveButton && dialogSaveButton.length && dialogSaveButton.is(':visible') && !dialogSaveButton.prop('disabled')) {
@@ -194,11 +212,63 @@ $(function() {
 				}
 			}
 		}
+        // Ctrl-Alt-g
+        if (k === 71 && altKey && ctrlKey) {
+            e.preventDefault();
+            var uuid = prompt('Enter the UUID for which you want to open the access control dialog');
+            if (uuid) {
+                if (uuid.length === 32) {
+                    Command.get(uuid, null, function(obj) {
+                        _Entities.showAccessControlDialog(obj);
+                    });
+                } else {
+                    alert('That does not look like a UUID! length != 32');
+                }
+            }
+        }
+		// Ctrl-Alt-h
+		if (k === 72 && altKey && ctrlKey) {
+			e.preventDefault();
+			if ("schema" === Structr.getActiveModuleName()) {
+				_Schema.hideSelectedSchemaTypes();
+			}
+		}
+		// Ctrl-Alt-s
+		if (k === 83 && altKey && ctrlKey) {
+			e.preventDefault();
+			Structr.dialog('Refactoring helper');
+			new RefactoringHelper(dialog).show();
+		}
+
+		// Ctrl-Alt-i
+		if (k === 73 && altKey && ctrlKey) {
+			e.preventDefault();
+
+			let tableData = [];
+			Object.keys(_Icons).forEach(function(key) {
+				if (typeof _Icons[key] === "string") {
+					tableData.push({
+						name: key,
+						icon: '<i class="' + _Icons.getFullSpriteClass(_Icons[key]) + '" />'
+					});
+				}
+			});
+
+			let html = '<table>' + tableData.map(function(trData) {
+				return '<tr><td>' + trData.name + '</td><td>' + trData.icon + '</td></tr>';
+			}).join('') + '</table>';
+
+			Structr.dialog('Icons');
+			dialogText.html(html);
+		}
 	});
 
-	$(window).on('resize', function() {
+	resizeFunction = function() {
 		Structr.resize();
-	});
+	};
+
+	$(window).on('resize', resizeFunction);
+
 	dmp = new diff_match_patch();
 });
 
@@ -210,6 +280,16 @@ var Structr = {
 	expanded: {},
 	msgCount: 0,
 	currentlyActiveSortable: undefined,
+	loadingSpinnerTimeout: undefined,
+	templateCache: new AsyncObjectCache(function(templateName) {
+
+		Promise.resolve($.ajax('templates/' + templateName + '.html')).then(function(templateHtml) {
+			Structr.templateCache.addObject(templateHtml, templateName);
+		}).catch(function(e) {
+			console.log(e.statusText, templateName, e);
+		});
+
+	}),
 
 	reconnect: function() {
 		_Logger.log(_LogType.INIT, 'deactivated ping');
@@ -249,24 +329,25 @@ var Structr = {
 		}
 	},
 	refreshUi: function() {
-		showLoadingSpinner();
+		Structr.showLoadingSpinner();
 
 		Structr.clearMain();
-		Structr.loadInitialModule();
-		Structr.startPing();
-		if (!dialogText.text().length) {
-			LSWrapper.removeItem(dialogDataKey);
-		} else {
-			var dialogData = JSON.parse(LSWrapper.getItem(dialogDataKey));
-			if (dialogData) {
-				Structr.restoreDialog(dialogData);
+		Structr.loadInitialModule(false, function() {
+			Structr.startPing();
+			if (!dialogText.text().length) {
+				LSWrapper.removeItem(dialogDataKey);
+			} else {
+				var dialogData = JSON.parse(LSWrapper.getItem(dialogDataKey));
+				if (dialogData) {
+					Structr.restoreDialog(dialogData);
+				}
 			}
-		}
-		hideLoadingSpinner();
-		_Console.initConsole();
-		_Favorites.initFavorites();
+			Structr.hideLoadingSpinner();
+			_Console.initConsole();
+			_Favorites.initFavorites();
+		});
 	},
-	updateUsername:function(name) {
+	updateUsername: function(name) {
 		if (name !== user) {
 			user = name;
 			$('#logout_').html('Logout <span class="username">' + name + '</span>');
@@ -303,6 +384,7 @@ var Structr = {
 		}
 	},
 	login: function(text) {
+
 		if (!loginBox.is(':visible')) {
 
 			fastRemoveAllChildren(main[0]);
@@ -324,13 +406,54 @@ var Structr = {
 		$('#logout_').html('Login');
 		if (text) {
 			$('#errorText').html(text);
+			$('#errorText-two-factor').html(text);
 		}
 
-		Structr.activateMenuEntry('logout');
+		//Structr.activateMenuEntry('logout');
+	},
+	clearLoginForm: function() {
+		loginBox.find('#usernameField').val('');
+		loginBox.find('#passwordField').val('');
+		loginBox.find('#errorText').empty();
+
+		loginBox.find('#two-factor').hide();
+		loginBox.find('#two-factor #two-factor-qr-code').hide();
+		loginBox.find('#two-factor img').attr('src', '');
+
+		loginBox.find('#errorText-two-factor').empty();
+		loginBox.find('#twoFactorTokenField').val('');
+		loginBox.find('#twoFactorCodeField').val('');
+	},
+	toggle2FALoginBox: function(data) {
+
+		$('#errorText').html('');
+		$('#errorText-two-factor').html('');
+
+		$('table.username-password', loginBox).hide();
+		$('#two-factor', loginBox).show();
+
+		if (data.qrdata) {
+			$('#two-factor #two-factor-qr-code').show();
+			$('#two-factor img', loginBox).attr('src', 'data:image/png;base64, ' + data.qrdata);
+		}
+
+		$('#twoFactorTokenField').val(data.token);
+		$('#twoFactorCodeField').val('').focus();
 	},
 	doLogin: function(username, password) {
-		Structr.renewSessionId(function () {
-			Command.login(username, password);
+		Structr.renewSessionId(function() {
+			Command.login({
+				username: username,
+				password: password
+			});
+		});
+	},
+	doTFALogin: function(twoFactorCode, twoFacorToken) {
+		Structr.renewSessionId(function() {
+			Command.login({
+				twoFactorCode: twoFactorCode,
+				twoFactorToken: twoFacorToken
+			});
 		});
 	},
 	doLogout: function(text) {
@@ -350,7 +473,7 @@ var Structr = {
 		ws.close();
 		return false;
 	},
-	renewSessionId: function (callback) {
+	renewSessionId: function(callback) {
 		$.get('/').always(function() {
 			sessionId = Structr.getSessionId();
 			if (typeof callback === "function") {
@@ -358,7 +481,7 @@ var Structr = {
 			}
 		});
 	},
-	loadInitialModule: function(isLogin) {
+	loadInitialModule: function(isLogin, callback) {
 
 		Structr.restoreLocalStorage(function() {
 
@@ -367,26 +490,18 @@ var Structr = {
 
 			var browserUrl = window.location.href;
 			var anchor = getAnchorFromUrl(browserUrl);
-			lastMenuEntry = ((!isLogin && anchor && anchor !== 'logout') ? anchor : LSWrapper.getItem(lastMenuEntryKey));
+			lastMenuEntry = ((!isLogin && anchor && anchor !== 'logout') ? anchor : Structr.getActiveModuleName());
 			if (!lastMenuEntry) {
-				lastMenuEntry = LSWrapper.getItem(lastMenuEntryKey) || 'dashboard';
+				lastMenuEntry = Structr.getActiveModuleName() || 'dashboard';
 			} else {
 				_Logger.log(_LogType.INIT, 'Last menu entry found: ' + lastMenuEntry);
 			}
 			_Logger.log(_LogType.INIT, 'lastMenuEntry', lastMenuEntry);
-			Structr.activateMenuEntry(lastMenuEntry);
-			_Logger.log(_LogType.INIT, Structr.modules);
-			var module = Structr.modules[lastMenuEntry];
-			if (module) {
-				module.onload();
-				Structr.adaptUiToAvailableFeatures();
-				if (module.resize) {
-					module.resize();
-				}
-			}
+			Structr.doActivateModule(lastMenuEntry);
 			Structr.updateVersionInfo();
-		});
 
+			callback();
+		});
 	},
 	clearMain: function() {
 		var newDroppables = new Array();
@@ -397,7 +512,7 @@ var Structr = {
 			}
 		});
 		$.ui.ddmanager.droppables['default'] = newDroppables;
-		$('iframe').unload();
+		$('iframe').contents().remove();
 		fastRemoveAllChildren(main[0]);
 		$('#graph-box').hide();
 	},
@@ -441,9 +556,9 @@ var Structr = {
 		});
 
 	},
-	saveLocalStorage: function() {
+	saveLocalStorage: function(callback) {
 		_Logger.log(_LogType.INIT, "Saving localstorage");
-		Command.saveLocalStorage();
+		Command.saveLocalStorage(callback);
 	},
 	restoreLocalStorage: function(callback) {
 		if (!LSWrapper.isLoaded()) {
@@ -474,6 +589,11 @@ var Structr = {
 			dialogText.empty();
 			dialogMsg.empty();
 			dialogMeta.empty();
+			dialogBtn.empty();
+
+			dialogBtn.html('<button class="closeButton">Close</button>');
+			dialogCancelButton = $('.closeButton', dialogBox);
+
 			$('.speechToText', dialogBox).remove();
 
 			if (text) {
@@ -515,7 +635,7 @@ var Structr = {
 
 		}
 	},
-	getDialogDimensions: function (marginLeft, marginTop) {
+	getDialogDimensions: function(marginLeft, marginTop) {
 
 		var winW = $(window).width();
 		var winH = $(window).height();
@@ -531,7 +651,7 @@ var Structr = {
 		};
 
 	},
-	blockUI: function (dimensions) {
+	blockUI: function(dimensions) {
 
 		$.blockUI({
 			fadeIn: 25,
@@ -604,7 +724,7 @@ var Structr = {
 		}
 
 		$('.fit-to-height').css({
-			height: h - 74 + 'px'
+			height: h - 84 + 'px'
 		});
 
 	},
@@ -617,7 +737,7 @@ var Structr = {
 		} else {
 
 			// Calculate dimensions of dialog
-			if ($('.blockPage').length) {
+			if ($('.blockPage').length && !loginBox.is(':visible')) {
 				Structr.setSize($(window).width(), $(window).height(), Math.min(900, $(window).width() - 24), Math.min(600, $(window).height() - 24));
 			}
 
@@ -693,7 +813,13 @@ var Structr = {
 				errorText = url + ': ';
 			}
 
-			errorText += response.code + ' ' + response.message;
+			errorText += response.code + '<br>';
+
+			Object.keys(response).forEach(function(key) {
+				if (key !== 'code') {
+					errorText += '<b>' + key.capitalize() + '</b>: ' + response[key] + '<br>';
+				}
+			});
 		}
 
 		var message = new MessageBuilder().error(errorText);
@@ -721,7 +847,7 @@ var Structr = {
 
 		message.show();
 	},
-	getErrorTextForStatusCode: function (statusCode) {
+	getErrorTextForStatusCode: function(statusCode) {
 		switch (statusCode) {
 			case 400: return 'Bad request';
 			case 401: return 'Authentication required';
@@ -742,7 +868,7 @@ var Structr = {
 	updateButtonWithAjaxLoaderAndText: function(btn, html) {
 		btn.attr('disabled', 'disabled').addClass('disabled').html(html + ' <img src="' + _Icons.ajax_loader_2 + '">');
 	},
-	updateButtonWithSuccessIcon: function (btn, html) {
+	updateButtonWithSuccessIcon: function(btn, html) {
 		btn.attr('disabled', null).removeClass('disabled').html(html + ' <i class="tick ' + _Icons.getFullSpriteClass(_Icons.tick_icon) + '" />');
 		window.setTimeout(function() {
 			$('.tick', btn).fadeOut();
@@ -806,11 +932,16 @@ var Structr = {
 			$('#menu > ul > li > a').removeAttr('disabled', 'disabled').removeClass('disabled');
 		}, ms);
 	},
-	activateModule: function(event, name) {
+	requestActivateModule: function(event, name) {
 		if (menuBlocked) return;
 		event.stopPropagation();
-		if (LSWrapper.getItem(lastMenuEntryKey) !== name || main.children().length === 0) {
-			var activeModule = Structr.modules[LSWrapper.getItem(lastMenuEntryKey)];
+		if (Structr.getActiveModuleName() !== name || main.children().length === 0) {
+			Structr.doActivateModule(name);
+		}
+	},
+	doActivateModule: function(name) {
+		if (Structr.modules[name]) {
+			var activeModule = Structr.modules[Structr.getActiveModuleName()];
 			if (activeModule && activeModule.unload) {
 				activeModule.unload();
 			}
@@ -818,6 +949,9 @@ var Structr = {
 			Structr.activateMenuEntry(name);
 			Structr.modules[name].onload();
 			Structr.adaptUiToAvailableFeatures();
+		} else {
+			_Logger.log(_LogType.INIT, 'Module ' + name + ' does not exist.');
+			Structr.unblockMenu();
 		}
 	},
 	activateMenuEntry: function(name) {
@@ -828,9 +962,7 @@ var Structr = {
 			return false;
 		}
 		lastMenuEntry = name;
-		$('.menu li').each(function(i, v) {
-			$(this).removeClass('active');
-		});
+		$('.menu li').removeClass('active');
 		li.addClass('active');
 		$('#title').text('Structr ' + menuEntry.text());
 		window.location.hash = lastMenuEntry;
@@ -849,10 +981,13 @@ var Structr = {
 			new MessageBuilder().error("Cannot register module '" + name + "' a second time - ignoring attempt.").show();
 		}
 	},
-	getActiveModuleName: function () {
+	getActiveModuleName: function() {
 		return LSWrapper.getItem(lastMenuEntryKey);
 	},
-	isModuleActive: function (module) {
+	getActiveModule: function() {
+		return Structr.modules[Structr.getActiveModuleName()];
+	},
+	isModuleActive: function(module) {
 		return (module._moduleName === Structr.getActiveModuleName());
 	},
 	containsNodes: function(element) {
@@ -965,10 +1100,21 @@ var Structr = {
 		});
 	},
 	openSlideOut: function(slideout, tab, activeTabKey, callback) {
-		var s = $(slideout);
+
+		var storedRightSlideoutWidth = LSWrapper.getItem(_Pages.rightSlideoutWidthKey);
+		var rsw = storedRightSlideoutWidth ? parseInt(storedRightSlideoutWidth) : (slideout.width() + 12);
+
+		slideout.css({
+			width: rsw - 12 + 'px'
+		});
+
+		slideout.addClass('open');
 		var t = $(tab);
 		t.addClass('active');
-		s.animate({right: '+=' + rsw + 'px'}, {duration: 100}).zIndex(1);
+		slideout.animate({right: 0 + 'px'}, {duration: 100}).zIndex(1);
+
+		$('.node', slideout).width(rsw - 25);
+
 		LSWrapper.setItem(activeTabKey, t.prop('id'));
 		if (callback) {
 			callback();
@@ -976,13 +1122,23 @@ var Structr = {
 		_Pages.resize(0, rsw);
 	},
 	closeSlideOuts: function(slideouts, activeTabKey) {
+		var storedRightSlideoutWidth = LSWrapper.getItem(_Pages.rightSlideoutWidthKey);
+		var rsw = 0;
+
 		var wasOpen = false;
 		slideouts.forEach(function(slideout) {
+			slideout.removeClass('open');
 			var l = slideout.position().left;
 			if (Math.abs(l - $(window).width()) >= 3) {
 				wasOpen = true;
+				rsw = storedRightSlideoutWidth ? parseInt(storedRightSlideoutWidth) : (slideout.width() + 12);
 				slideout.animate({right: '-=' + rsw + 'px'}, {duration: 100}).zIndex(2);
 				$('.compTab.active', slideout).removeClass('active');
+
+				var openSlideoutCallback = slideout.data('closeCallback');
+				if (typeof openSlideoutCallback === "function") {
+					openSlideoutCallback();
+				}
 			}
 		});
 		if (wasOpen) {
@@ -1000,11 +1156,12 @@ var Structr = {
 		var slideoutWidth = psw + 12;
 		LSWrapper.setItem(activeTabKey, t.prop('id'));
 		slideoutElement.width(psw);
-		slideoutElement.animate({left: 0 + 'px'}, 100, function () {
+		slideoutElement.animate({left: 0 + 'px'}, 100, function() {
 			if (typeof callback === 'function') {
 				callback({sw: slideoutWidth});
 			}
 		}).zIndex(1);
+		slideoutElement.addClass('open');
 		t.draggable({
 			axis: 'x',
 			start: function(e, ui) {
@@ -1040,12 +1197,13 @@ var Structr = {
 		var osw;
 		slideouts.forEach(function(w) {
 			var s = $(w);
+			s.removeClass('open');
 			var l = s.position().left;
 			var sw = s.width() + 12;
 			if (Math.abs(l) <= 3) {
 				wasOpen = true;
 				osw = sw;
-				s.animate({left: - sw -1 + 'px'}, 100, function () {
+				s.animate({left: - sw -1 + 'px'}, 100, function() {
 					if (typeof callback === 'function') {
 						callback(wasOpen, -osw, 0);
 					}
@@ -1054,137 +1212,6 @@ var Structr = {
 			}
 		});
 		LSWrapper.removeItem(activeTabKey);
-	},
-	pushDialog: function(id, recursive) {
-
-		var obj = StructrModel.obj(id);
-
-		Structr.dialog('Push node to remote server', function() {}, function() {});
-
-		var pushConf = JSON.parse(LSWrapper.getItem(pushConfigKey)) || {};
-
-		dialog.append('Do you want to transfer <b>' + (obj.name || obj.id) + '</b> to the remote server?');
-
-		dialog.append('<table class="props push">'
-				+ '<tr><td>Host</td><td><input id="push-host" type="text" length="20" value="' + (pushConf.host || '') + '"></td></tr>'
-				+ '<tr><td>Port</td><td><input id="push-port" type="text" length="20" value="' + (pushConf.port || '') + '"></td></tr>'
-				+ '<tr><td>Username</td><td><input id="push-username" type="text" length="20" value="' + (pushConf.username || '') + '"></td></tr>'
-				+ '<tr><td>Password</td><td><input id="push-password" type="password" length="20" value="' + (pushConf.password || '') + '"></td></tr>'
-				+ '</table>'
-				+ '<button id="start-push">Start</button>');
-
-		$('#start-push', dialog).on('click', function() {
-			var host = $('#push-host', dialog).val();
-			var port = parseInt($('#push-port', dialog).val());
-			var username = $('#push-username', dialog).val();
-			var password = $('#push-password', dialog).val();
-			var key = 'key_' + obj.id;
-
-			pushConf = {host: host, port: port, username: username, password: password};
-			LSWrapper.setItem(pushConfigKey, JSON.stringify(pushConf));
-
-			Command.push(obj.id, host, port, username, password, key, recursive, function() {
-				dialog.empty();
-				dialogCancelButton.click();
-			});
-		});
-
-		return false;
-	},
-	pullDialog: function(type, optionalContainer) {
-
-		var container;
-
-		if (optionalContainer) {
-			 container = optionalContainer;
-			 container.append('<h3>Sync ' + type.replace(/,/, '(s) or ') + '(s) from remote server</h3>');
-		} else {
-			container = dialog;
-			Structr.dialog('Sync ' + type.replace(/,/, '(s) or ') + '(s) from remote server', function() {}, function() {});
-		}
-
-		var pushConf = JSON.parse(LSWrapper.getItem(pushConfigKey)) || {};
-
-		container.append('<table class="props push">'
-				+ '<tr><td>Host</td><td><input id="push-host" type="text" length="32" value="' + (pushConf.host || '') + '"></td>'
-				+ '<td>Port</td><td><input id="push-port" type="text" length="32" value="' + (pushConf.port || '') + '"></td></tr>'
-				+ '<tr><td>Username</td><td><input id="push-username" type="text" length="32" value="' + (pushConf.username || '') + '"></td>'
-				+ '<td>Password</td><td><input id="push-password" type="password" length="32" value="' + (pushConf.password || '') + '"></td></tr>'
-				+ '</table>'
-				+ '<button id="show-syncables">Show available entities</button>'
-				+ '<table id="syncables" class="props push"><tr><th>Name</th><th>Size</th><th>Last Modified</th><th>Type</th><th>Recursive</th><th>Actions</th></tr>'
-				+ '</table>'
-				);
-
-		$('#show-syncables', container).on('click', function() {
-
-			var syncables = $("#syncables");
-			var host = $('#push-host', container).val();
-			var port = parseInt($('#push-port', container).val());
-			var username = $('#push-username', container).val();
-			var password = $('#push-password', container).val();
-			var key = 'syncables';
-
-			pushConf = {host: host, port: port, username: username, password: password};
-			LSWrapper.setItem(pushConfigKey, JSON.stringify(pushConf));
-
-			fastRemoveAllChildren(syncables[0]);
-			syncables.append('<tr><th>Name</th><th>Size</th><th>Last Modified</th><th>Type</th><th>Recursive</th><th>Actions</th></tr>');
-
-			Command.listSyncables(host, port, username, password, key, type, function(result) {
-
-				result.forEach(function(syncable) {
-
-					syncables.append(
-							'<tr>'
-							+ '<td>' + syncable.name + '</td>'
-							+ '<td>' + (syncable.size ? syncable.size : "-") + '</td>'
-							+ '<td>' + (syncable.lastModifiedDate ? syncable.lastModifiedDate : "-") + '</td>'
-							+ '<td>' + syncable.type + '</td>'
-							+ '<td><input type="checkbox" id="recursive-' + syncable.id + '"></td>'
-							+ '<td><button id="pull-' + syncable.id + '"></td>'
-							+ '</tr>'
-							);
-
-					var syncButton = $('#pull-' + syncable.id, container);
-
-					if (syncable.isSynchronized) {
-						syncButton.empty();
-						syncButton.append('<i class="' + _Icons.getFullSpriteClass(_Icons.refresh_icon) + '" /> Update');
-					} else {
-						syncButton.empty();
-						syncButton.append('<i class="' + _Icons.getFullSpriteClass(_Icons.pull_file_icon) + '" /> Import');
-					}
-
-					syncButton.on('click', function() {
-
-						syncButton.empty();
-						syncButton.append('Importing..');
-
-						var recursive = $('#recursive-' + syncable.id, syncables).prop('checked');
-						Command.pull(syncable.id, host, port, username, password, 'key-' + syncable.id, recursive, function() {
-							syncButton.empty();
-							syncButton.append('<i class="' + _Icons.getFullSpriteClass(_Icons.refresh_icon) + '" /> Update');
-						});
-					});
-				});
-
-			});
-		});
-
-		return false;
-	},
-	ensureIsAdmin: function(el, callback) {
-		Structr.ping(function() {
-			if (!isAdmin) {
-				Structr.error('You do not have sufficient permissions<br>to access this function.', true);
-				el.append('<div class="errorText"><i class="' + _Icons.getFullSpriteClass(_Icons.error_icon) + '" /> You do not have sufficient permissions to access this function.</div>');
-			} else {
-				if (callback) {
-					callback();
-				}
-			}
-		});
 	},
 	updateVersionInfo: function() {
 		$.get(rootUrl + '_env', function(data) {
@@ -1196,7 +1223,7 @@ var Structr = {
 				$('#header .structr-instance-stage').text(envInfo.instanceStage);
 
 				var ui = envInfo.components['structr-ui'];
-				if (ui !== null) {
+				if (ui) {
 
 					var version = ui.version;
 					var build = ui.build;
@@ -1222,7 +1249,7 @@ var Structr = {
 
 						$('.structr-version').html(versionInfo);
 
-						_Dashboard.checkLicenseEnd(envInfo, $('.structr-version .edition-icon'), {
+						_Dashboard.checkLicenseEnd(envInfo, $('.structr-version'), {
 							offsetX: -300,
 							helpElementCss: {
 								color: "black",
@@ -1238,7 +1265,7 @@ var Structr = {
 
 				var hamburger = $('#menu li.submenu-trigger');
 				var subMenu = $('#submenu');
-				envInfo.mainMenu.forEach(function (entry) {
+				envInfo.mainMenu.forEach(function(entry) {
 					$('li[data-name="' + entry + '"]', subMenu).insertBefore(hamburger);
 				});
 
@@ -1251,7 +1278,8 @@ var Structr = {
 		$('.structr-version').html('');
 	},
 	getId: function(element) {
-		return Structr.getIdFromPrefixIdString($(element).prop('id'), 'id_') || undefined;
+		var id = Structr.getIdFromPrefixIdString($(element).prop('id'), 'id_') || $(element).data('nodeId');
+		return id || undefined;
 	},
 	getIdFromPrefixIdString: function(idString, prefix) {
 		if (!idString || !idString.startsWith(prefix)) {
@@ -1262,10 +1290,10 @@ var Structr = {
 	getComponentId: function(element) {
 		return Structr.getIdFromPrefixIdString($(element).prop('id'), 'componentId_') || undefined;
 	},
-	getUserId: function (element) {
+	getUserId: function(element) {
 		return element.data('userId');
 	},
-	getGroupId: function (element) {
+	getGroupId: function(element) {
 		return element.data('groupId');
 	},
 	getActiveElementId: function(element) {
@@ -1300,7 +1328,7 @@ var Structr = {
 			}
 		});
 	},
-	isAvailableInEdition: function (requiredEdition) {
+	isAvailableInEdition: function(requiredEdition) {
 		switch(Structr.edition) {
 			case 'Enterprise':
 				return true;
@@ -1312,50 +1340,19 @@ var Structr = {
 				return ['Community'].indexOf(requiredEdition) !== -1;
 		};
 	},
-	guardExecution:function (callbackToGuard) {
-		var didRun = false;
-
-		var guardedFunction = function () {
-			if (didRun) {
-				return;
-			}
-			didRun = true;
-
-			if (typeof callbackToGuard === "function") {
-				callbackToGuard();
-			}
-		};
-
-		return guardedFunction;
-	},
-	updateMainHelpLink: function (newUrl) {
+	updateMainHelpLink: function(newUrl) {
 		$('#main-help a').attr('href', newUrl);
 	},
-	isButtonDisabled: function (button) {
+	isButtonDisabled: function(button) {
 		return $(button).data('disabled');
 	},
-	disableButton: function (button, newClickHandler) {
-		var b = $(button);
-		b.data('disabled', true);
-		b.addClass('disabled');
-
-		if (newClickHandler) {
-			b.off('click');
-			b.on('click', newClickHandler);
-			b.data('disabled', false);
-		}
+	disableButton: function(btn) {
+		$(btn).addClass('disabled').attr('disabled', 'disabled');
 	},
-	enableButton: function (button, newClickHandler) {
-		var b = $(button);
-		b.data('disabled', false);
-		b.removeClass('disabled');
-
-		if (newClickHandler) {
-			b.off('click');
-			b.on('click', newClickHandler);
-		}
+	enableButton: function(btn) {
+		$(btn).removeClass('disabled').removeAttr('disabled');
 	},
-	addExpandedNode: function (id) {
+	addExpandedNode: function(id) {
 		_Logger.log(_LogType.INIT, 'addExpandedNode', id);
 
 		if (id) {
@@ -1368,7 +1365,7 @@ var Structr = {
 			}
 		}
 	},
-	removeExpandedNode: function (id) {
+	removeExpandedNode: function(id) {
 		_Logger.log(_LogType.INIT, 'removeExpandedNode', id);
 
 		if (id) {
@@ -1376,7 +1373,7 @@ var Structr = {
 			LSWrapper.setItem(expandedIdsKey, JSON.stringify(Structr.expanded));
 		}
 	},
-	isExpanded: function (id) {
+	isExpanded: function(id) {
 		_Logger.log(_LogType.INIT, 'id, Structr.getExpanded()[id]', id, Structr.getExpanded()[id]);
 
 		if (id) {
@@ -1389,7 +1386,7 @@ var Structr = {
 
 		return false;
 	},
-	getExpanded: function () {
+	getExpanded: function() {
 		if (!Structr.expanded) {
 			Structr.expanded = JSON.parse(LSWrapper.getItem(expandedIdsKey));
 		}
@@ -1399,18 +1396,20 @@ var Structr = {
 		}
 		return Structr.expanded;
 	},
-	showAndHideInfoBoxMessage: function (msg, msgClass, delayTime, fadeTime) {
-		dialogMsg.html('<div class="infoBox ' + msgClass + '">' + msg + '</div>');
+	showAndHideInfoBoxMessage: function(msg, msgClass, delayTime, fadeTime) {
+		var newDiv = $('<div class="infoBox ' + msgClass + '"></div>');
+		newDiv.text(msg);
+		dialogMsg.html(newDiv);
 		$('.infoBox', dialogMsg).delay(delayTime).fadeOut(fadeTime);
 	},
-	initVerticalSlider: function (sliderEl, localstorageKey, minWidth, dragCallback) {
+	initVerticalSlider: function(sliderEl, localstorageKey, minWidth, dragCallback) {
 
 		if (typeof dragCallback !== "function") {
 			console.error('dragCallback is not a function!');
 			return;
 		}
 
-		sliderEl.draggable({
+		$(sliderEl).draggable({
 			axis: 'x',
 			drag: function(e, ui) {
 				var left = Math.max(minWidth, ui.position.left);
@@ -1424,7 +1423,7 @@ var Structr = {
 		});
 
 	},
-	appendInfoTextToElement: function (config) {
+	appendInfoTextToElement: function(config) {
 
 		var element            = config.element;
 		var appendToElement    = config.appendToElement || element;
@@ -1478,53 +1477,18 @@ var Structr = {
 
 		helpElement.css(helpElementCss);
 	},
-	refreshPositionsForCurrentlyActiveSortable: function () {
+	refreshPositionsForCurrentlyActiveSortable: function() {
 
 		if (Structr.currentlyActiveSortable) {
 
 			Structr.currentlyActiveSortable.sortable({ refreshPositions: true });
 
-			window.setTimeout(function () {
+			window.setTimeout(function() {
 				Structr.currentlyActiveSortable.sortable({ refreshPositions: false });
 			}, 500);
 		}
 	},
-	handleGenericMessage: function (data) {
-
-		var fileImportTitles = {
-			QUEUED: 'Import added to queue',
-			BEGIN: 'Import started',
-			CHUNK: 'Import status',
-			END: 'Import finished',
-			WAIT_ABORT: 'Import waiting to abort',
-			ABORTED: 'Import aborted',
-			WAIT_PAUSE: 'Import waiting to pause',
-			PAUSED: 'Import paused',
-			RESUMED: 'Import resumed'
-		};
-
-		var fileImportTexts = {
-			QUEUED: 'Import of <b>' + data.filename + '</b> will begin after currently running/queued job(s)',
-			BEGIN: 'Started importing data from <b>' + data.filename + '</b>',
-			CHUNK: 'Finished importing chunk ' + data.currentChunkNo + ' of <b>' + data.filename + '</b><br>Objects created: ' + data.objectsCreated + '<br>Time: ' + data.duration + '<br>Objects/s: ' + data.objectsPerSecond,
-			END: 'Finished importing data from <b>' + data.filename + '</b><br>Objects created: ' + data.objectsCreated + '<br>Time: ' + data.duration + '<br>Objects/s: ' + data.objectsPerSecond,
-			WAIT_ABORT: 'The import of <b>' + data.filename + '</b> will be aborted after finishing the current chunk',
-			ABORTED: 'The import of <b>' + data.filename + '</b> has been aborted',
-			WAIT_PAUSE: 'The import of <b>' + data.filename + '</b> will be paused after finishing the current chunk',
-			PAUSED: 'The import of <b>' + data.filename + '</b> has been paused',
-			RESUMED: 'The import of <b>' + data.filename + '</b> has been resumed'
-		};
-
-		var scriptJobTitles = {
-			QUEUED: 'Script added to queue',
-			BEGIN: 'Script started',
-			END: 'Script finished'
-		};
-		var scriptJobTexts = {
-			QUEUED: 'Script job # ' + data.jobId + ' will begin after currently running/queued job(s)',
-			BEGIN: 'Started script job #' + data.jobId,
-			END: 'Finished script job #' + data.jobId
-		};
+	handleGenericMessage: function(data) {
 
 		switch (data.type) {
 
@@ -1544,7 +1508,7 @@ var Structr = {
 						END:   'Finished importing CSV data (Time: ' + data.duration + ')'
 					};
 
-					new MessageBuilder().title(titles[data.subtype]).info(texts[data.subtype]).uniqueClass('csv-import-status').updatesText().requiresConfirmation().show();
+					new MessageBuilder().title(titles[data.subtype]).info(texts[data.subtype]).uniqueClass('csv-import-status').updatesText().requiresConfirmation().allowConfirmAll().show();
 				}
 				break;
 
@@ -1555,11 +1519,36 @@ var Structr = {
 							.title(data.title)
 							.error(data.text)
 							.requiresConfirmation()
+							.allowConfirmAll()
 							.show();
 				}
 				break;
 
 			case "FILE_IMPORT_STATUS":
+
+				var fileImportTitles = {
+					QUEUED: 'Import added to queue',
+					BEGIN: 'Import started',
+					CHUNK: 'Import status',
+					END: 'Import finished',
+					WAIT_ABORT: 'Import waiting to abort',
+					ABORTED: 'Import aborted',
+					WAIT_PAUSE: 'Import waiting to pause',
+					PAUSED: 'Import paused',
+					RESUMED: 'Import resumed'
+				};
+
+				var fileImportTexts = {
+					QUEUED: 'Import of <b>' + data.filename + '</b> will begin after currently running/queued job(s)',
+					BEGIN: 'Started importing data from <b>' + data.filename + '</b>',
+					CHUNK: 'Finished importing chunk ' + data.currentChunkNo + ' of <b>' + data.filename + '</b><br>Objects created: ' + data.objectsCreated + '<br>Time: ' + data.duration + '<br>Objects/s: ' + data.objectsPerSecond,
+					END: 'Finished importing data from <b>' + data.filename + '</b><br>Objects created: ' + data.objectsCreated + '<br>Time: ' + data.duration + '<br>Objects/s: ' + data.objectsPerSecond,
+					WAIT_ABORT: 'The import of <b>' + data.filename + '</b> will be aborted after finishing the current chunk',
+					ABORTED: 'The import of <b>' + data.filename + '</b> has been aborted',
+					WAIT_PAUSE: 'The import of <b>' + data.filename + '</b> will be paused after finishing the current chunk',
+					PAUSED: 'The import of <b>' + data.filename + '</b> has been paused',
+					RESUMED: 'The import of <b>' + data.filename + '</b> has been resumed'
+				};
 
 				if (me.username === data.username) {
 
@@ -1569,7 +1558,7 @@ var Structr = {
 							.uniqueClass(data.jobtype + '-import-status-' + data.filepath);
 
 					if (data.subtype !== 'QUEUED') {
-						msg.updatesText().requiresConfirmation();
+						msg.updatesText().requiresConfirmation().allowConfirmAll();
 					}
 
 					msg.show();
@@ -1593,6 +1582,7 @@ var Structr = {
 							.title("Exception while importing " + data.jobtype)
 							.error("File: " + data.filepath + "<br>" + text)
 							.requiresConfirmation()
+							.allowConfirmAll()
 							.show();
 
 					if (Structr.isModuleActive(Importer)) {
@@ -1603,6 +1593,17 @@ var Structr = {
 
 			case "SCRIPT_JOB_STATUS":
 
+				var scriptJobTitles = {
+					QUEUED: 'Script added to queue',
+					BEGIN: 'Script started',
+					END: 'Script finished'
+				};
+				var scriptJobTexts = {
+					QUEUED: 'Script job #' + data.jobId + ' will begin after currently running/queued job(s)',
+					BEGIN: 'Started script job #' + data.jobId + ((data.jobName.length === 0) ? '' : '<br>' + data.jobName),
+					END: 'Finished script job #' + data.jobId + ((data.jobName.length === 0) ? '' : '<br>' + data.jobName)
+				};
+
 				if (me.username === data.username) {
 
 					var msg = new MessageBuilder()
@@ -1611,7 +1612,7 @@ var Structr = {
 							.uniqueClass(data.jobtype + '-status-' + data.jobId);
 
 					if (data.subtype !== 'QUEUED') {
-						msg.updatesText().requiresConfirmation();
+						msg.updatesText().requiresConfirmation().allowConfirmAll();
 					}
 
 					msg.show();
@@ -1622,77 +1623,194 @@ var Structr = {
 				}
 				break;
 
-			case "DEPLOYMENT_IMPORT_STATUS":
+			case 'DEPLOYMENT_IMPORT_STATUS':
+			case 'DEPLOYMENT_DATA_IMPORT_STATUS':
+
+				var type            = 'Deployment Import';
+				var messageCssClass = 'deployment-import';
+
+				if (data.type === 'DEPLOYMENT_DATA_IMPORT_STATUS') {
+					type            = 'Data Deployment Import';
+					messageCssClass = 'data-deployment-import';
+				}
+
 
 				if (data.subtype === 'BEGIN') {
 
-					var text = "Deployment Import started: " + new Date(data.start) + "<br>"
-							+ "Importing from: " + data.source + "<br><br>"
-							+ "Please wait until the import process is finished. any changes made during a deployment might get lost or conflict with the deployment! This message will be updated during the deployment process.<br>";
+					var text = type + ' started: ' + new Date(data.start) + '<br>'
+							+ 'Importing from: ' + data.source + '<br><br>'
+							+ 'Please wait until the import process is finished. Any changes made during a deployment might get lost or conflict with the deployment! This message will be updated during the deployment process.<br><ol class="message-steps"></ol>';
 
-					new MessageBuilder().title("Deployment Import Progress").uniqueClass('deployment-import').info(text).requiresConfirmation().updatesText().show();
+					new MessageBuilder().title(type + ' Progress').uniqueClass(messageCssClass).info(text).requiresConfirmation().updatesText().show();
 
 				} else if (data.subtype === 'PROGRESS') {
 
-					new MessageBuilder().title("Deployment Import Progress").uniqueClass('deployment-import').info("Step " + data.step + ": " + data.message).requiresConfirmation().appendsText().show();
+					new MessageBuilder().title(type + ' Progress').uniqueClass(messageCssClass).info('<li>' + data.message + '</li>').requiresConfirmation().appendsText('.message-steps').show();
 
 				} else if (data.subtype === 'END') {
 
-					var text = "<br>Deployment Import finished: " + new Date(data.end)
+					var text = "<br>" + type + " finished: " + new Date(data.end)
 							+ "<br>Total duration: " + data.duration
 							+ "<br><br>Reload the page to see the new data.";
 
-					new MessageBuilder().title("Deployment Import finished").uniqueClass('deployment-import').info(text).specialInteractionButton("Reload Page", function () { location.reload(); }, "Ignore").appendsText().updatesButtons().show();
+					new MessageBuilder().title(type + " finished").uniqueClass(messageCssClass).info(text).specialInteractionButton('Reload Page', function() { location.reload(); }, 'Ignore').appendsText().updatesButtons().show();
 
 				}
 				break;
 
-			case "DEPLOYMENT_EXPORT_STATUS":
+			case 'DEPLOYMENT_EXPORT_STATUS':
+			case 'DEPLOYMENT_DATA_EXPORT_STATUS':
+
+				var type            = 'Deployment Export';
+				var messageCssClass = 'deployment-export';
+
+				if (data.type === 'DEPLOYMENT_DATA_EXPORT_STATUS') {
+					type            = 'Data Deployment Export';
+					messageCssClass = 'data-deployment-export';
+				}
 
 				if (data.subtype === 'BEGIN') {
 
-					var text = "Deployment Export started: " + new Date(data.start) + "<br>"
-							+ "Exporting to: " + data.target + "<br><br>"
-							+ "System performance may be affected during Export.<br>";
+					var text = type + ' started: ' + new Date(data.start) + '<br>'
+							+ 'Exporting to: ' + data.target + '<br><br>'
+							+ 'System performance may be affected during Export.<br><ol class="message-steps"></ol>';
 
-					new MessageBuilder().title("Deployment Export Progress").uniqueClass('deployment-export').info(text).requiresConfirmation().updatesText().show();
+					new MessageBuilder().title(type + ' Progress').uniqueClass(messageCssClass).info(text).requiresConfirmation().updatesText().show();
 
 				} else if (data.subtype === 'PROGRESS') {
 
-					new MessageBuilder().title("Deployment Export Progress").uniqueClass('deployment-export').info("Step " + data.step + ": " + data.message).requiresConfirmation().appendsText().show();
+					new MessageBuilder().title(type + ' Progress').uniqueClass(messageCssClass).info('<li>' + data.message + '</li>').requiresConfirmation().appendsText('.message-steps').show();
 
 				} else if (data.subtype === 'END') {
 
-					var text = "<br>Deployment Export finished: " + new Date(data.end)
+					var text = '<br>'+ type + ' finished: ' + new Date(data.end)
+							+ '<br>Total duration: ' + data.duration;
+
+					new MessageBuilder().title(type + ' finished').uniqueClass(messageCssClass).info(text).appendsText().requiresConfirmation().show();
+
+				}
+				break;
+
+			case "SCHEMA_ANALYZE_STATUS":
+
+				if (data.subtype === 'BEGIN') {
+
+					var text = "Schema Analysis started: " + new Date(data.start) + "<br>"
+							+ "Please wait until the import process is finished. This message will be updated during the process.<br><ol class='message-steps'></ol>";
+
+					new MessageBuilder().title("Schema Analysis progress").uniqueClass('schema-analysis').info(text).requiresConfirmation().updatesText().show();
+
+				} else if (data.subtype === 'PROGRESS') {
+
+					new MessageBuilder().title("Schema Analysis progress").uniqueClass('schema-analysis').info("<li>" + data.message + "</li>").requiresConfirmation().appendsText('.message-steps').show();
+
+				} else if (data.subtype === 'END') {
+
+					var text = "<br>Schema Analysis finished: " + new Date(data.end)
 							+ "<br>Total duration: " + data.duration;
 
-					new MessageBuilder().title("Deployment Export finished").uniqueClass('deployment-export').info(text).appendsText().requiresConfirmation().show();
+					new MessageBuilder().title("Schema Analysis finished").uniqueClass('schema-analysis').info(text).appendsText().requiresConfirmation().show();
 
 				}
 				break;
 
 			case "WARNING":
-				new MessageBuilder().title(data.title).warning(data.text).requiresConfirmation().show();
+				new MessageBuilder().title(data.title).warning(data.message).requiresConfirmation().allowConfirmAll().show();
+				break;
+
+			case "SCRIPT_JOB_EXCEPTION":
+				new MessageBuilder().title('Exception in Scheduled Job').warning(data.message).requiresConfirmation().allowConfirmAll().show();
 				break;
 
 			default: {
 
 					var text = "<p>No handler for generic message of type <b>" + data.type + "</b> defined - printing complete message data.</p>";
-					Object.keys(data).forEach(function (key) {
+					Object.keys(data).forEach(function(key) {
 						text += "<b>" + key + "</b>: " + data[key] + "<br>";
 					});
 
 					new MessageBuilder().title("GENERIC_MESSAGE").warning(text).requiresConfirmation().show();
 
 			}
-
 		}
+	},
+	fetchHtmlTemplate: function(templateName, templateConfig, callback) {
+
+		Structr.templateCache.registerCallback(templateName, templateName, function(templateHtml, cacheHit) {
+			var convertTemplateToLiteral = new Function('config', 'return `' + templateHtml + '`;');
+			var parameterizedTemplate = convertTemplateToLiteral(templateConfig);
+			callback(parameterizedTemplate, cacheHit);
+		});
+	},
+	activateCommentsInElement: function(elem, defaults) {
+
+		$('[data-comment]', elem).each(function(idx, el) {
+
+			let config = {
+				text: $(el).data("comment"),
+				element: $(el),
+				css: {
+					"margin": "0 4px",
+					"vertical-align": "top"
+				}
+			};
+
+			let elCommentConfig = $(el).data('commentConfig') || {};
+
+			// base config is overridden by the defaults parameter which is overriden by the element config
+			let infoConfig = Object.assign(config, defaults, elCommentConfig);
+			Structr.appendInfoTextToElement(infoConfig);
+		});
+
+	},
+	blockUiGeneric: function(html, timeout) {
+		Structr.loadingSpinnerTimeout = window.setTimeout(function() {
+			$.blockUI.defaults.overlayCSS.opacity = .2;
+			$.blockUI.defaults.applyPlatformOpacityRules = false;
+			$.blockUI({
+				fadeIn: 0,
+				fadeOut: 0,
+				message: html,
+				forceInput: true,
+				css: {
+					border: 'none',
+					backgroundColor: 'transparent'
+				}
+			});
+		}, timeout || 0);
+	},
+	unblockUiGeneric: function() {
+		window.clearTimeout(Structr.loadingSpinnerTimeout);
+		Structr.loadingSpinnerTimeout = undefined;
+
+		$.unblockUI({
+			fadeOut: 0
+		});
+	},
+	showLoadingSpinner: function() {
+		Structr.blockUiGeneric('<div id="structr-loading-spinner"><img src="' + _Icons.getSpinnerImageAsData() + '"></div>');
+	},
+	hideLoadingSpinner: function() {
+		Structr.unblockUiGeneric();
+	},
+	showLoadingMessage: function(title, text, timeout) {
+
+		var messageTitle = title || 'Executing Task';
+		var messageText  = text || 'Please wait until the operation has finished...';
+
+		$('#tempInfoBox .infoMsg').html('<img src="' + _Icons.getSpinnerImageAsData() + '"> <b>' + messageTitle + '</b><br><br>' + messageText);
+
+		$('#tempInfoBox .closeButton').hide();
+		Structr.blockUiGeneric($('#tempInfoBox'), timeout || 500);
+	},
+	hideLoadingMessage: function() {
+		Structr.unblockUiGeneric();
 	}
 };
 
 var _TreeHelper = {
-	initTree: function (tree, initFunction, stateKey) {
-		tree.jstree({
+	initTree: function(tree, initFunction, stateKey) {
+		$(tree).jstree({
 			plugins: ["themes", "dnd", "search", "state", "types", "wholerow"],
 			core: {
 				animation: 0,
@@ -1729,7 +1847,7 @@ var _TreeHelper = {
 		}
 	},
 	refreshTree: function(tree, callback) {
-		tree.jstree('refresh');
+		$(tree).jstree('refresh');
 
 		if (typeof callback === "function") {
 			window.setTimeout(function() {
@@ -1737,7 +1855,7 @@ var _TreeHelper = {
 			}, 500);
 		}
 	},
-	makeDroppable: function (tree, list) {
+	makeDroppable: function(tree, list) {
 		window.setTimeout(function() {
 			list.forEach(function(obj) {
 				StructrModel.create({id: obj.id}, null, false);
@@ -1745,7 +1863,7 @@ var _TreeHelper = {
 			});
 		}, 500);
 	},
-	makeTreeElementDroppable: function (tree, id) {
+	makeTreeElementDroppable: function(tree, id) {
 		var el = $('#' + id + ' > .jstree-wholerow', tree);
 		_Dragndrop.makeDroppable(el);
 	}
@@ -1759,16 +1877,19 @@ function MessageBuilder () {
 		delayDuration: 3000,
 		fadeDuration: 1000,
 		confirmButtonText: 'Confirm',
+		allowConfirmAll: false,
+		confirmAllButtonText: 'Confirm all...',
 		classNames: ['message'],
 		uniqueClass: undefined,
 		uniqueCount: 1,
 		updatesText: false,
 		updatesButtons: false,
 		appendsText: false,
+		appendSelector: '',
 		incrementsUniqueCount: false
 	};
 
-	this.requiresConfirmation = function (confirmButtonText) {
+	this.requiresConfirmation = function(confirmButtonText) {
 		this.params.requiresConfirmation = true;
 
 		if (confirmButtonText) {
@@ -1778,82 +1899,101 @@ function MessageBuilder () {
 		return this;
 	};
 
-	this.title = function (title) {
+	this.allowConfirmAll = function(confirmAllButtonText) {
+		this.params.allowConfirmAll = true;
+
+		if (confirmAllButtonText) {
+			this.params.confirmAllButtonText = confirmAllButtonText;
+		}
+
+		return this;
+	};
+
+	this.title = function(title) {
 		this.params.title = title;
 		return this;
 	};
 
-	this.text = function (text) {
+	this.text = function(text) {
 		this.params.text = text;
 		return this;
 	};
 
-	this.furtherText = function (furtherText) {
+	this.furtherText = function(furtherText) {
 		this.params.furtherText = furtherText;
 		return this;
 	};
 
-	this.error = function (text) {
+	this.error = function(text) {
 		this.params.text = text;
 		return this.className('error');
 	};
 
-	this.warning = function (text) {
+	this.warning = function(text) {
 		this.params.text = text;
 		return this.className('warning');
 	};
 
-	this.info = function (text) {
+	this.info = function(text) {
 		this.params.text = text;
 		return this.className('info');
 	};
 
-	this.success = function (text) {
+	this.success = function(text) {
 		this.params.text = text;
 		return this.className('success');
 	};
 
-	this.delayDuration = function (delayDuration) {
+	this.delayDuration = function(delayDuration) {
 		this.params.delayDuration = delayDuration;
 		return this;
 	};
 
-	this.fadeDuration = function (fadeDuration) {
+	this.fadeDuration = function(fadeDuration) {
 		this.params.fadeDuration = fadeDuration;
 		return this;
 	};
 
-	this.className = function (className) {
+	this.className = function(className) {
 		this.params.classNames.push(className);
 		return this;
 	};
 
-	this.delayDuration = function (delayDuration) {
+	this.delayDuration = function(delayDuration) {
 		this.params.delayDuration = delayDuration;
 		return this;
 	};
 
-	this.getButtonHtml = function () {
+	this.getButtonHtml = function() {
 		return (this.params.requiresConfirmation ? '<button class="confirm">' + this.params.confirmButtonText + '</button>' : '') +
+			   (this.params.requiresConfirmation && this.params.allowConfirmAll ? '<button class="confirmAll">' + this.params.confirmAllButtonText + '</button>' : '') +
 			   (this.params.specialInteractionButton ? '<button class="special">' + this.params.specialInteractionButton.text + '</button>' : '');
 	};
 
-	this.activateButtons = function (originalMsgBuilder, newMsgBuilder) {
+	this.activateButtons = function(originalMsgBuilder, newMsgBuilder) {
 
 		if (newMsgBuilder.params.requiresConfirmation === true) {
 
-			$('#' + originalMsgBuilder.params.msgId).find('button.confirm').click(function () {
+			$('#' + originalMsgBuilder.params.msgId).find('button.confirm').click(function() {
 				$(this).remove();
 				originalMsgBuilder.hide();
 			});
 
+			if (newMsgBuilder.params.allowConfirmAll === true) {
+
+				$('#info-area button.confirmAll').click(function() {
+					$('#info-area button.confirm').click();
+				});
+
+			}
+
 		} else {
 
-			window.setTimeout(function () {
+			window.setTimeout(function() {
 				originalMsgBuilder.hide();
 			}, this.params.delayDuration);
 
-			$('#' + newMsgBuilder.params.msgId).click(function () {
+			$('#' + newMsgBuilder.params.msgId).click(function() {
 				originalMsgBuilder.hide();
 			});
 
@@ -1861,7 +2001,7 @@ function MessageBuilder () {
 
 		if (newMsgBuilder.params.specialInteractionButton) {
 
-			$('#' + originalMsgBuilder.params.msgId).find('button.special').click(function () {
+			$('#' + originalMsgBuilder.params.msgId).find('button.special').click(function() {
 				if (newMsgBuilder.params.specialInteractionButton) {
 					newMsgBuilder.params.specialInteractionButton.action();
 
@@ -1872,7 +2012,7 @@ function MessageBuilder () {
 		}
 	};
 
-	this.show = function () {
+	this.show = function() {
 
 		var uniqueMessageAlreadyPresented = false;
 
@@ -1891,7 +2031,12 @@ function MessageBuilder () {
 					$('#info-area .message.' + this.params.uniqueClass + ' .text').html(this.params.text);
 				} else if (this.params.appendsText) {
 					$('#info-area .message.' + this.params.uniqueClass + ' .title').html(this.params.title);
-					$('#info-area .message.' + this.params.uniqueClass + ' .text').append('<br>' + this.params.text);
+
+					var selector = '#info-area .message.' + this.params.uniqueClass + ' .text';
+					if (this.params.appendSelector !== '') {
+						selector += ' ' + this.params.appendSelector;
+					}
+					$(selector).append(this.params.text);
 				}
 
 				if (this.params.updatesButtons) {
@@ -1923,19 +2068,19 @@ function MessageBuilder () {
 		}
 	};
 
-	this.hide = function () {
+	this.hide = function() {
 		$('#' + this.params.msgId).animate({
 			opacity: 0,
 			height: 0
 		}, {
 			duration: this.params.fadeDuration,
-			complete: function () {
+			complete: function() {
 				$(this).remove();
 			}
 		});
 	};
 
-	this.specialInteractionButton = function (buttonText, callback, confirmButtonText) {
+	this.specialInteractionButton = function(buttonText, callback, confirmButtonText) {
 
 		this.params.specialInteractionButton = {
 			text: buttonText,
@@ -1950,7 +2095,7 @@ function MessageBuilder () {
 		}
 	};
 
-	this.uniqueClass = function (className) {
+	this.uniqueClass = function(className) {
 		if (className) {
 			className = className.replace(/[\/\. ]/g, "_");
 			this.params.uniqueClass = className;
@@ -1959,31 +2104,32 @@ function MessageBuilder () {
 		return this;
 	};
 
-	this.incrementsUniqueCount = function () {
+	this.incrementsUniqueCount = function() {
 		this.params.incrementsUniqueCount = true;
 		return this;
 	};
 
-	this.updatesText = function () {
+	this.updatesText = function() {
 		this.params.updatesText = true;
 		return this;
 	};
 
-	this.updatesButtons = function () {
+	this.updatesButtons = function() {
 		this.params.updatesButtons = true;
 		return this;
 	};
 
-	this.appendsText = function () {
-		this.params.appendsText = true;
+	this.appendsText = function(selector) {
+		this.params.appendsText    = true;
+		this.params.appendSelector = selector || '';
 		return this;
 	};
 
-	this.getUniqueCountElement = function () {
+	this.getUniqueCountElement = function() {
 		return ' <b class="uniqueCount">' + ((this.params.uniqueCount > 1) ? '(' + this.params.uniqueCount + ') ' : '') + '</b> ';
 	};
 
-	this.incrementUniqueCount = function () {
+	this.incrementUniqueCount = function() {
 		this.params.uniqueCount++;
 		$('#' + this.params.msgId).find('b.uniqueCount').replaceWith(this.getUniqueCountElement());
 	};
@@ -2027,25 +2173,3 @@ $(window).on('beforeunload', function(event) {
 		Structr.saveLocalStorage();
 	}
 });
-
-function showLoadingSpinner() {
-	var msg = '<div id="structr-loading-spinner"><img src="' + _Icons.getSpinnerImageAsData() + '"></div>';
-	$.blockUI.defaults.overlayCSS.opacity = .2;
-	$.blockUI.defaults.applyPlatformOpacityRules = false;
-	$.blockUI({
-		fadeIn: 0,
-		fadeOut: 0,
-		message: msg,
-		forceInput: true,
-		css: {
-			border: 'none',
-			backgroundColor: 'transparent'
-		}
-	});
-}
-
-function hideLoadingSpinner() {
-	$.unblockUI({
-		fadeOut: 0
-	});
-}

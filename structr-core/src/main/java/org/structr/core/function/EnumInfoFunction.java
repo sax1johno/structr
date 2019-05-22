@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -30,88 +30,83 @@ import org.structr.core.property.StringProperty;
 import org.structr.schema.ConfigurationProvider;
 import org.structr.schema.SchemaHelper;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-public class EnumInfoFunction extends Function<Object, Object> {
+public class EnumInfoFunction extends AdvancedScriptingFunction {
 
 	public static final String ERROR_MESSAGE_ENUM_INFO    = "Usage: ${enum_info(type, enumProperty[, raw])}. Example ${enum_info('Document', 'documentType')}";
 	public static final String ERROR_MESSAGE_ENUM_INFO_JS = "Usage: ${Structr.enum_info(type, enumProperty[, raw])}. Example ${Structr.enum_info('Document', 'documentType')}";
+
+	@Override
+	public String getName() {
+		return "enum_info";
+	}
 
 	@Override
 	public Object apply(ActionContext ctx, Object caller, Object[] sources) throws FrameworkException {
 
 		try {
 
-			if (arrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 2, 3)) {
+			assertArrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 2, 3);
 
-				final ConfigurationProvider config = StructrApp.getConfiguration();
-				final String typeName = sources[0].toString();
-				final String enumPropertyName = sources[1].toString();
-				final boolean rawList = (sources.length == 3) ? Boolean.parseBoolean(sources[2].toString()) : false;
-				final Class type = SchemaHelper.getEntityClassForRawType(typeName);
+			final ConfigurationProvider config = StructrApp.getConfiguration();
+			final String typeName = sources[0].toString();
+			final String enumPropertyName = sources[1].toString();
+			final boolean rawList = (sources.length == 3) ? Boolean.parseBoolean(sources[2].toString()) : false;
+			final Class type = SchemaHelper.getEntityClassForRawType(typeName);
 
-				if (type != null) {
+			if (type != null) {
 
-					final PropertyKey key = config.getPropertyKeyForJSONName(type, enumPropertyName, false);
-					if (key != null) {
+				final PropertyKey key = StructrApp.key(type, enumPropertyName);
+				if (key != null) {
 
-						if (key instanceof EnumProperty) {
-							final String formatString = SchemaHelper.getPropertyInfo(ctx.getSecurityContext(), key).get("format").toString();
+					if (key instanceof EnumProperty) {
+						final String formatString = SchemaHelper.getPropertyInfo(ctx.getSecurityContext(), key).get("format").toString();
 
-							final List<String> valueList = Arrays.asList(formatString.replace(" ", "").split(","));
+						final List<String> valueList = Arrays.asList(formatString.replace(" ", "").split(","));
 
-							if (rawList) {
+						if (rawList) {
 
-								return valueList;
+							return valueList;
 
-							} else {
-
-								final ArrayList<GraphObjectMap> resultList = new ArrayList();
-
-								for (final String value : valueList) {
-
-									final GraphObjectMap valueMap = new GraphObjectMap();
-									resultList.add(valueMap);
-
-									valueMap.put(new StringProperty("value"), value);
-
-								}
-
-								return resultList;
-
-							}
 						} else {
 
-							logger.warn("Error: Not an Enum property \"{}.{}\"", typeName, enumPropertyName);
-							return "Not an Enum property " + typeName + "." + enumPropertyName;
+							final ArrayList<GraphObjectMap> resultList = new ArrayList();
+
+							for (final String value : valueList) {
+
+								final GraphObjectMap valueMap = new GraphObjectMap();
+								resultList.add(valueMap);
+
+								valueMap.put(new StringProperty("value"), value);
+
+							}
+
+							return resultList;
 						}
 
 					} else {
 
-						logger.warn("Error: Unknown property \"{}.{}\"", typeName, enumPropertyName);
-						return "Unknown property " + typeName + "." + enumPropertyName;
+						logger.warn("Error: Not an Enum property \"{}.{}\"", typeName, enumPropertyName);
+						return "Not an Enum property " + typeName + "." + enumPropertyName;
 					}
 
 				} else {
 
-					logger.warn("Error: Unknown type \"{}\"", typeName);
-					return "Unknown type " + typeName;
+					logger.warn("Error: Unknown property \"{}.{}\"", typeName, enumPropertyName);
+					return "Unknown property " + typeName + "." + enumPropertyName;
 				}
 
 			} else {
 
-				logParameterError(caller, sources, ctx.isJavaScriptContext());
-				return usage(ctx.isJavaScriptContext());
-
+				logger.warn("Error: Unknown type \"{}\"", typeName);
+				return "Unknown type " + typeName;
 			}
 
-		} catch (final IllegalArgumentException e) {
+		} catch (IllegalArgumentException e) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			logParameterError(caller, sources, e.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
-
 	}
 
 	@Override
@@ -123,10 +118,4 @@ public class EnumInfoFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Returns the enum values as an array";
 	}
-
-	@Override
-	public String getName() {
-		return "enum_info()";
-	}
-
 }

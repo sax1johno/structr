@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -32,10 +32,7 @@ import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
-/**
- *
- */
-public class FromXmlFunction extends UiFunction {
+public class FromXmlFunction extends UiAdvancedFunction {
 
 	private static final Property<List> attributesProperty = new GenericProperty<>("attributes");
 	private static final Property<List> childrenProperty   = new GenericProperty<>("children");
@@ -45,6 +42,11 @@ public class FromXmlFunction extends UiFunction {
 
 	public static final String ERROR_MESSAGE_FROM_XML    = "Usage: ${from_xml(source)}. Example: ${from_xml('<entry>0</entry>')}";
 	public static final String ERROR_MESSAGE_FROM_XML_JS = "Usage: ${{Structr.from_xml(src)}}. Example: ${{Structr.from_xml('<entry>0</entry>')}}";
+
+	@Override
+	public String getName() {
+		return "from_xml";
+	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, Object[] sources) throws FrameworkException {
@@ -96,11 +98,6 @@ public class FromXmlFunction extends UiFunction {
 	@Override
 	public String shortDescription() {
 		return "Parses the given XML and returns a list of objects.";
-	}
-
-	@Override
-	public String getName() {
-		return "from_xml";
 	}
 
 	// ----- private methods -----

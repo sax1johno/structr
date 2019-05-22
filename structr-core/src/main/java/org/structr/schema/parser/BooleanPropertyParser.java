@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,8 +18,10 @@
  */
 package org.structr.schema.parser;
 
+import java.util.Map;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
+import org.structr.core.entity.SchemaNode;
 import org.structr.core.property.BooleanProperty;
 import org.structr.schema.Schema;
 import org.structr.schema.SchemaHelper.Type;
@@ -60,6 +62,6 @@ public class BooleanPropertyParser extends PropertySourceGenerator {
 	}
 
 	@Override
-	public void parseFormatString(final Schema entity, String expression) throws FrameworkException {
+	public void parseFormatString(final Map<String, SchemaNode> schemaNodes, final Schema entity, String expression) throws FrameworkException {
 	}
 }

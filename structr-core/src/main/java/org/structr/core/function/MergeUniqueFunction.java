@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,24 +18,19 @@
  */
 package org.structr.core.function;
 
-import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.Set;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class MergeUniqueFunction extends Function<Object, Object> {
+public class MergeUniqueFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_MERGE_UNIQUE = "Usage: ${merge_unique(list1, list2, list3, ...)}. Example: ${merge_unique(this.children, this.siblings)}";
 
 	@Override
 	public String getName() {
-		return "merge_unique()";
+		return "merge_unique";
 	}
 
 	@Override
@@ -44,10 +39,10 @@ public class MergeUniqueFunction extends Function<Object, Object> {
 		final Set result = new LinkedHashSet<>();
 		for (final Object source : sources) {
 
-			if (source instanceof Collection) {
+			if (source instanceof Iterable) {
 
 				// filter null objects
-				for (Object obj : (Collection)source) {
+				for (Object obj : (Iterable)source) {
 
 					if (obj != null) {
 

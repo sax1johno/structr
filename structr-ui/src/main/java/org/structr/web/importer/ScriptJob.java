@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -24,10 +24,13 @@ import org.mozilla.javascript.Script;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.AccessMode;
+import org.structr.common.ContextStore;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
+import org.structr.core.app.StructrApp;
 import org.structr.core.entity.Principal;
 import org.structr.core.graph.TransactionCommand;
+import org.structr.core.graph.Tx;
 import org.structr.core.scheduler.ScheduledJob;
 import org.structr.core.script.Scripting;
 import org.structr.core.script.Snippet;
@@ -40,9 +43,9 @@ public class ScriptJob extends ScheduledJob {
 	private static final Logger logger = LoggerFactory.getLogger(ScriptJob.class);
 	private Object script              = null;
 
-	public ScriptJob(final Principal user, final Map<String, Object> configuration, final Object script) {
+	public ScriptJob(final Principal user, final Map<String, Object> configuration, final Object script, final ContextStore ctxStore, final String jobTitle) {
 
-		super(null, user, configuration);
+		super(jobTitle, user, configuration, ctxStore);
 
 		this.script  = script;
 	}
@@ -57,9 +60,10 @@ public class ScriptJob extends ScheduledJob {
 
 		return () -> {
 
-			try {
+			try (final Tx tx = StructrApp.getInstance().tx()) {
 
 				final SecurityContext securityContext = SecurityContext.getInstance(user, AccessMode.Backend);
+				securityContext.setContextStore(ctxStore);
 				final ActionContext actionContext     = new ActionContext(securityContext);
 				final long startTime                  = System.currentTimeMillis();
 
@@ -80,6 +84,8 @@ public class ScriptJob extends ScheduledJob {
 				}
 
 				reportFinished();
+
+				tx.success();
 
 			} catch (Exception e) {
 
@@ -117,6 +123,7 @@ public class ScriptJob extends ScheduledJob {
 		data.put("jobtype",    getJobType());
 		data.put("subtype",    subtype);
 		data.put("username",   getUsername());
+		data.put("jobName",    jobName);
 
 		return data;
 	}
@@ -130,6 +137,7 @@ public class ScriptJob extends ScheduledJob {
 		jobInfo.put("jobtype",         getJobType());
 		jobInfo.put("username",        getUsername());
 		jobInfo.put("status",          getCurrentStatus());
+		jobInfo.put("jobName",         jobName);
 
 		return jobInfo;
 	}

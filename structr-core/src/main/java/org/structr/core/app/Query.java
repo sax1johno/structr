@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,11 +18,13 @@
  */
 package org.structr.core.app;
 
+import java.util.Comparator;
 import java.util.List;
 import org.structr.api.Predicate;
+import org.structr.api.search.QueryContext;
+import org.structr.api.util.ResultStream;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
 import org.structr.core.graph.search.SearchAttribute;
 import org.structr.core.graph.search.SearchAttributeGroup;
 import org.structr.core.property.PropertyKey;
@@ -35,7 +37,11 @@ import org.structr.core.property.PropertyMap;
  */
 public interface Query<T extends GraphObject> extends Iterable<T> {
 
-	public Result<T> getResult() throws FrameworkException;
+	public void setQueryContext(final QueryContext queryContext);
+	public QueryContext getQueryContext();
+	public Query<T> isPing(final boolean isPing);
+
+	public ResultStream<T> getResultStream() throws FrameworkException;
 	public List<T> getAsList() throws FrameworkException;
 	public T getFirst() throws FrameworkException;
 
@@ -45,17 +51,19 @@ public interface Query<T extends GraphObject> extends Iterable<T> {
 	public Query<T> sortAscending(final PropertyKey key);
 	public Query<T> sortDescending(final PropertyKey key);
 	public Query<T> order(final boolean descending);
+	public Query<T> comparator(final Comparator<T> comparator);
 	public Query<T> pageSize(final int pageSize);
 	public Query<T> page(final int page);
 	public Query<T> publicOnly();
-	public Query<T> includeDeletedAndHidden();
+	public Query<T> includeHidden();
 	public Query<T> publicOnly(final boolean publicOnly);
-	public Query<T> includeDeletedAndHidden(final boolean includeDeletedAndHidden);
+	public Query<T> includeHidden(final boolean includeHidden);
 	public Query<T> uuid(final String uuid);
 	public Query<T> andType(final Class<T> type);
 	public Query<T> orType(final Class<T> type);
 	public Query<T> andTypes(final Class<T> type);
 	public Query<T> orTypes(final Class<T> type);
+	public Class getType();
 
 	public Query<T> andName(final String name);
 	public Query<T> orName(final String name);
@@ -64,6 +72,18 @@ public interface Query<T extends GraphObject> extends Iterable<T> {
 	public Query<T> location(final String street, final String postalCode, final String city, final String country, final double distance);
 	public Query<T> location(final String street, final String postalCode, final String city, final String state, final String country, final double distance);
 	public Query<T> location(final String street, final String house, final String postalCode, final String city, final String state, final String country, final double distance);
+
+	default public <P> Query<T> and(final String name, final P value) {
+
+		final PropertyKey<P> key = StructrApp.getConfiguration().getPropertyKeyForJSONName(getType(), name, false);
+		if (key != null) {
+
+			return and(key, value);
+		}
+
+		throw new IllegalArgumentException("Invalid property key " + name + " for type " + getClass().getSimpleName());
+	}
+
 	public <P> Query<T> and(final PropertyKey<P> key, final P value);
 	public <P> Query<T> and(final PropertyKey<P> key, final P value, final boolean exact);
 	public <P> Query<T> and(final PropertyMap attributes);
@@ -75,6 +95,7 @@ public interface Query<T extends GraphObject> extends Iterable<T> {
 	public Query<T> blank(final PropertyKey key);
 
 	public <P> Query<T> andRange(final PropertyKey<P> key, final P rangeStart, final P rangeEnd);
+	public <P> Query<T> andRange(final PropertyKey<P> key, final P rangeStart, final P rangeEnd, final boolean includeStart, final boolean includeEnd);
 	public <P> Query<T> orRange(final PropertyKey<P> key, final P rangeStart, final P rangeEnd);
 
 	public Query<T> or();

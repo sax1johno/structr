@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.Permission;
 import org.structr.common.Permissions;
+import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.StaticValue;
 import org.structr.core.Value;
@@ -36,107 +37,118 @@ import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
 
-//~--- classes ----------------------------------------------------------------
 /**
- * Websocket command to grant or revoke a permission
- *
- *
+ * Websocket command to grant or revoke a permission.
  */
 public class SetPermissionCommand extends AbstractCommand {
 
 	private static final Logger logger = LoggerFactory.getLogger(SetPermissionCommand.class.getName());
 
+	private static final String RECURSIVE_KEY    = "recursive";
+	private static final String PRINCIPAL_ID_KEY = "principalId";
+	private static final String PERMISSION_KEY   = "permission";
+	private static final String ACTION_KEY       = "action";
+
 	static {
 
 		StructrWebSocket.addCommand(SetPermissionCommand.class);
-
 	}
 
 	private int sum   = 0;
 	private int count = 0;
 
-	//~--- methods --------------------------------------------------------
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
-		AbstractNode obj = getNode(webSocketData.getId());
-		boolean rec = (Boolean) webSocketData.getNodeData().get("recursive");
-		String principalId = (String) webSocketData.getNodeData().get("principalId");
-		String permission = (String) webSocketData.getNodeData().get("permission");
-		String action = (String) webSocketData.getNodeData().get("action");
+		setDoTransactionNotifications(true);
 
-		if (principalId == null) {
+		try {
 
-			logger.error("This command needs a principalId");
-			getWebSocket().send(MessageBuilder.status().code(400).build(), true);
+			AbstractNode obj   = getNode(webSocketData.getId());
+			boolean rec        = webSocketData.getNodeDataBooleanValue(RECURSIVE_KEY);
+			String principalId = webSocketData.getNodeDataStringValue(PRINCIPAL_ID_KEY);
+			String permission  = webSocketData.getNodeDataStringValue(PERMISSION_KEY);
+			String action      = webSocketData.getNodeDataStringValue(ACTION_KEY);
 
-		}
+			if (principalId == null) {
 
-		Principal principal = (Principal) getNode(principalId);
+				logger.error("This command needs a principalId");
+				getWebSocket().send(MessageBuilder.status().code(400).build(), true);
+			}
 
-		if (principal == null) {
+			Principal principal = (Principal) getNode(principalId);
+			if (principal == null) {
 
-			logger.error("No principal found with id {}", new Object[]{principalId});
-			getWebSocket().send(MessageBuilder.status().code(400).build(), true);
+				logger.error("No principal found with id {}", new Object[]{principalId});
+				getWebSocket().send(MessageBuilder.status().code(400).build(), true);
+			}
 
-		}
+			webSocketData.getNodeData().remove("recursive");
 
-		webSocketData.getNodeData().remove("recursive");
+			if (obj != null) {
 
-		if (obj != null) {
+				final SecurityContext securityContext = getWebSocket().getSecurityContext();
 
-			final App app = StructrApp.getInstance(getWebSocket().getSecurityContext());
-			try (final Tx nestedTx = app.tx()) {
+				securityContext.setDoTransactionNotifications(false);
+				securityContext.disableEnsureCardinality();
 
-				if (!((AbstractNode)obj).isGranted(Permission.accessControl, getWebSocket().getSecurityContext())) {
+				final App app = StructrApp.getInstance(securityContext);
+				try (final Tx nestedTx = app.tx()) {
 
-					logger.warn("No access control permission for {} on {}", new Object[]{getWebSocket().getCurrentUser().toString(), obj.toString()});
-					getWebSocket().send(MessageBuilder.status().message("No access control permission").code(400).build(), true);
+					if (!((AbstractNode)obj).isGranted(Permission.accessControl, securityContext)) {
+
+						logger.warn("No access control permission for {} on {}", new Object[]{getWebSocket().getCurrentUser().toString(), obj.toString()});
+						getWebSocket().send(MessageBuilder.status().message("No access control permission").code(400).build(), true);
+						nestedTx.success();
+
+						return;
+
+					}
+
 					nestedTx.success();
 
-					return;
-
+				} catch (FrameworkException ex) {
+					logger.warn("", ex);
 				}
 
-				nestedTx.success();
+				try {
 
-			} catch (FrameworkException ex) {
-				logger.warn("", ex);
-			}
+					final Value<Tx> value = new StaticValue<>(null);
 
-			try {
+					setPermission(value, app, obj, principal, action, Permissions.valueOf(permission), rec);
 
-				final Value<Tx> value = new StaticValue<>(null);
+					// commit and close transaction
+					final Tx tx = value.get(null);
+					if (tx != null) {
 
-				setPermission(value, app, obj, principal, action, Permissions.valueOf(permission), rec);
+						try {
+							tx.success();
+						} finally {
+							tx.close();
+						}
 
-				// commit and close transaction
-				final Tx tx = value.get(null);
-				if (tx != null) {
+						value.set(null, null);
+					}
+					webSocketData.setResult(Arrays.asList(principal));
 
-					tx.success();
-					tx.close();
+					// send only over local connection (no broadcast)
+					getWebSocket().send(webSocketData, true);
 
-					value.set(null, null);
+				} catch (FrameworkException ex) {
+
+					logger.error("Unable to set permissions: {}", ((FrameworkException) ex).toString());
+					getWebSocket().send(MessageBuilder.status().code(ex.getStatus()).jsonErrorObject(ex.toJSON()).build(), true);
 				}
 
-				webSocketData.setResult(Arrays.asList(principal));
+			} else {
 
-				// send only over local connection (no broadcast)
-				getWebSocket().send(webSocketData, true);
-
-			} catch (FrameworkException ex) {
-
-				logger.error("Unable to set permissions: {}", ((FrameworkException) ex).toString());
-				getWebSocket().send(MessageBuilder.status().code(400).build(), true);
-
+				logger.warn("Graph object with uuid {} not found.", webSocketData.getId());
+				getWebSocket().send(MessageBuilder.status().code(404).build(), true);
 			}
 
-		} else {
-
-			logger.warn("Graph object with uuid {} not found.", webSocketData.getId());
-			getWebSocket().send(MessageBuilder.status().code(404).build(), true);
-
+		} catch (FrameworkException ex) {
+			logger.warn("Exception occured", ex);
+			getWebSocket().send(MessageBuilder.status().code(ex.getStatus()).message(ex.getMessage()).build(), true);
 		}
 
 	}
@@ -148,9 +160,7 @@ public class SetPermissionCommand extends AbstractCommand {
 
 	@Override
 	public String getCommand() {
-
 		return "SET_PERMISSION";
-
 	}
 
 	private void setPermission(final Value<Tx> transaction, final App app, final AbstractNode obj, final Principal principal, final String action, final Permission permission, final boolean rec) throws FrameworkException {
@@ -184,8 +194,11 @@ public class SetPermissionCommand extends AbstractCommand {
 			count = 0;
 
 			// commit and close old transaction
-			tx.success();
-			tx.close();
+			try {
+				tx.success();
+			} finally {
+				tx.close();
+			}
 
 			// create new transaction, do not notify Ui
 			tx = app.tx(true, true, false);
@@ -196,11 +209,7 @@ public class SetPermissionCommand extends AbstractCommand {
 			for (final Object t : ((LinkedTreeNode) obj).treeGetChildren()) {
 
 				setPermission(transaction, app, (AbstractNode) t, principal, action, permission, rec);
-
 			}
 		}
-
 	}
-
-
 }

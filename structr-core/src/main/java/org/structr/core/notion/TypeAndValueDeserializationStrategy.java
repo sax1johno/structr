@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -34,8 +34,6 @@ import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.core.property.RelationProperty;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
  * Deserializes a {@link GraphObject} using a type and a property value.
  *
@@ -45,18 +43,18 @@ public class TypeAndValueDeserializationStrategy<S, T extends NodeInterface> ext
 
 	private static final Logger logger = LoggerFactory.getLogger(TypeAndValueDeserializationStrategy.class.getName());
 
-	//~--- fields ---------------------------------------------------------
-
 	protected RelationProperty<S> relationProperty = null;
 	protected boolean createIfNotExisting          = false;
 	protected PropertyKey propertyKey              = null;
-
-	//~--- constructors ---------------------------------------------------
 
 	public TypeAndValueDeserializationStrategy(PropertyKey propertyKey, boolean createIfNotExisting) {
 
 		this.createIfNotExisting = createIfNotExisting;
 		this.propertyKey         = propertyKey;
+
+		if (propertyKey == null) {
+			throw new IllegalStateException("TypeAndValueDeserializationStrategy must contain at least one property.");
+		}
 	}
 
 	@Override
@@ -67,8 +65,8 @@ public class TypeAndValueDeserializationStrategy<S, T extends NodeInterface> ext
 	@Override
 	public T deserialize(final SecurityContext securityContext, Class<T> type, S source, final Object context) throws FrameworkException {
 
-		final App app    = StructrApp.getInstance(securityContext);
-		Result<T> result = Result.EMPTY_RESULT;
+		final App app        = StructrApp.getInstance(securityContext);
+		final List<T> result = new LinkedList<>();
 
 		// default to UUID
 		if (propertyKey == null) {
@@ -91,17 +89,18 @@ public class TypeAndValueDeserializationStrategy<S, T extends NodeInterface> ext
 				Object value = ((Map<String, Object>)convertedSource).get(propertyKey.jsonName());
 				if (value != null) {
 
-					result = app.nodeQuery(type).and(propertyKey, value.toString()).getResult();
+					result.addAll(app.nodeQuery(type).and(propertyKey, value.toString()).getAsList());
 				}
 
 			} else if (convertedSource instanceof GraphObject) {
 
 				final GraphObject obj = (GraphObject)convertedSource;
-				result                = app.nodeQuery(type).and(propertyKey, obj.getProperty(propertyKey)).getResult();
+
+				result.addAll(app.nodeQuery(type).and(propertyKey, obj.getProperty(propertyKey)).getAsList());
 
 			} else {
 
-				result = app.nodeQuery(type).and(propertyKey, convertedSource).getResult();
+				result.addAll(app.nodeQuery(type).and(propertyKey, convertedSource).getAsList());
 			}
 		}
 

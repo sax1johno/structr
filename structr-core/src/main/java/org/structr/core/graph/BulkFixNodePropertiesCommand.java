@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -113,7 +113,7 @@ public class BulkFixNodePropertiesCommand extends NodeServiceCommand implements 
 					}
 
 					@Override
-					public void handleGraphObject(SecurityContext securityContext, AbstractNode node) {
+					public boolean handleGraphObject(SecurityContext securityContext, AbstractNode node) {
 
 						if (propertyName != null) {
 
@@ -136,6 +136,8 @@ public class BulkFixNodePropertiesCommand extends NodeServiceCommand implements 
 								}
 							}
 						}
+
+						return true;
 					}
 				});
 

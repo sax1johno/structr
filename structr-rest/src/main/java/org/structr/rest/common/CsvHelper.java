@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -41,24 +41,24 @@ import static org.structr.rest.servlet.CsvServlet.DEFAULT_QUOTE_CHARACTER_COLLEC
 public class CsvHelper {
 
 	public static Iterable<JsonInput> cleanAndParseCSV(final SecurityContext securityContext, final Reader input, final Class type, final Character fieldSeparator, final Character quoteCharacter, final String range) throws FrameworkException, IOException {
-		return cleanAndParseCSV(securityContext, input, type, fieldSeparator, quoteCharacter, range, null);
+		return cleanAndParseCSV(securityContext, input, type, fieldSeparator, quoteCharacter, range, null, true);
 	}
 
-	public static Iterable<JsonInput> cleanAndParseCSV(final SecurityContext securityContext, final Reader input, final Class type, final Character fieldSeparator, final Character quoteCharacter, final String range, final Map<String, String> propertyMapping) throws FrameworkException, IOException {
+	public static Iterable<JsonInput> cleanAndParseCSV(final SecurityContext securityContext, final Reader input, final Class type, final Character fieldSeparator, final Character quoteCharacter, final String range, final Map<String, String> propertyMapping, final boolean strictQuotes) throws FrameworkException, IOException {
 
 		final CSVReader reader;
-		
+
 		if (quoteCharacter == null) {
-			
+
 			reader = new CSVReader(input, fieldSeparator);
 
 		} else {
-		
-			reader = new CSVReader(input, fieldSeparator, quoteCharacter, true);
+
+			reader = new CSVReader(input, fieldSeparator, quoteCharacter, strictQuotes);
 		}
-		
+
 		final String[] propertyNames = reader.readNext();
-		
+
 		return new Iterable<JsonInput>() {
 
 			@Override

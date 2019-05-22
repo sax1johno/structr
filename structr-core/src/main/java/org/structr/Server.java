@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -33,7 +33,7 @@ public class Server {
 	
 	public static void main(String[] args) {
 		
-		logger.info("Starting server instance");
+		logger.info("Starting Structr..");
 		
 		// start service layer using default configuration
 		// augmented by local structr.conf

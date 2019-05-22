@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,6 +18,7 @@
  */
 package org.structr.core.function;
 
+import java.util.List;
 import java.util.Map;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
@@ -29,11 +30,15 @@ import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.schema.ConfigurationProvider;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-public class PrivilegedFindFunction extends Function<Object, Object> {
+public class PrivilegedFindFunction extends AdvancedScriptingFunction {
 
     public static final String ERROR_MESSAGE_PRIVILEGEDFIND = "Usage: ${find_privileged(type, key, value)}. Example: ${find_privileged(\"User\", \"email\", \"tester@test.com\"}";
+
+    @Override
+    public String getName() {
+        return "find_privileged";
+    }
 
     @Override
     public Object apply(final ActionContext ctx, final Object caller, Object[] sources) throws FrameworkException {
@@ -41,8 +46,8 @@ public class PrivilegedFindFunction extends Function<Object, Object> {
 		if (sources != null) {
 
 			final SecurityContext securityContext = SecurityContext.getSuperUserInstance();
-			final ConfigurationProvider config = StructrApp.getConfiguration();
-			final Query query = StructrApp.getInstance(securityContext).nodeQuery().sort(GraphObject.createdDate).order(false);
+			final ConfigurationProvider config    = StructrApp.getConfiguration();
+			final Query query                     = StructrApp.getInstance(securityContext).nodeQuery().sort(GraphObject.createdDate).order(false);
 
 			// the type to query for
 			Class type = null;
@@ -87,15 +92,16 @@ public class PrivilegedFindFunction extends Function<Object, Object> {
 				}
 
 				// special case: second parameter is a UUID
-				final PropertyKey key = config.getPropertyKeyForJSONName(type, "id");
+				final PropertyKey key = StructrApp.key(type, "id");
 
 				query.and(key, sources[1].toString());
 
-				final int resultCount = query.getResult().size();
+				final List<GraphObject> result = query.getAsList();
+				final int resultCount = result.size();
 
 				switch (resultCount) {
 					case 1:
-						return query.getFirst();
+						return result.get(0);
 					case 0:
 						return null;
 					default:
@@ -113,7 +119,7 @@ public class PrivilegedFindFunction extends Function<Object, Object> {
 
 				for (int c = 1; c < parameter_count; c += 2) {
 
-					final PropertyKey key = config.getPropertyKeyForJSONName(type, sources[c].toString());
+					final PropertyKey key = StructrApp.key(type, sources[c].toString());
 
 					if (key != null) {
 
@@ -145,10 +151,4 @@ public class PrivilegedFindFunction extends Function<Object, Object> {
     public String shortDescription() {
         return "Returns a collection of entities of the given type from the database, takes optional key/value pairs. Executed in a super user context.";
     }
-
-    @Override
-    public String getName() {
-        return("find_privileged()");
-    }
-
 }

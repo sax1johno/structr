@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,35 +18,38 @@
  */
 package org.structr.web.entity.dom;
 
+import java.net.URI;
 import org.structr.common.SecurityContext;
-import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.property.PropertyMap;
+import org.structr.core.app.StructrApp;
 import org.structr.schema.NonIndexed;
+import org.structr.schema.SchemaService;
+import org.structr.schema.json.JsonObjectType;
+import org.structr.schema.json.JsonSchema;
+import org.structr.web.common.AsyncBuffer;
 import org.structr.web.common.RenderContext;
 
 /**
  *
- *
  */
-public class Comment extends Content implements org.w3c.dom.Comment, NonIndexed {
+public interface Comment extends Content, org.w3c.dom.Comment, NonIndexed {
 
-	@Override
-	public boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
+	static class Impl { static {
 
-		if (super.isValid(errorBuffer)) {
+		final JsonSchema schema   = SchemaService.getDynamicSchema();
+		final JsonObjectType type = schema.addType("Comment");
 
-			setProperties(securityContext, new PropertyMap(Comment.contentType, "text/html"));
-			return true;
-		}
+		type.setImplements(URI.create("https://structr.org/v1.1/definitions/Comment"));
+		type.setExtends(URI.create("#/definitions/Content"));
+		type.setCategory("ui");
 
-		return false;
-	}
+		type.overrideMethod("onCreation", true,  "setProperty(contentTypeProperty, \"text/html\");");
+		type.overrideMethod("render",     false, Comment.class.getName() + ".render(this, arg0, arg1);");
+	}}
 
-	@Override
-	public void render(RenderContext renderContext, int depth) throws FrameworkException {
+	static void render(final Comment comment, final RenderContext renderContext, final int depth) throws FrameworkException {
 
-		final String _content = getProperty(content);
+		String _content = comment.getContent();
 
 		// Avoid rendering existing @structr comments since those comments are
 		// created depending on the visiblity settings of individual nodes. If
@@ -54,8 +57,30 @@ public class Comment extends Content implements org.w3c.dom.Comment, NonIndexed 
 		// trip export/import test.
 		if (!_content.contains("@structr:")) {
 
-			renderContext.getBuffer().append("<!--").append(_content).append("-->");
-		}
+			try {
 
+				final SecurityContext securityContext = comment.getSecurityContext();
+				final RenderContext.EditMode edit = renderContext.getEditMode(securityContext.getUser(false));
+				final AsyncBuffer buf = renderContext.getBuffer();
+
+				if (RenderContext.EditMode.DEPLOYMENT.equals(edit)) {
+
+					DOMNode.renderDeploymentExportComments(comment, buf, true);
+
+				} else {
+
+					_content = comment.getPropertyWithVariableReplacement(renderContext, StructrApp.key(Content.class, "content"));
+
+				}
+
+				buf.append("<!--").append(_content).append("-->");
+
+			} catch (Throwable t) {
+
+				// catch exception to prevent ugly status 500 error pages in frontend.
+				logger.error("", t);
+
+			}
+		}
 	}
 }

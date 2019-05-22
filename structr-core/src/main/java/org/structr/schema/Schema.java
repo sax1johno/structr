@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,12 +18,10 @@
  */
 package org.structr.schema;
 
-import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import org.structr.api.graph.PropertyContainer;
-import org.structr.common.error.ErrorBuffer;
-import org.structr.common.error.FrameworkException;
 import org.structr.core.entity.SchemaMethod;
+import org.structr.core.entity.SchemaNode;
 import org.structr.core.entity.SchemaProperty;
 import org.structr.core.entity.SchemaView;
 
@@ -33,17 +31,14 @@ import org.structr.core.entity.SchemaView;
  */
 public interface Schema {
 
-	public String getSource(final ErrorBuffer errorBuffer) throws FrameworkException;
-	public String getAuxiliarySource() throws FrameworkException;
-
-	public String getMultiplicity(final String propertyNameToCheck);
-	public String getRelatedType(final String propertyNameToCheck);
+	public String getMultiplicity(final Map<String, SchemaNode> schemaNodes, final String propertyNameToCheck);
+	public String getRelatedType(final Map<String, SchemaNode> schemaNodes, final String propertyNameToCheck);
 	public PropertyContainer getPropertyContainer();
-	public Set<String> getViews();
 	public String getClassName();
 	public String getSuperclassName();
+	public String getUuid();
 
-	public List<SchemaProperty> getSchemaProperties();
-	public List<SchemaView> getSchemaViews();
-	public List<SchemaMethod> getSchemaMethods();
+	public Iterable<SchemaProperty> getSchemaProperties();
+	public Iterable<SchemaView> getSchemaViews();
+	public Iterable<SchemaMethod> getSchemaMethods();
 }

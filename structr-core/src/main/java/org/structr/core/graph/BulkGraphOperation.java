@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -33,7 +33,7 @@ public abstract class BulkGraphOperation<T> {
 
 	private static final Logger logger = LoggerFactory.getLogger(BulkGraphOperation.class.getName());
 
-	public abstract void handleGraphObject(SecurityContext securityContext, T obj) throws FrameworkException;
+	public abstract boolean handleGraphObject(SecurityContext securityContext, T obj) throws FrameworkException;
 
 	public void handleThrowable(final SecurityContext securityContext, final Throwable t, final T currentObject) {
 		logger.warn("Exception in bulk graph operation.", t);

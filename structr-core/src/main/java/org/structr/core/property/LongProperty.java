@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -111,7 +111,7 @@ public class LongProperty extends AbstractPrimitiveProperty<Long> implements Num
 
 				} catch (Throwable t) {
 
-					throw new FrameworkException(422, "Cannot parse input for property " + jsonName(), new NumberToken(declaringClass.getSimpleName(), LongProperty.this));
+					throw new FrameworkException(422, "Cannot parse input " + source + " for property " + jsonName(), new NumberToken(declaringClass.getSimpleName(), LongProperty.this));
 				}
 			}
 
@@ -146,8 +146,8 @@ public class LongProperty extends AbstractPrimitiveProperty<Long> implements Num
 	}
 
 	@Override
-	public void index(GraphObject entity, Object value) {
-		super.index(entity, fixDatabaseProperty(value));
+	public Object getIndexValue(final Object value) {
+		return fixDatabaseProperty(value);
 	}
 
 	// ----- CMIS support -----

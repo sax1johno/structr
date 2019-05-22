@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,12 +18,12 @@
  */
 package org.structr.core.entity;
 
-import java.util.HashSet;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
-import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.api.Predicate;
@@ -62,14 +62,19 @@ public class ManyEndpoint<T extends NodeInterface> extends AbstractEndpoint impl
 
 		if (rels != null) {
 
-			return Iterables.map(new Function<Relationship, T>() {
+			if (predicate != null && predicate.comparator() != null) {
 
-				@Override
-				public T apply(Relationship from) throws RuntimeException {
-					return nodeFactory.instantiate(from.getEndNode(), from);
-				}
+				final List<T> result = Iterables.toList(Iterables.map(from -> nodeFactory.instantiate(from.getEndNode(), from.getId()), rels));
 
-			}, sort(rels));
+				Collections.sort(result, predicate.comparator());
+
+				return result;
+
+			} else {
+
+				// sort relationships by id
+				return Iterables.map(from -> nodeFactory.instantiate(from.getEndNode(), from.getId()), rels);
+			}
 		}
 
 		return null;
@@ -90,7 +95,7 @@ public class ManyEndpoint<T extends NodeInterface> extends AbstractEndpoint impl
 		}
 
 		// create intersection of both sets
-		final Set<T> intersection = new HashSet<>(toBeCreated);
+		final Set<T> intersection = new LinkedHashSet<>(toBeCreated);
 		intersection.retainAll(toBeDeleted);
 
 		// intersection needs no change
@@ -102,10 +107,9 @@ public class ManyEndpoint<T extends NodeInterface> extends AbstractEndpoint impl
 			// remove existing relationships
 			for (T targetNode : toBeDeleted) {
 
-				for (AbstractRelationship rel : actualSourceNode.getOutgoingRelationships()) {
+				for (Iterator<AbstractRelationship> it = actualSourceNode.getOutgoingRelationships(relation.getClass()).iterator(); it.hasNext();) {
 
-					final String relTypeName    = rel.getRelType().name();
-					final String desiredRelType = relation.name();
+					final AbstractRelationship rel = it.next();
 
 					if (actualSourceNode.equals(targetNode)) {
 
@@ -114,8 +118,7 @@ public class ManyEndpoint<T extends NodeInterface> extends AbstractEndpoint impl
 						// skip self relationships
 						continue;
 					}
-
-					if (relTypeName.equals(desiredRelType) && rel.getTargetNode().equals(targetNode)) {
+					if (rel.getTargetNode().equals(targetNode)) {
 						app.delete(rel);
 					}
 				}

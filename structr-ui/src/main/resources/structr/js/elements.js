@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -112,53 +112,53 @@ var _Elements = {
 	mostUsedAttrs: [
 		{
 			elements: ['input', 'textarea'],
-			attrs: ['name', 'type', 'checked', 'selected', 'value', 'size', 'multiple', 'disabled', 'autofocus', 'placeholder'],
+			attrs: ['name', 'type', 'checked', 'selected', 'value', 'size', 'multiple', 'disabled', 'autofocus', 'placeholder', 'style'],
 			focus: 'type'
 		},
 		{
 			elements: ['button'],
-			attrs: ['name', 'type', 'checked', 'selected', 'value', 'size', 'multiple', 'disabled', 'autofocus', 'placeholder', 'onclick']
+			attrs: ['name', 'type', 'checked', 'selected', 'value', 'size', 'multiple', 'disabled', 'autofocus', 'placeholder', 'onclick', 'style']
 		},
 		{
 			elements: ['select', 'option'],
-			attrs: ['name', 'type', 'checked', 'selected', 'value', 'size', 'multiple', 'disabled', 'autofocus', 'placeholder']
+			attrs: ['name', 'type', 'checked', 'selected', 'value', 'size', 'multiple', 'disabled', 'autofocus', 'placeholder', 'style']
 		},
 		{
 			elements: ['optgroup'],
-			attrs: ['label', 'disabled'],
+			attrs: ['label', 'disabled', 'style'],
 			focus: 'label'
 		},
 		{
 			elements: ['form'],
-			attrs: ['action', 'method']
+			attrs: ['action', 'method', 'style']
 		},
 		{
 			elements: ['img'],
-			attrs: ['alt', 'title', 'src'],
+			attrs: ['alt', 'title', 'src', 'style'],
 			focus: 'src'
 		},
 		{
 			elements: ['script', 'img', 'object'],
-			attrs: ['type', 'rel', 'href', 'media', 'src'],
+			attrs: ['type', 'rel', 'href', 'media', 'src', 'style'],
 			focus: 'src'
 		},
 		{
 			elements: ['link'],
-			attrs: ['type', 'rel', 'href'],
+			attrs: ['type', 'rel', 'href', 'style'],
 			focus: 'href'
 		},
 		{
 			elements: ['a'],
-			attrs: ['type', 'rel', 'href', 'target'],
+			attrs: ['type', 'rel', 'href', 'target', 'style'],
 			focus: 'href'
 		},
 		{
 			elements: ['td', 'th'],
-			attrs: ['colspan', 'rowspan']
+			attrs: ['colspan', 'rowspan', 'style']
 		},
 		{
 			elements: ['label'],
-			attrs: ['for', 'form'],
+			attrs: ['for', 'form', 'style'],
 			focus: 'for'
 		},
 		{
@@ -168,7 +168,7 @@ var _Elements = {
 		},
 		{
 			elements: ['iframe'],
-			attrs: ['src', 'width', 'height'],
+			attrs: ['src', 'width', 'height', 'style'],
 			focus: 'src'
 		},
 		{
@@ -252,7 +252,7 @@ var _Elements = {
 		thead    : [ "tr" ],
 		tbody    : [ "tr" ],
 		tfoot    : [ "tr" ],
-		tr       : ["th", "td" ],
+		tr       : [ "th", "td" ],
 		ul       : [ "li" ],
 		ol       : [ "li" ],
 		dir      : [ "li" ],
@@ -303,7 +303,6 @@ var _Elements = {
 					});
 				});
 			});
-
 		}
 	},
 	reloadComponents: function() {
@@ -311,10 +310,13 @@ var _Elements = {
 		if (!componentsSlideout) return;
 		componentsSlideout.find(':not(.compTab)').remove();
 
+		componentsSlideout.append('<div class="" id="newComponentDropzone"><div class="new-component-info"><i class="active ' + _Icons.getFullSpriteClass(_Icons.add_icon) + '" /><i class="inactive ' + _Icons.getFullSpriteClass(_Icons.add_grey_icon) + '" /> Drop element here to create new shared component</div></div>');
+		let newComponentDropzone = $('#newComponentDropzone', componentsSlideout);
+
 		componentsSlideout.append('<div class="ver-scrollable" id="componentsArea"></div>');
 		components = $('#componentsArea', componentsSlideout);
 
-		components.droppable({
+		newComponentDropzone.droppable({
 			drop: function(e, ui) {
 				e.preventDefault();
 				e.stopPropagation();
@@ -342,7 +344,6 @@ var _Elements = {
 
 			_Elements.appendEntitiesToDOMElement(result, components);
 			Structr.refreshPositionsForCurrentlyActiveSortable();
-
 		});
 	},
 	createComponent: function(el) {
@@ -352,7 +353,7 @@ var _Elements = {
 		var sourceId = Structr.getId(sourceEl);
 		if (!sourceId) return false;
 		var obj = StructrModel.obj(sourceId);
-		if (obj && obj.syncedNodes && obj.syncedNodes.length || sourceEl.parent().attr('id') === 'componentsArea') {
+		if (obj && obj.syncedNodesIds && obj.syncedNodesIds.length || sourceEl.parent().attr('id') === 'componentsArea') {
 			_Logger.log(_LogType.ELEMENTS, 'component dropped on components area, aborting');
 			return false;
 		}
@@ -360,33 +361,53 @@ var _Elements = {
 		dropBlocked = false;
 
 	},
+	clearUnattachedNodes: function() {
+		elementsSlideout.find(':not(.compTab)').remove();
+	},
 	reloadUnattachedNodes: function() {
 
-		elementsSlideout.find(':not(.compTab)').remove();
-		elementsSlideout.append('<div class="ver-scrollable" id="elementsArea"></div>');
-		elements = $('#elementsArea', elementsSlideout);
+		if (elementsSlideout.hasClass('open')) {
 
-		elements.append('<button class="btn" id="delete-all-unattached-nodes">Delete all</button>');
+			_Elements.clearUnattachedNodes();
 
-		var btn = $('#delete-all-unattached-nodes');
-		btn.on('click', function() {
-			Structr.confirmation('<p>Delete all DOM elements without parent?</p>',
-					function() {
-						Command.deleteUnattachedNodes();
-						$.unblockUI({
-							fadeOut: 25
+			elementsSlideout.append('<div class="ver-scrollable" id="elementsArea"></div>');
+			elements = $('#elementsArea', elementsSlideout);
+
+			elements.append('<button class="btn action disabled" id="delete-all-unattached-nodes" disabled>Loading </button>');
+
+			var btn = $('#delete-all-unattached-nodes');
+			Structr.loaderIcon(btn, {
+				"max-height": "100%",
+				"height": "initial",
+				"width": "initial"
+			});
+			btn.on('click', function() {
+				Structr.confirmation('<p>Delete all DOM elements without parent?</p>',
+						function() {
+							Command.deleteUnattachedNodes();
+							$.unblockUI({
+								fadeOut: 25
+							});
+							Structr.closeSlideOuts([elementsSlideout]);
 						});
-						Structr.closeSlideOuts([elementsSlideout]);
-					});
-		});
+			});
 
-		_Dragndrop.makeSortable(elements);
+			_Dragndrop.makeSortable(elements);
 
-		Command.listUnattachedNodes(1000, 1, 'name', 'asc', function(result) {
+			Command.listUnattachedNodes(1000, 1, 'name', 'asc', function(result) {
 
-			_Elements.appendEntitiesToDOMElement(result, elements);
+				var count = result.length;
+				if (count > 0) {
+					btn.text('Delete all (' + count + ')');
+					btn.removeClass('disabled');
+					btn.prop('disabled', false);
+				} else {
+					btn.text('No unused elements');
+				}
 
-		});
+				_Elements.appendEntitiesToDOMElement(result, elements);
+			});
+		}
 
 	},
 	appendEntitiesToDOMElement: function (entities, domElement) {
@@ -460,8 +481,7 @@ var _Elements = {
 
 		div.append('<i class="typeIcon ' + _Icons.getFullSpriteClass(icon) + '" />'
 			+ '<b title="' + displayName + '" class="tag_ name_">' + fitStringToWidth(displayName, 200) + '</b><span class="id">' + entity.id + '</span>'
-			+ _Elements.classIdString(entity._html_id, entity._html_class)
-			+ '</div>');
+			+ _Elements.classIdString(entity._html_id, entity._html_class));
 
 		div.append('<i title="Clone ' + displayName + ' element ' + entity.id + '\" class="clone_icon button ' + _Icons.getFullSpriteClass(_Icons.clone_icon) + '" />');
 		$('.clone_icon', div).on('click', function(e) {
@@ -479,14 +499,14 @@ var _Elements = {
 		$('.delete_icon', div).on('click', function(e) {
 			e.stopPropagation();
 			_Entities.deleteNode(this, entity, true, function() {
-				var synced = entity.syncedNodes;
+				var synced = entity.syncedNodesIds;
 				if (synced && synced.length) {
 					synced.forEach(function(id) {
 						var el = Structr.node(id);
 						if (el && el.children && el.children.length) {
 							var newSpriteClass = _Icons.getSpriteClassOnly(_Icons.brick_icon);
 							el.children('i.typeIcon').each(function (i, el) {
-								_Icons.updateSpritasdeClassTo(el, newSpriteClass);
+								_Icons.updateSpriteClassTo(el, newSpriteClass);
 							});
 						}
 					});
@@ -494,9 +514,9 @@ var _Elements = {
 			});
 		});
 
-		_Entities.setMouseOver(div, undefined, ((entity.syncedNodes&&entity.syncedNodes.length)?entity.syncedNodes:[entity.sharedComponent]));
+		_Entities.setMouseOver(div, undefined, ((entity.syncedNodesIds&&entity.syncedNodesIds.length)?entity.syncedNodesIds:[entity.sharedComponentId]));
 
-		if (!hasChildren && !entity.sharedComponent) {
+		if (!hasChildren && !entity.sharedComponentId) {
 			_Entities.appendEditSourceIcon(div, entity);
 		}
 
@@ -505,23 +525,29 @@ var _Elements = {
 		if (entity.tag === 'a' || entity.tag === 'link' || entity.tag === 'script' || entity.tag === 'img' || entity.tag === 'video' || entity.tag === 'object') {
 
 			div.append('<i title="Edit Link" class="link_icon button ' + _Icons.getFullSpriteClass(_Icons.link_icon) + '" />');
-			if (entity.linkable) {
-				div.append('<span class="linkable">' + entity.linkable + '</span>');
-			}
+			if (entity.linkableId) {
 
-			$('.linkable', div).on('click', function(e) {
-				e.stopPropagation();
+				Command.get(entity.linkableId, 'id,type,name,isFile,isPage', function(linkedEntity) {
 
-				var file = {'name': entity.linkable, 'id': entity.linkableId};
+					div.append('<span class="linkable">' + linkedEntity.name + '</span>');
 
-				Structr.dialog('Edit ' + file.name, function() {
-					_Logger.log(_LogType.ELEMENTS, 'content saved');
-				}, function() {
-					_Logger.log(_LogType.ELEMENTS, 'cancelled');
+					if (linkedEntity.isFile) {
+
+						$('.linkable', div).on('click', function(e) {
+							e.stopPropagation();
+
+							var file = {'name': linkedEntity.name, 'id': linkedEntity.id};
+
+							Structr.dialog('Edit ' + file.name, function() {
+								_Logger.log(_LogType.ELEMENTS, 'content saved');
+							}, function() {
+								_Logger.log(_LogType.ELEMENTS, 'cancelled');
+							});
+							_Files.editContent(this, file, $('#dialogBox .dialogText'));
+						});
+					}
 				});
-				_Files.editContent(this, file, $('#dialogBox .dialogText'));
-
-			});
+			}
 
 			$('.link_icon', div).on('click', function(e) {
 				e.stopPropagation();
@@ -569,7 +595,7 @@ var _Elements = {
 
 					_Pager.initPager('folders-to-link', 'Folder', 1, 25);
 					_Pager.initFilters('folders-to-link', 'Folder', { hasParent: false });
-					var linkFolderPager = _Pager.addPager('folders-to-link', foldersToLink, true, 'Folder', 'public', function(folders) {
+					var linkFolderPager = _Pager.addPager('folders-to-link', foldersToLink, true, 'Folder', 'ui', function(folders) {
 
 						folders.forEach(function(folder) {
 
@@ -602,8 +628,8 @@ var _Elements = {
 					linkFolderPager.pager.append('<input type="checkbox" class="filter" data-attribute="hasParent" hidden>');
 					linkFolderPager.activateFilterElements();
 
-					_Pager.initPager('files-to-link', 'FileBase', 1, 25);
-					var linkFilesPager = _Pager.addPager('files-to-link', filesToLink, true, 'FileBase', 'public', function(files) {
+					_Pager.initPager('files-to-link', 'File', 1, 25);
+					var linkFilesPager = _Pager.addPager('files-to-link', filesToLink, true, 'File', 'ui', function(files) {
 
 						files.forEach(function(file) {
 
@@ -630,7 +656,7 @@ var _Elements = {
 					var imagesToLink = $('#imagesToLink');
 
 					_Pager.initPager('images-to-link', 'Image', 1, 25);
-					_Pager.addPager('images-to-link', imagesToLink, false, 'Image', 'public', function(images) {
+					_Pager.addPager('images-to-link', imagesToLink, false, 'Image', 'ui', function(images) {
 
 						images.forEach(function(image) {
 
@@ -651,8 +677,8 @@ var _Elements = {
 		return div;
 	},
 	getElementIcon:function(element) {
-		var isComponent = element.sharedComponent || (element.syncedNodes && element.syncedNodes.length);
-		var isActiveNode = element.isActiveNode();
+		var isComponent = element.sharedComponentId || (element.syncedNodesIds && element.syncedNodesIds.length);
+		var isActiveNode = (typeof element.isActiveNode === "function") ? element.isActiveNode() : false;
 
 		return (isActiveNode ? _Icons.repeater_icon : (isComponent ? _Icons.comp_icon : _Icons.brick_icon));
 	},
@@ -684,7 +710,7 @@ var _Elements = {
 			subDiv.on('click', function(e) {
 				if (!subDiv.children('.node').length) {
 					e.stopPropagation();
-					Command.get(subFolder.id, "id,files,folders", function(node) {
+					Command.get(subFolder.id, 'id,name,files,folders', function(node) {
 						_Elements.expandFolder(e, entity, node, callback);
 					});
 				} else {
@@ -703,7 +729,7 @@ var _Elements = {
 
 		$.each(folder.files, function(i, f) {
 
-			Command.get(f.id, "id,name,contentType,linkingElements", function(file) {
+			Command.get(f.id, 'id,name,contentType,linkingElements', function(file) {
 
 				$('.' + folder.id + '_').append('<div class="clear"></div><div class="node file sub ' + file.id + '_"><i class="fa ' + _Icons.getFileIconClass(file) + '"></i> '
 						+ '<b title="' + file.name + '" class="name_">' + file.name + '</b></div>');
@@ -718,7 +744,7 @@ var _Elements = {
 	},
 	handleLinkableElement: function (div, entityToLinkTo, linkableObject) {
 
-		if (isIn(entityToLinkTo.id, linkableObject.linkingElements)) {
+		if (isIn(entityToLinkTo.id, linkableObject.linkingElementsIds)) {
 			div.addClass('nodeActive');
 		}
 
@@ -729,6 +755,15 @@ var _Elements = {
 			if (div.hasClass('nodeActive')) {
 				Command.setProperty(entityToLinkTo.id, 'linkableId', null);
 			} else {
+
+				var attrName = (entityToLinkTo.type === 'Link') ? '_html_href' : '_html_src';
+
+				Command.getProperty(entityToLinkTo.id, attrName, function(val) {
+					if (!val || val === '') {
+						Command.setProperty(entityToLinkTo.id, attrName, '${link.path}', null);
+					}
+				});
+
 				Command.link(entityToLinkTo.id, linkableObject.id);
 			}
 
@@ -779,15 +814,14 @@ var _Elements = {
 
 		var leftOrRight = 'left';
 		var topOrBottom = 'top';
-		var x = (e.pageX - 8);
-		var y = (div.offset().top - 58);
+		var x = (e.clientX - 8);
+		var y = div.offset().top;
 
 		if (e.pageX > ($(window).width() / 2)) {
 			leftOrRight = 'right';
 		}
 
 		if (e.pageY > ($(window).height() - menuHeight)) {
-			topOrBottom = 'bottom';
 			y -= 20 + menuHeight - ($(window).height() - e.pageY);
 		}
 
@@ -831,7 +865,7 @@ var _Elements = {
 					var pageId = (entity.type === 'Page') ? entity.id : entity.pageId;
 					var tagName = (itemText === 'content') ? null : itemText;
 
-					Command.createAndAppendDOMNode(pageId, entity.id, tagName, {}, _Elements.isInheritVisibililtyFlagsChecked());
+					Command.createAndAppendDOMNode(pageId, entity.id, tagName, _Dragndrop.getAdditionalDataForElementCreation(tagName), _Elements.isInheritVisibililtyFlagsChecked());
 				}
 
 				_Elements.removeContextMenu();
@@ -926,7 +960,7 @@ var _Elements = {
 			var pageId = isPage ? entity.id : entity.pageId;
 			var tagName = (itemText === 'content') ? null : itemText;
 
-			Command.createAndAppendDOMNode(pageId, entity.id, tagName, {}, _Elements.isInheritVisibililtyFlagsChecked());
+			Command.createAndAppendDOMNode(pageId, entity.id, tagName, _Dragndrop.getAdditionalDataForElementCreation(tagName), _Elements.isInheritVisibililtyFlagsChecked());
 		};
 
 		var handleWrapInHTMLAction = function (itemText) {
@@ -967,7 +1001,7 @@ var _Elements = {
 			elements.push({
 				name: 'Insert div element',
 				clickHandler: function() {
-					Command.createAndAppendDOMNode(entity.pageId, entity.id, 'div', {}, _Elements.isInheritVisibililtyFlagsChecked());
+					Command.createAndAppendDOMNode(entity.pageId, entity.id, 'div', _Dragndrop.getAdditionalDataForElementCreation('div'), _Elements.isInheritVisibililtyFlagsChecked());
 					return false;
 				}
 			});
@@ -1001,9 +1035,10 @@ var _Elements = {
 			});
 		}
 
-		appendSeparator();
 
 		if (!isPage) {
+
+			appendSeparator();
 
 			if (_Elements.selectedEntity && _Elements.selectedEntity.id === entity.id) {
 				elements.push({
@@ -1018,6 +1053,19 @@ var _Elements = {
 					name: 'Select element',
 					clickHandler: function() {
 						_Elements.selectEntity(entity);
+						return false;
+					}
+				});
+			}
+
+			var isEntitySharedComponent = entity.sharedComponent || entity.pageId === shadowPage.id;
+			if (!isEntitySharedComponent) {
+				appendSeparator();
+
+				elements.push({
+					name: 'Convert to Shared Component',
+					clickHandler: function() {
+						Command.createComponent(entity.id);
 						return false;
 					}
 				});
@@ -1051,7 +1099,9 @@ var _Elements = {
 					}
 				});
 
-			} else if ( !isPage || (isPage && !hasChildren && (_Elements.selectedEntity.tag === 'html' || _Elements.selectedEntity.type === 'Template')) ) {
+			}
+
+			if ( !isPage || (isPage && !hasChildren && (_Elements.selectedEntity.tag === 'html' || _Elements.selectedEntity.type === 'Template')) ) {
 				elements.push({
 					name: 'Clone selected element here',
 					clickHandler: function() {
@@ -1118,7 +1168,7 @@ var _Elements = {
 				{
 					name: 'Access Control and Visibility',
 					clickHandler: function() {
-						_Entities.showAccessControlDialog(entity.id);
+						_Entities.showAccessControlDialog(entity);
 						return false;
 					}
 				},
@@ -1303,7 +1353,7 @@ var _Elements = {
 
 		var icon = _Elements.getContentIcon(entity);
 		var html = '<div id="id_' + entity.id + '" class="node content ' + (isActiveNode ? ' activeNode' : 'staticNode') + (_Elements.isEntitySelected(entity) ? ' nodeSelectedFromContextMenu' : '') + '">'
-				+ '<i class="typeIcon ' + _Icons.getFullSpriteClass(icon) + '" />'
+				+ '<i class="typeIcon ' + _Icons.getFullSpriteClass(icon) + ' typeIcon-nochildren" />'
 				+ (name ? ('<b title="' + displayName + '" class="tag_ name_">' + fitStringToWidth(displayName, 200) + '</b>') : ('<div class="content_">' + escapeTags(entity.content) + '</div>'))
 				+ '<span class="id">' + entity.id + '</span>'
 				+ '</div>';
@@ -1341,12 +1391,7 @@ var _Elements = {
 			_Entities.deleteNode(this, entity);
 		});
 
-		div.append('<i title="Edit Content of ' + (entity.name ? entity.name : entity.id) + '" class="edit_icon button ' + _Icons.getFullSpriteClass(_Icons.edit_icon) + '" />');
-		$('.edit_icon', div).on('click', function(e) {
-			e.stopPropagation();
-			_Elements.openEditContentDialog(this, entity);
-			return false;
-		});
+		_Elements.appendEditContentIcon(div, entity);
 
 		$('.content_', div).on('click', function(e) {
 			e.stopPropagation();
@@ -1354,7 +1399,7 @@ var _Elements = {
 			return false;
 		});
 
-		_Entities.setMouseOver(div, undefined, ((entity.syncedNodes && entity.syncedNodes.length) ? entity.syncedNodes : [entity.sharedComponent]));
+		_Entities.setMouseOver(div, undefined, ((entity.syncedNodesIds && entity.syncedNodesIds.length) ? entity.syncedNodesIds : [entity.sharedComponentId]));
 
 		_Entities.appendEditPropertiesIcon(div, entity);
 
@@ -1363,10 +1408,20 @@ var _Elements = {
 	getContentIcon:function(content) {
 		var isComment = (content.type === 'Comment');
 		var isTemplate = (content.type === 'Template');
-		var isComponent = content.sharedComponent || (content.syncedNodes && content.syncedNodes.length);
+		var isComponent = content.sharedComponentId || (content.syncedNodesIds && content.syncedNodesIds.length);
 		var isActiveNode = content.isActiveNode();
 
 		return isComment ? _Icons.comment_icon : ((isTemplate && isComponent) ? _Icons.comp_templ_icon : (isTemplate ? (isActiveNode ? _Icons.active_template_icon : _Icons.template_icon) : (isComponent ? _Icons.active_content_icon : (isActiveNode ? _Icons.active_content_icon : _Icons.content_icon))));
+	},
+	appendEditContentIcon: function(div, entity) {
+
+		div.append('<i title="Edit Content of ' + (entity.name ? entity.name : entity.id) + '" class="edit_icon button ' + _Icons.getFullSpriteClass(_Icons.edit_icon) + '" />');
+		$('.edit_icon', div).on('click', function(e) {
+			e.stopPropagation();
+			_Elements.openEditContentDialog(this, entity);
+			return false;
+		});
+
 	},
 	openEditContentDialog: function(btn, entity) {
 		Structr.dialog('Edit content of ' + (entity.name ? entity.name : entity.id), function() {
@@ -1581,8 +1636,8 @@ var _Elements = {
 			Command.patch(entity.id, text1, text2, function() {
 				Structr.showAndHideInfoBoxMessage('Content saved.', 'success', 2000, 200);
 				_Pages.reloadPreviews();
-				dialogSaveButton.prop("disabled", true).addClass('disabled');
-				saveAndClose.prop("disabled", true).addClass('disabled');
+				dialogSaveButton.prop('disabled', true).addClass('disabled');
+				saveAndClose.prop('disabled', true).addClass('disabled');
 				Command.getProperty(entity.id, 'content', function(newText) {
 					text = newText;
 				});

@@ -3,36 +3,41 @@
 	<head>
 		<title id="title">Structr</title>
 		<!-- Structr is released under the <a href="agplv3.html">AGPLv3</a>-->
-		<meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
-		<meta name="viewport" content="width=1024, user-scalable=yes" />
-		<link rel="stylesheet" type="text/css" media="screen" href="css/lib/jquery-ui-1.10.3.custom.min.css" >
-		<link rel="stylesheet" type="text/css" media="screen" href="css/lib/jquery.terminal-0.11.11.min.css" >
-		<link rel="stylesheet" type="text/css" media="screen" href="css/lib/chosen.min.css" >
-		<link rel="stylesheet" type="text/css" media="screen" href="css/lib/jstree-3.2.1.min.css" >
+		<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+		<meta name="viewport" content="width=1024, user-scalable=yes"/>
+		<link rel="stylesheet" type="text/css" media="screen" href="css/lib/jquery-ui-1.10.3.custom.min.css">
+		<link rel="stylesheet" type="text/css" media="screen" href="css/lib/jquery.terminal-1.12.1.min.css">
+		<link rel="stylesheet" type="text/css" media="screen" href="css/lib/chosen.min.css">
+		<link rel="stylesheet" type="text/css" media="screen" href="css/lib/select2.min.css">
+		<link rel="stylesheet" type="text/css" media="screen" href="css/lib/jstree.min.css">
 		<link rel="stylesheet" type="text/css" href="css/lib/font-awesome.min.css">
 		<link rel="stylesheet" href="codemirror/lib/codemirror.css">
 		<link rel="stylesheet" href="codemirror/addon/dialog/dialog.css">
 		<link rel="stylesheet" href="codemirror/addon/hint/show-hint.css">
 		<link rel="stylesheet" href="codemirror/addon/search/matchesonscrollbar.css">
 		<link rel="stylesheet" href="trumbowyg/ui/trumbowyg.min.css">
-		<link rel="stylesheet" type="text/css" media="screen" href="css/main.css" >
-		<link rel="stylesheet" type="text/css" media="screen" href="css/crud.css" >
-		<link rel="stylesheet" type="text/css" media="screen" href="css/graph_editor.css" >
-		<link rel="stylesheet" type="text/css" media="screen" href="css/app-builder.css" >
-		<link rel="stylesheet" type="text/css" media="screen" href="css/lib/cropper.min.css" >
+		<link rel="stylesheet" type="text/css" media="screen" href="css/main.css">
+		<link rel="stylesheet" type="text/css" media="screen" href="css/sprites.css">
+		<link rel="stylesheet" type="text/css" media="screen" href="css/crud.css">
+		<link rel="stylesheet" type="text/css" media="screen" href="css/dialogs.css">
+		<link rel="stylesheet" type="text/css" media="screen" href="css/graph_editor.css">
+		<link rel="stylesheet" type="text/css" media="screen" href="css/lib/cropper.min.css">
+		<link rel="stylesheet" type="text/css" media="screen" href="css/flow-editor.css">
+		<link rel="stylesheet" type="text/css" media="screen" href="css/simple-pages.css">
 		<link rel="icon" href="favicon.ico" type="image/x-icon">
-		<script src="js/lib/jquery-1.11.1.min.js"></script>
+		<script src="js/lib/jquery-3.3.1.min.js"></script>
 		<script src="js/lib/jquery-ui-1.11.0.custom.min.js"></script>
 		<script src="js/lib/chosen.jquery.min.js"></script>
+		<script src="js/lib/select2.min.js"></script>
 		<script src="js/lib/jquery-chosen-sortable.js"></script>
 		<script src="js/lib/moment-with-locales.min.js"></script>
 		<script src="js/lib/moment-jdateformatparser.min.js"></script>
 		<script src="js/lib/dateformatconverter.js"></script>
 		<script src="js/lib/jquery-ui-timepicker-addon.js"></script>
 		<script src="js/lib/jquery-ui-idrop.js"></script>
-		<script src="js/lib/jquery.terminal-0.11.11.min.js"></script>
+		<script src="js/lib/jquery.terminal-1.12.1.min.js"></script>
 		<script src="js/lib/jquery.mousewheel.js"></script>
-		<script src="js/lib/jstree-3.2.1.min.js"></script>
+		<script src="js/lib/jstree.min.js"></script>
 		<script src="js/lib/diff_match_patch.js"></script>
 		<script src="js/lib/jquery.blockUI.js"></script>
 		<script src="js/lib/js.cookie.js"></script>
@@ -40,18 +45,21 @@
 		<script src="js/lib/uuid.js"></script>
 		<script src="js/lib/dagre.min.js"></script>
 		<script src="js/lib/papaparse.min.js"></script>
-
 		<script src="js/lib/linkurious/sigma.min.js"></script>
 		<script src="js/lib/linkurious/plugins.min.js"></script>
 		<script src="js/lib/graphbrowser/graph-browser.js"></script>
-
 		<script src="js/lib/clipboard.min.js"></script>
 
-		<script src="codemirror/codemirror-compressed.js"></script>
+		<script src="codemirror/lib/codemirror.js"></script>
 		<script src="codemirror/addon/scroll/annotatescrollbar.js"></script>
 		<script src="codemirror/addon/search/matchesonscrollbar.js"></script>
+		<script src="codemirror/addon/search/search.js"></script>
 		<script src="codemirror/addon/dialog/dialog.js"></script>
 		<script src="codemirror/addon/hint/show-hint.js"></script>
+		<script src="codemirror/mode/xml/xml.js"></script>
+		<script src="codemirror/mode/htmlembedded/htmlembedded.js"></script>
+		<script src="codemirror/mode/clike/clike.js"></script>
+		<script src="codemirror/mode/javascript/javascript.js"></script>
 		<script src="trumbowyg/trumbowyg.min.js"></script>
 
 		<script src="js/lib/cropper/cropper.min.js"></script>
@@ -61,6 +69,7 @@
 		<script src="js/dragndrop.js"></script>
 		<script src="js/websocket.js"></script>
 		<script src="js/command.js"></script>
+		<script src="js/dialogs.js"></script>
 		<script src="js/entities.js"></script>
 		<script src="js/crud.js"></script>
 		<script src="js/security.js"></script>
@@ -70,6 +79,7 @@
 		<script src="js/elements.js"></script>
 		<script src="js/contents.js"></script>
 		<script src="js/files.js"></script>
+		<script src="js/code.js"></script>
 		<script src="js/dashboard.js"></script>
 		<script src="js/graph.js"></script>
 		<script src="js/model.js"></script>
@@ -83,6 +93,10 @@
 		<script src="js/importer.js"></script>
 		<script src="js/virtual-types.js"></script>
 		<script src="js/mail-templates.js"></script>
+		<script src="js/refactoring-helper.js"></script>
+		<script src="js/simple-pages.js"></script>
+		<script src="js/apps.js"></script>
+		<script src="js/flows.js" type="module"></script>
 	</head>
 	<body>
 		<div id="info-area" class="blockMsg"></div>
@@ -94,19 +108,23 @@
 						<i class="sprite sprite-hamburger_white"></i>
 						<ul id="submenu">
 							<li data-name="Dashboard"><a id="dashboard_" href="#dashboard" data-activate-module="dashboard">Dashboard</a></li>
+							<li data-name="Apps"><a id="apps_" href="#apps" data-activate-module="apps">Apps</a></li>
 							<li data-name="Graph"><a id="graph_" href="#graph" data-activate-module="graph">Graph</a></li>
 							<li data-name="Contents"><a id="contents_" href="#contents" data-activate-module="contents">Contents</a></li>
+							<li data-name="Simple Pages"><a id="simple-pages_" href="#simple-pages" data-activate-module="simple-pages">Simple Pages</a></li>
 							<li data-name="Pages"><a id="pages_" href="#pages" data-activate-module="pages">Pages</a></li>
 							<li data-name="Files"><a id="files_" href="#files" data-activate-module="files">Files</a></li>
 							<li data-name="Security"><a id="security_" href="#security" data-activate-module="security">Security</a></li>
 							<li data-name="Schema"><a id="schema_" href="#schema" data-activate-module="schema">Schema</a></li>
+							<li data-name="Code"><a id="code_" href="#code" data-activate-module="code">Code</a></li>
+							<li data-name="Flows" class="module-dependend" data-structr-module="api-builder"><a id="flows_" href="#flows" data-activate-module="flows">Flows</a></li>
 							<li data-name="Data"><a id="crud_" href="#crud" data-activate-module="crud">Data</a></li>
 							<li data-name="Importer"><a id="importer_" href="#importer" data-activate-module="importer">Importer</a></li>
 							<li data-name="Crawler" class="module-dependend" data-structr-module="crawler"><a id="crawler_" href="#crawler" data-activate-module="crawler">Crawler</a></li>
 							<li data-name="Localization"><a id="localization_" href="#localization" data-activate-module="localization">Localization</a></li>
 							<li data-name="Virtual Types" class="module-dependend" data-structr-module="api-builder"><a id="virtual-types_" href="#virtual-types" data-activate-module="virtual-types">Virtual Types</a></li>
 							<li data-name="Mail Templates" class="edition-dependend" data-structr-edition="Enterprise"><a id="mail-templates_" href="#mail-templates" data-activate-module="mail-templates">Mail Templates</a></li>
-							<li data-name="Login"><a id="logout_" href="#">Login</a></li>
+							<li data-name="Login"><a id="logout_" href="javascript:void(0)">Login</a></li>
 						</ul>
 					</li>
 				</ul>
@@ -132,12 +150,25 @@
 			<i title="Structr Logo" class="logo-login sprite sprite-structr_gray_100x27"></i>
 
 			<form action="javascript:void(0)">
-				<table>
+				<table class="username-password">
 					<tr><td><label for="usernameField">Username:</label></td><td><input id="usernameField" type="text" name="username" autofocus required></td></tr>
 					<tr><td><label for="passwordField">Password:</label></td><td><input id="passwordField" type="password" name="password" required></td></tr>
 					<tr><td colspan="2" class="btn"><span id="errorText"></span></td></tr>
-					<tr><td colspan="2" class="btn"><button id="loginButton" name="login"><i class="sprite sprite-key"></i> Login</button></td></tr>
+					<tr class="username-pw"><td colspan="2" class="btn"><button id="loginButton" name="login"><i class="sprite sprite-key"></i> Login</button></td></tr>
 				</table>
+			</form>
+			<form action="javascript:void(0)">
+				<div id="two-factor" style="display:none;">
+					<div id="two-factor-qr-code" style="display:none;">
+						<div><img></div>
+						<div id="two-factor-qr-info">Scan this QR Code with a Google Authenticator compatible app to log in.</div>
+					</div>
+					<table>
+						<tr><td><label for="twoFactorTokenField">Two-Factor Code:</label></td><td><input id="twoFactorTokenField" type="hidden" name="twoFactorToken"><input id="twoFactorCodeField" type="text" name="twoFactorCode" required></td></tr>
+						<tr><td colspan="2" class="btn"><span id="errorText-two-factor"></span></td></tr>
+						<tr><td colspan="2" class="btn"><button id="loginButtonTFA" name="login"><i class="sprite sprite-key"></i> Login 2FA</button></td></tr>
+					</table>
+				</div>
 			</form>
 		</div>
 

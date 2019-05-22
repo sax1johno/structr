@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,7 +20,6 @@ package org.structr.bolt.index;
 
 import java.util.Map;
 import org.neo4j.driver.v1.types.Node;
-import org.structr.api.QueryResult;
 import org.structr.bolt.BoltDatabaseService;
 import org.structr.bolt.SessionTransaction;
 
@@ -28,14 +27,15 @@ import org.structr.bolt.SessionTransaction;
  */
 public class NodeResultStream extends AbstractResultStream<Node> {
 
-	public NodeResultStream(final BoltDatabaseService db, final PageableQuery query) {
+	public NodeResultStream(final BoltDatabaseService db, final CypherQuery query) {
 		super(db, query);
 	}
 
 	@Override
-	protected QueryResult<Node> fetchData(final BoltDatabaseService db, final String statement, final Map<String, Object> data) {
+	protected Iterable<Node> fetchData(final BoltDatabaseService db, final String statement, final Map<String, Object> data) {
 
 		final SessionTransaction tx = db.getCurrentTransaction();
+		tx.setIsPing(getQuery().getQueryContext().isPing());
 		return tx.getNodes(statement, data);
 	}
 }

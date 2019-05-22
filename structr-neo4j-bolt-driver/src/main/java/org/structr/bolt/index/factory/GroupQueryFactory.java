@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,40 +19,97 @@
 package org.structr.bolt.index.factory;
 
 import org.structr.api.search.GroupQuery;
-import org.structr.api.search.Occurrence;
 import org.structr.api.search.QueryPredicate;
+import org.structr.api.search.TypeQuery;
+
+import java.util.Iterator;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.structr.api.index.AbstractIndex;
+import org.structr.api.index.AbstractQueryFactory;
 import org.structr.bolt.index.AdvancedCypherQuery;
 
 /**
  *
  */
-public class GroupQueryFactory extends AbstractQueryFactory {
+public class GroupQueryFactory extends AbstractQueryFactory<AdvancedCypherQuery> {
+
+	public GroupQueryFactory(final AbstractIndex index) {
+		super(index);
+	}
 
 	@Override
-	public boolean createQuery(final QueryFactory parent, final QueryPredicate predicate, final AdvancedCypherQuery query, final boolean isFirst) {
+	public boolean createQuery(final QueryPredicate predicate, final AdvancedCypherQuery query, final boolean isFirst) {
 
 		if (predicate instanceof GroupQuery) {
 
-			if (predicate.getOccurrence().equals(Occurrence.FORBIDDEN)) {
-				query.not();
-			}
-
-			//query.beginGroup();
-
 			final GroupQuery group   = (GroupQuery)predicate;
-			boolean first            = isFirst;
 
-			for (final QueryPredicate attr : group.getQueryPredicates()) {
+			// Filter type predicates since they require special handling
+			final List<QueryPredicate> predicateList               = group.getQueryPredicates();
+			final List<QueryPredicate> typePredicates              = predicateList.stream().filter((p) -> { return p instanceof TypeQuery; }).collect(Collectors.toList());
+			final List<QueryPredicate> attributeAndGroupPredicates = predicateList.stream().filter((p) -> { return !(p instanceof TypeQuery); }).collect(Collectors.toList());
 
-				if (parent.createQuery(parent, attr, query, first)) {
+			// Apply all type queries first as they affect as different part of the query expression
+			for (final QueryPredicate p : typePredicates) {
 
-					first = false;
-				}
+				index.createQuery(p, query, isFirst);
 			}
 
-			//query.endGroup();
+			// Apply any group and attribute predicates, if existent
+			if (!attributeAndGroupPredicates.isEmpty()) {
 
-			return !first;
+				// Check if any child group contains elements
+				boolean allChildrenAreGroups = true;
+				boolean nonEmptyGroup        = false;
+
+				for (QueryPredicate p : attributeAndGroupPredicates) {
+
+					if (p instanceof GroupQuery) {
+
+						final List<QueryPredicate> containedPredicates = ((GroupQuery)p).getQueryPredicates();
+						if (containedPredicates.size() > 0) {
+
+							nonEmptyGroup = true;
+						}
+					} else {
+						allChildrenAreGroups = false;
+					}
+				}
+
+				if (!(allChildrenAreGroups && !nonEmptyGroup)) {
+					checkOccur(query, predicate.getOccurrence(), isFirst);
+				}
+
+				if (attributeAndGroupPredicates.size() > 1 && !(allChildrenAreGroups && !nonEmptyGroup)) {
+					query.beginGroup();
+				}
+
+				boolean firstWithinGroup = true;
+
+				Iterator<QueryPredicate> it = attributeAndGroupPredicates.iterator();
+
+				while (it.hasNext()) {
+
+					if (index.createQuery(it.next(), query, firstWithinGroup)) {
+
+						firstWithinGroup = false;
+					}
+				}
+
+				if (attributeAndGroupPredicates.size() > 1 && !(allChildrenAreGroups && !nonEmptyGroup)) {
+					query.endGroup();
+				}
+
+				if (allChildrenAreGroups && !nonEmptyGroup) {
+					return false;
+				} else {
+					return true;
+				}
+
+			}
+
+			return false;
 		}
 
 		return false;

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -66,7 +66,7 @@ public class ClearDatabase extends NodeServiceCommand {
 			final long deletedNodes = bulkGraphOperation(securityContext, nodeIterator, 1000, "ClearDatabase", new BulkGraphOperation<NodeInterface>() {
 
 				@Override
-				public void handleGraphObject(SecurityContext securityContext, NodeInterface node) {
+				public boolean handleGraphObject(SecurityContext securityContext, NodeInterface node) {
 
 					// Delete only "our" nodes
 					if (node.getProperty(GraphObject.id) != null) {
@@ -78,6 +78,8 @@ public class ClearDatabase extends NodeServiceCommand {
 							logger.warn("Unable to delete node {}: {}", new Object[] { node.getUuid(), fex.getMessage() } );
 						}
 					}
+
+					return true;
 				}
 
 				@Override

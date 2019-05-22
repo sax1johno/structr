@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,13 +19,14 @@
 package org.structr.websocket.command;
 
 import java.util.List;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.util.Iterables;
 import org.structr.common.error.FrameworkException;
+import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
+import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.TransactionCommand;
-import org.structr.core.property.PropertyMap;
 import org.structr.web.entity.ContentContainer;
 import org.structr.web.entity.ContentItem;
 import org.structr.websocket.StructrWebSocket;
@@ -50,9 +51,10 @@ public class AppendContentItemCommand extends AbstractCommand {
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
+		setDoTransactionNotifications(true);
+
 		String id                    = webSocketData.getId();
-		Map<String, Object> nodeData = webSocketData.getNodeData();
-		String parentId              = (String) nodeData.get("parentId");
+		String parentId              = webSocketData.getNodeDataStringValue("parentId");
 
 		// check node to append
 		if (id == null) {
@@ -95,18 +97,37 @@ public class AppendContentItemCommand extends AbstractCommand {
 
 		if (parentNode instanceof ContentContainer) {
 
-			ContentContainer container = (ContentContainer) parentNode;
+			final ContentContainer container = (ContentContainer) parentNode;
+			final NodeInterface node         = (NodeInterface) getNode(id);
 
-			ContentItem item = (ContentItem) getNode(id);
-
-			if (item != null) {
+			if (node != null) {
 
 				try {
-					final List<ContentItem> items = container.getProperty(ContentContainer.items);
-					items.add(item);
-					container.setProperties(container.getSecurityContext(), new PropertyMap(ContentContainer.items, items));
 
-					TransactionCommand.registerNodeCallback(item, callback);
+					if (node instanceof ContentItem) {
+
+						final ContentItem item = (ContentItem) node;
+
+						final List<ContentItem> items = Iterables.toList(container.getItems());
+
+						items.add(item);
+
+						container.setProperty(StructrApp.key(ContentContainer.class, "items"), items);
+
+					} else if (node instanceof ContentContainer) {
+
+						final ContentContainer child = (ContentContainer) node;
+
+						child.setProperty(StructrApp.key(ContentContainer.class, "parent"), container);
+
+					} else {
+
+						// send exception
+						getWebSocket().send(MessageBuilder.status().code(422).message("Given object is not of type ContentItem or ContentContainer").build(), true);
+						return;
+					}
+
+					TransactionCommand.registerNodeCallback(node, callback);
 
 				} catch (FrameworkException ex) {
 					logger.error("", ex);
@@ -114,13 +135,11 @@ public class AppendContentItemCommand extends AbstractCommand {
 				}
 			}
 
-
 		} else {
 
 			// send exception
 			getWebSocket().send(MessageBuilder.status().code(422).message("Parent node is not instance of ContentContainer").build(), true);
 		}
-
 	}
 
 	@Override

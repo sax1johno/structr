@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,41 +18,36 @@
  */
 package org.structr.core.function;
 
-import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import static org.structr.core.function.Functions.cleanString;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class CleanFunction extends Function<Object, Object> {
+public class CleanFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_CLEAN = "Usage: ${clean(string)}. Example: ${clean(this.stringWithNonWordChars)}";
 
 	@Override
 	public String getName() {
-		return "clean()";
+		return "clean";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
 		try {
-			if (!arrayHasLengthAndAllElementsNotNull(sources, 1)) {
-				
-				return null;
-			}
 
-			if (sources[0] instanceof Collection) {
+			assertArrayHasLengthAndAllElementsNotNull(sources, 1);
+
+			if (sources[0] instanceof Iterable) {
 
 				final List<String> cleanList = new LinkedList<>();
 
-				for (final Object obj : (Collection)sources[0]) {
+				for (final Object obj : (Iterable)sources[0]) {
 
 					if (StringUtils.isBlank(obj.toString())) {
 
@@ -61,7 +56,6 @@ public class CleanFunction extends Function<Object, Object> {
 					} else {
 
 						cleanList.add(cleanString(obj));
-
 					}
 				}
 
@@ -74,15 +68,17 @@ public class CleanFunction extends Function<Object, Object> {
 
 			return cleanString(sources[0]);
 
-		} catch (final IllegalArgumentException e) {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			// silently ignore null arguments
+			return null;
+
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
-
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {
@@ -93,5 +89,4 @@ public class CleanFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Cleans the given string";
 	}
-
 }

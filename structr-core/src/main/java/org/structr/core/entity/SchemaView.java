@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,11 +18,11 @@
  */
 package org.structr.core.entity;
 
-import java.util.List;
 import org.structr.common.PropertyView;
 import org.structr.common.View;
 import org.structr.core.entity.relationship.SchemaNodeView;
 import org.structr.core.entity.relationship.SchemaViewProperty;
+import org.structr.core.graph.ModificationQueue;
 import static org.structr.core.graph.NodeInterface.name;
 import org.structr.core.notion.PropertySetNotion;
 import org.structr.core.property.BooleanProperty;
@@ -37,11 +37,11 @@ import org.structr.core.property.StringProperty;
  */
 public class SchemaView extends SchemaReloadingNode {
 
-	public static final Property<AbstractSchemaNode>   schemaNode         = new StartNode<>("schemaNode", SchemaNodeView.class, new PropertySetNotion(AbstractNode.id, AbstractNode.name));
-	public static final Property<List<SchemaProperty>> schemaProperties   = new EndNodes<>("schemaProperties", SchemaViewProperty.class, new PropertySetNotion(AbstractNode.id, AbstractNode.name, SchemaProperty.isBuiltinProperty));
-	public static final Property<Boolean>              isBuiltinView      = new BooleanProperty("isBuiltinView");
-	public static final Property<String>               nonGraphProperties = new StringProperty("nonGraphProperties");
-	public static final Property<String>               sortOrder          = new StringProperty("sortOrder");
+	public static final Property<AbstractSchemaNode>   schemaNode           = new StartNode<>("schemaNode", SchemaNodeView.class, new PropertySetNotion(AbstractNode.id, AbstractNode.name));
+	public static final Property<Iterable<SchemaProperty>> schemaProperties = new EndNodes<>("schemaProperties", SchemaViewProperty.class, new PropertySetNotion(AbstractNode.id, AbstractNode.name, SchemaProperty.isBuiltinProperty));
+	public static final Property<Boolean>              isBuiltinView        = new BooleanProperty("isBuiltinView");
+	public static final Property<String>               nonGraphProperties   = new StringProperty("nonGraphProperties");
+	public static final Property<String>               sortOrder            = new StringProperty("sortOrder");
 
 	public static final View defaultView = new View(SchemaProperty.class, PropertyView.Public,
 		name, schemaNode, schemaProperties, nonGraphProperties
@@ -58,4 +58,19 @@ public class SchemaView extends SchemaReloadingNode {
 	public static final View exportView = new View(SchemaView.class, "export",
 		id, type, name, schemaNode, nonGraphProperties, isBuiltinView, sortOrder
 	);
+
+	@Override
+	public boolean reloadSchemaOnCreate() {
+		return true;
+	}
+
+	@Override
+	public boolean reloadSchemaOnModify(final ModificationQueue modificationQueue) {
+		return true;
+	}
+
+	@Override
+	public boolean reloadSchemaOnDelete() {
+		return true;
+	}
 }

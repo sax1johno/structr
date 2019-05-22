@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -51,6 +51,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.api.config.Settings;
 import org.structr.api.service.Command;
+import org.structr.api.service.ServiceDependency;
 import org.structr.api.service.SingletonService;
 import org.structr.api.service.StructrServices;
 import org.structr.common.AccessMode;
@@ -64,11 +65,13 @@ import org.structr.core.entity.Principal;
 import org.structr.core.graph.Tx;
 import org.structr.files.ssh.filesystem.StructrFilesystem;
 import org.structr.rest.auth.AuthHelper;
+import org.structr.schema.SchemaService;
 
 /**
  *
  *
  */
+@ServiceDependency(SchemaService.class)
 public class SSHService implements SingletonService, PasswordAuthenticator, PublickeyAuthenticator, FileSystemFactory, Factory<org.apache.sshd.server.Command>, SftpEventListener, CommandFactory {
 
 	private static final Logger logger = LoggerFactory.getLogger(SSHService.class.getName());
@@ -156,6 +159,11 @@ public class SSHService implements SingletonService, PasswordAuthenticator, Publ
 		return false;
 	}
 
+	@Override
+	public boolean waitAndRetry() {
+		return false;
+	}
+
 	// ----- interface Feature -----
 	@Override
 	public String getModuleName() {
@@ -225,7 +233,7 @@ public class SSHService implements SingletonService, PasswordAuthenticator, Publ
 				securityContext = SecurityContext.getInstance(principal, AccessMode.Backend);
 
 				// check single (main) pubkey
-				final String pubKeyData = principal.getProperty(Principal.publicKey);
+				final String pubKeyData = principal.getProperty(StructrApp.key(Principal.class, "publicKey"));
 				if (pubKeyData != null) {
 
 					final PublicKey pubKey = PublicKeyEntry.parsePublicKeyEntry(pubKeyData).resolvePublicKey(PublicKeyEntryResolver.FAILING);
@@ -235,7 +243,7 @@ public class SSHService implements SingletonService, PasswordAuthenticator, Publ
 				}
 
 				// check array of pubkeys for this user
-				final String[] pubKeysData = principal.getProperty(Principal.publicKeys);
+				final String[] pubKeysData = principal.getProperty(StructrApp.key(Principal.class, "publicKeys"));
 				if (pubKeysData != null) {
 
 					for (final String k : pubKeysData) {

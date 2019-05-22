@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,50 +19,29 @@
 package org.structr.api.service;
 
 import java.security.CodeSigner;
+import java.util.Date;
 
 /**
  */
 public interface LicenseManager {
 
-	public static final int Community              = 0x01; // 0001
-	public static final int Basic                  = 0x02; // 0010
-	public static final int SmallBusiness          = 0x04; // 0100
-	public static final int Enterprise             = 0x08; // 1000
+	void refresh();
 
 	String getEdition();
-	boolean isEdition(final int bitmask);
 
 	String getLicensee();
 	String getHardwareFingerprint();
 
-	String getStartDate();
-	String getEndDate();
+	Date getStartDate();
+	Date getEndDate();
+
+	int getNumberOfUsers();
 
 	boolean isValid(final Feature feature);
 	boolean isValid(final CodeSigner[] codeSigners);
 
 	boolean isModuleLicensed(final String module);
+	boolean isClassLicensed(final String fqcn);
 
-	/**
-	 * Returns the highest edition represented by this bitmask.
-	 *
-	 * @param bitmask
-	 * @return the name of the highest edition indicated by the given bitmask
-	 */
-	public static String getEdition(final int bitmask) {
-
-		if ((bitmask & Enterprise) == Enterprise) {
-			return "Enterprise";
-		}
-
-		if ((bitmask & SmallBusiness) == SmallBusiness) {
-			return "Small Business";
-		}
-
-		if ((bitmask & Basic) == Basic) {
-			return "Basic";
-		}
-
-		return "Community";
-	}
+	void addLicensedClass(final String fqcn);
 }

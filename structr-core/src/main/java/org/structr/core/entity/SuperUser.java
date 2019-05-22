@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -25,9 +25,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.structr.api.Predicate;
+import org.structr.api.graph.Identity;
 import org.structr.api.graph.Node;
 import org.structr.api.graph.PropertyContainer;
-import org.structr.api.graph.Relationship;
 import org.structr.api.graph.RelationshipType;
 import org.structr.cmis.CMISInfo;
 import org.structr.common.AccessControllable;
@@ -39,19 +39,15 @@ import org.structr.core.GraphObject;
 import org.structr.core.graph.ModificationQueue;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.RelationshipInterface;
+import org.structr.core.graph.TransactionCommand;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.schema.NonIndexed;
 import org.structr.schema.action.ActionContext;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
  * The SuperUser entity. Please note that this class is not persitent but will
  * be instantiated when needed.
- *
- *
- *
  */
 public class SuperUser implements Principal, AccessControllable, NonIndexed {
 
@@ -62,7 +58,13 @@ public class SuperUser implements Principal, AccessControllable, NonIndexed {
 	public void grant(Permission permission, Principal obj) {}
 
 	@Override
+	public void grant(Permission permission, Principal obj, SecurityContext ctx) {}
+
+	@Override
 	public void revoke(Permission permission, Principal obj) {}
+
+	@Override
+	public void revoke(Permission permission, Principal obj, SecurityContext ctx) {}
 
 	@Override
 	public void unlockSystemPropertiesOnce() {}
@@ -71,18 +73,15 @@ public class SuperUser implements Principal, AccessControllable, NonIndexed {
 	public void unlockReadOnlyPropertiesOnce() {}
 
 	@Override
-	public boolean onCreation(SecurityContext securityContext, ErrorBuffer errorBuffer) throws FrameworkException {
-		return true;
+	public void onCreation(SecurityContext securityContext, ErrorBuffer errorBuffer) throws FrameworkException {
 	}
 
 	@Override
-	public boolean onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
-		return true;
+	public void onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
 	}
 
 	@Override
-	public boolean onDeletion(SecurityContext securityContext, ErrorBuffer errorBuffer, PropertyMap properties) throws FrameworkException {
-		return true;
+	public void onDeletion(SecurityContext securityContext, ErrorBuffer errorBuffer, PropertyMap properties) throws FrameworkException {
 	}
 
 	@Override
@@ -109,13 +108,6 @@ public class SuperUser implements Principal, AccessControllable, NonIndexed {
 	@Override
 	public boolean isAdmin() {
 		return true;
-	}
-
-	@Override
-	public long getId() {
-
-		return -1L;
-
 	}
 
 	public String getRealName() {
@@ -153,7 +145,6 @@ public class SuperUser implements Principal, AccessControllable, NonIndexed {
 	public Set<PropertyKey> getPropertyKeys(String propertyView) {
 
 		return null;
-
 	}
 
 	@Override
@@ -169,27 +160,28 @@ public class SuperUser implements Principal, AccessControllable, NonIndexed {
 	}
 
 	@Override
+	public void setProperties(final SecurityContext securityContext, final PropertyMap properties) throws FrameworkException {
+	}
+
+	@Override
+	public void setProperties(final SecurityContext securityContext, final PropertyMap properties, final boolean isCreation) throws FrameworkException {
+	}
+
+	@Override
 	public <T> Comparable getComparableProperty(PropertyKey<T> key) {
 
 		return null;
 	}
 
 	@Override
-	public PropertyKey getDefaultSortKey() {
-
-		return null;
-
-	}
-
-	@Override
-	public String getDefaultSortOrder() {
-
-		return null;
-
-	}
-
-	@Override
 	public List<Principal> getParents() {
+
+		return Collections.emptyList();
+
+	}
+
+	@Override
+	public List<Principal> getParentsPrivileged() {
 
 		return Collections.emptyList();
 
@@ -201,24 +193,10 @@ public class SuperUser implements Principal, AccessControllable, NonIndexed {
 
 	}
 
-	public boolean isFrontendUser() {
-
-		return (true);
-
-	}
-
-	public boolean isBackendUser() {
-
-		return (true);
-
-	}
-
 	@Override
 	public boolean shouldSkipSecurityRelationships() {
 		return true;
 	}
-
-	//~--- set methods ----------------------------------------------------
 
 	public void setPassword(final String passwordValue) {
 
@@ -232,12 +210,13 @@ public class SuperUser implements Principal, AccessControllable, NonIndexed {
 
 	public void setConfirmationKey(String value) throws FrameworkException {}
 
-	public void setFrontendUser(boolean isFrontendUser) throws FrameworkException {}
-
-	public void setBackendUser(boolean isBackendUser) throws FrameworkException {}
-
 	@Override
 	public Object setProperty(PropertyKey key, Object value) throws FrameworkException {
+		return null;
+	}
+
+	@Override
+	public Object setProperty(PropertyKey key, Object value, final boolean isCreation) throws FrameworkException {
 		return null;
 	}
 
@@ -251,19 +230,11 @@ public class SuperUser implements Principal, AccessControllable, NonIndexed {
 	}
 
 	@Override
-	public void updateInIndex() {
-	}
-
-	@Override
-	public void removeFromIndex() {
-	}
-
-	@Override
 	public void indexPassiveProperties() {
 	}
 
 	@Override
-	public void init(SecurityContext securityContext, Node dbNode, final Class entityType, final boolean isCreation) {
+	public void init(SecurityContext securityContext, Node dbNode, final Class entityType, final long transactionId) {
 		throw new UnsupportedOperationException("Not supported.");
 	}
 
@@ -295,11 +266,6 @@ public class SuperUser implements Principal, AccessControllable, NonIndexed {
 	@Override
 	public String getName() {
 		return "superadmin";
-	}
-
-	@Override
-	public boolean isDeleted() {
-		throw new UnsupportedOperationException("Not supported.");
 	}
 
 	@Override
@@ -388,16 +354,6 @@ public class SuperUser implements Principal, AccessControllable, NonIndexed {
 	}
 
 	@Override
-	public Date getVisibilityStartDate() {
-		throw new UnsupportedOperationException("Not supported.");
-	}
-
-	@Override
-	public Date getVisibilityEndDate() {
-		throw new UnsupportedOperationException("Not supported.");
-	}
-
-	@Override
 	public Date getCreatedDate() {
 		throw new UnsupportedOperationException("Not supported.");
 	}
@@ -468,37 +424,12 @@ public class SuperUser implements Principal, AccessControllable, NonIndexed {
 	}
 
 	@Override
-	public Set<String> getAllowedPermissions() {
-		return null;
-	}
-
-	@Override
-	public Set<String> getDeniedPermissions() {
-		return null;
-	}
-
-	@Override
 	public boolean isValidPassword(final String password) {
 		return false;
 	}
 
 	@Override
-	public String getEncryptedPassword() {
-		return null;
-	}
-
-	@Override
-	public String getSalt() {
-		return null;
-	}
-
-	@Override
-	public void setRawPathSegment(final Relationship rawSegment) {
-	}
-
-	@Override
-	public Relationship getRawPathSegment() {
-		return null;
+	public void setRawPathSegmentId(final Identity rawSegmentId) {
 	}
 
 	@Override
@@ -514,5 +445,90 @@ public class SuperUser implements Principal, AccessControllable, NonIndexed {
 	@Override
 	public Class getEntityType() {
 		return SuperUser.class;
+	}
+
+	@Override
+	public String getLocale() {
+		return null;
+	}
+
+	@Override
+	public String getSessionData() {
+		return null;
+	}
+
+	@Override
+	public void setSessionData(String sessionData) throws FrameworkException {
+	}
+
+	@Override
+	public boolean isBlocked() {
+		return false;
+	}
+
+	@Override
+	public void setIsAdmin(boolean isAdmin) throws FrameworkException {
+	}
+
+	@Override
+	public void setEMail(String eMail) throws FrameworkException {
+	}
+
+	@Override
+	public void setSalt(String salt) throws FrameworkException {
+	}
+
+	@Override
+	public List<Security> getSecurityRelationships() {
+		return null;
+	}
+
+	@Override
+	public List<Favoritable> getFavorites() {
+		return null;
+	}
+
+	@Override
+	public void setFavorites(final Iterable<Favoritable> favorites) throws FrameworkException {
+	}
+
+	@Override
+	public <A extends NodeInterface, B extends NodeInterface, S extends Source, T extends Target> boolean hasRelationship(Class<? extends Relation<A, B, S, T>> type) {
+		return false;
+	}
+
+	@Override
+	public <A extends NodeInterface, B extends NodeInterface, S extends Source, T extends Target, R extends Relation<A, B, S, T>> boolean hasIncomingRelationships(Class<R> type) {
+		return false;
+	}
+
+	@Override
+	public <A extends NodeInterface, B extends NodeInterface, S extends Source, T extends Target, R extends Relation<A, B, S, T>> boolean hasOutgoingRelationships(Class<R> type) {
+		return false;
+	}
+
+	@Override
+	public <A extends NodeInterface, B extends NodeInterface, S extends Source, R extends Relation<A, B, S, OneEndpoint<B>>> R getOutgoingRelationshipAsSuperUser(Class<R> type) {
+		return null;
+	}
+
+	@Override
+	public Map<String, Object> getTemporaryStorage() {
+		throw new UnsupportedOperationException("Not supported.");
+	}
+
+	@Override
+	public String getEMail() {
+		return null;
+	}
+
+	@Override
+	public List<Group> getGroups() {
+		return Collections.emptyList();
+	}
+
+	@Override
+	public long getSourceTransactionId() {
+		return TransactionCommand.getCurrentTransactionId();
 	}
 }

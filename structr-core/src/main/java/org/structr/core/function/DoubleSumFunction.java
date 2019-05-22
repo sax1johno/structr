@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,54 +18,50 @@
  */
 package org.structr.core.function;
 
-import java.util.Collection;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class DoubleSumFunction extends Function<Object, Object> {
+public class DoubleSumFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_DOUBLE_SUM = "Usage: ${double_sum(list)}. Example: ${double_sum(extract(this.children, \"amount\"))}";
 
 	@Override
 	public String getName() {
-		return "double_sum()";
+		return "double_sum";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
-		double result = 0.0;
-
 		try {
-			if (!arrayHasLengthAndAllElementsNotNull(sources, 1)) {
-				
-				return null;
-			}
 
-			if (sources[0] instanceof Collection) {
+			assertArrayHasLengthAndAllElementsNotNull(sources, 1);
 
-				for (final Number num : (Collection<Number>)sources[0]) {
+			double result = 0.0;
+
+			if (sources[0] instanceof Iterable) {
+
+				for (final Number num : (Iterable<Number>)sources[0]) {
 
 					result += num.doubleValue();
 				}
 			}
 
-		} catch (final IllegalArgumentException e) {
+			return result;
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+		} catch (ArgumentNullException pe) {
 
+			// silently ignore null arguments
+			return null;
+
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
-
-		return result;
-
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {
@@ -76,6 +72,4 @@ public class DoubleSumFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Returns the sum of the given arguments as a floating-point number";
 	}
-
-
 }

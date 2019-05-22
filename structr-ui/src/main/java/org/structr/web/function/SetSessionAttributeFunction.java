@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,14 +18,12 @@
  */
 package org.structr.web.function;
 
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class SetSessionAttributeFunction extends Function<Object, Object> {
+public class SetSessionAttributeFunction extends UiAdvancedFunction {
 
 	public static final String ERROR_MESSAGE_SET_SESSION_ATTRIBUTE    = "Usage: ${set_session_attribute(key, value)}. Example: ${set_session_attribute(\"do_no_track\", true)}";
 	public static final String ERROR_MESSAGE_SET_SESSION_ATTRIBUTE_JS = "Usage: ${{Structr.set_session_attribute(key, value)}}. Example: ${{Structr.set_session_attribute(\"do_not_track\", true)}}";
@@ -33,31 +31,30 @@ public class SetSessionAttributeFunction extends Function<Object, Object> {
 
 	@Override
 	public String getName() {
-		return "set_session_attribute()";
+		return "set_session_attribute";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
 		try {
-			
-			if (!arrayHasLengthAndAllElementsNotNull(sources, 2)) {
-				
-				return null;
-			}
+
+			assertArrayHasLengthAndAllElementsNotNull(sources, 2);
 
 			ctx.getSecurityContext().getSession().setAttribute(SESSION_ATTRIBUTE_PREFIX.concat(sources[0].toString()), sources[1]);
 
-		} catch (final IllegalArgumentException e) {
+			return "";
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+		} catch (ArgumentNullException pe) {
 
+			// silently ignore null arguments
+			return null;
+
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
-
-		return "";
-
 	}
 
 	@Override
@@ -69,5 +66,4 @@ public class SetSessionAttributeFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "";
 	}
-
 }

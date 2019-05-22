@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -27,8 +27,6 @@ import org.structr.core.GraphObject;
 import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.message.WebSocketMessage;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
  * Websocket command to retrieve a single graph object by id.
  *
@@ -48,10 +46,12 @@ public class GetCommand extends AbstractCommand {
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
+		setDoTransactionNotifications(false);
+
 		final SecurityContext securityContext  = getWebSocket().getSecurityContext();
-				
-		final String nodeId                    = (String) webSocketData.getNodeData().get("nodeId");
-		final String properties                = (String) webSocketData.getNodeData().get("properties");
+
+		final String nodeId                    = webSocketData.getNodeDataStringValue("nodeId");
+		final String properties                = webSocketData.getNodeDataStringValue("properties");
 
 		if (properties != null) {
 			securityContext.setCustomView(StringUtils.split(properties, ","));
@@ -75,8 +75,6 @@ public class GetCommand extends AbstractCommand {
 
 		}
 	}
-
-	//~--- get methods ----------------------------------------------------
 
 	@Override
 	public String getCommand() {

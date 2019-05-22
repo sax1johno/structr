@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.lang.StringUtils;
+import org.structr.api.util.Iterables;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
@@ -31,7 +32,6 @@ import org.structr.core.entity.Principal;
 import org.structr.core.graph.NodeAttribute;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.Tx;
-import org.structr.core.property.PropertyMap;
 import org.structr.util.Writable;
 
 /**
@@ -106,7 +106,7 @@ public class UserConsoleCommand extends AdminConsoleCommand {
 
 			try (final Tx tx = app.tx()) {
 
-				final List<NodeInterface> users = app.nodeQuery(type).getAsList();
+				final List<NodeInterface> users = app.nodeQuery(type).sort(AbstractNode.name).getAsList();
 				for (final Iterator<NodeInterface> it = users.iterator(); it.hasNext();) {
 
 					final NodeInterface user = it.next();
@@ -151,16 +151,16 @@ public class UserConsoleCommand extends AdminConsoleCommand {
 
 			try (final Tx tx = app.tx()) {
 
-				final NodeInterface user = app.create(type, new NodeAttribute<>(AbstractNode.name, name));
+				final Principal user = app.create(type, new NodeAttribute<>(AbstractNode.name, name));
 
 				// set e-mail address
 				if (eMail != null && !"isAdmin".equals(eMail)) {
-					user.setProperties(securityContext, new PropertyMap(Principal.eMail, eMail));
+					user.setEMail(eMail);
 				}
 
 				// set isAdmin flag
 				if ("isAdmin".equals(eMail) || "isAdmin".equals(isAdmin)) {
-					user.setProperties(securityContext, new PropertyMap(Principal.isAdmin, true));
+					user.setIsAdmin(true);
 				}
 
 				writable.println("User created.");
@@ -195,7 +195,8 @@ public class UserConsoleCommand extends AdminConsoleCommand {
 
 				if (user != null) {
 
-					if (user.getProperty(Principal.ownedNodes).isEmpty()) {
+					final List<NodeInterface> ownedNodes = Iterables.toList(user.getProperty(Principal.ownedNodes));
+					if (ownedNodes.isEmpty()) {
 
 						app.delete(user);
 
@@ -243,19 +244,19 @@ public class UserConsoleCommand extends AdminConsoleCommand {
 			throw new FrameworkException(422, "Missing user name for password command.");
 		}
 
-		final Class<? extends NodeInterface> type = StructrApp.getConfiguration().getNodeEntityClass("User");
-		final App app                             = StructrApp.getInstance(securityContext);
+		final Class<? extends Principal> type = StructrApp.getConfiguration().getNodeEntityClass("User");
+		final App app                          = StructrApp.getInstance(securityContext);
 
 		if (type != null) {
 
 			try (final Tx tx = app.tx()) {
 
-				final NodeInterface user = app.nodeQuery(type).andName(name).getFirst();
+				final Principal user = app.nodeQuery(type).andName(name).getFirst();
 				if (user != null) {
 
 					if (StringUtils.isNotBlank(password)) {
 
-						user.setProperties(securityContext, new PropertyMap(Principal.password, password));
+						user.setPassword(password);
 
 						writable.println("Password changed.");
 

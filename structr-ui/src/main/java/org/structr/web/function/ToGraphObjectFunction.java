@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with Structr.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 package org.structr.web.function;
 
 import org.structr.common.SecurityContext;
@@ -24,14 +23,14 @@ import org.structr.core.StaticValue;
 import org.structr.core.Value;
 import org.structr.schema.action.ActionContext;
 
-public class ToGraphObjectFunction extends UiFunction {
+public class ToGraphObjectFunction extends UiCommunityFunction {
 
 	public static final String ERROR_MESSAGE_TO_GRAPH_OBJECT    = "Usage: ${to_graph_object(obj [, view[, depth = 3]])}. Example: ${to_graph_object(this, 'public', 4)}";
 	public static final String ERROR_MESSAGE_TO_GRAPH_OBJECT_JS = "Usage: ${{Structr.to_graph_object(obj [, view[, depth = 3]])}}. Example: ${{Structr.to_graph_object(Structr.get('this'), 'public', 4)}}";
 
 	@Override
 	public String getName() {
-		return "to_graph_object()";
+		return "to_graph_object";
 	}
 
 	@Override

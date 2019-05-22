@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -34,9 +34,7 @@ import org.structr.api.graph.Node;
 import org.structr.api.graph.PropertyContainer;
 import org.structr.api.graph.Relationship;
 import org.structr.api.graph.RelationshipType;
-import org.structr.api.index.Index;
 import org.structr.cmis.CMISInfo;
-import org.structr.common.GraphObjectComparator;
 import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
 import org.structr.common.ValidationHelper;
@@ -48,22 +46,20 @@ import org.structr.common.error.InternalSystemPropertyToken;
 import org.structr.common.error.NullArgumentToken;
 import org.structr.common.error.ReadOnlyPropertyToken;
 import org.structr.core.GraphObject;
-import org.structr.core.Services;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.converter.PropertyConverter;
 import org.structr.core.graph.ModificationQueue;
 import org.structr.core.graph.NodeFactory;
 import org.structr.core.graph.NodeInterface;
-import org.structr.core.graph.NodeService;
 import org.structr.core.graph.RelationshipInterface;
-import org.structr.core.property.IntProperty;
 import org.structr.core.property.Property;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.core.property.RelationshipTypeProperty;
 import org.structr.core.property.SourceId;
 import org.structr.core.property.SourceNodeProperty;
+import org.structr.core.property.StringProperty;
 import org.structr.core.property.TargetId;
 import org.structr.core.property.TargetNodeProperty;
 import org.structr.core.script.Scripting;
@@ -82,12 +78,12 @@ public abstract class AbstractRelationship<S extends NodeInterface, T extends No
 
 	private static final Logger logger = LoggerFactory.getLogger(AbstractRelationship.class.getName());
 
-	public static final Property<Integer>       cascadeDelete              = new IntProperty("cascadeDelete");
-	public static final Property<String>        relType                    = new RelationshipTypeProperty();
-	public static final SourceId                sourceId                   = new SourceId("sourceId");
-	public static final TargetId                targetId                   = new TargetId("targetId");
-	public static final Property<NodeInterface> sourceNodeProperty         = new SourceNodeProperty("sourceNode");
-	public static final Property<NodeInterface> targetNodeProperty         = new TargetNodeProperty("targetNode");
+	public static final Property<String>        internalTimestamp  = new StringProperty("internalTimestamp").systemInternal().indexed().unvalidated().writeOnce().partOfBuiltInSchema().category(SYSTEM_CATEGORY);
+	public static final Property<String>        relType            = new RelationshipTypeProperty();
+	public static final SourceId                sourceId           = new SourceId("sourceId");
+	public static final TargetId                targetId           = new TargetId("targetId");
+	public static final Property<NodeInterface> sourceNode         = new SourceNodeProperty("sourceNode");
+	public static final Property<NodeInterface> targetNode         = new TargetNodeProperty("targetNode");
 
 	public static final View defaultView = new View(AbstractRelationship.class, PropertyView.Public,
 		id, type, relType, sourceId, targetId
@@ -98,15 +94,18 @@ public abstract class AbstractRelationship<S extends NodeInterface, T extends No
 	);
 
 	public static final View graphView = new View(AbstractRelationship.class, View.INTERNAL_GRAPH_VIEW,
-		id, type, relType, sourceNodeProperty, targetNodeProperty
+		id, type, relType, sourceNode, targetNode
 	);
 
 	public boolean internalSystemPropertiesUnlocked = false;
 
+	private long transactionId                 = -1;
 	private boolean readOnlyPropertiesUnlocked = false;
 
 	private String cachedEndNodeId             = null;
 	private String cachedStartNodeId           = null;
+	private PropertyKey sourceProperty         = null;
+	private PropertyKey targetProperty         = null;
 
 	protected SecurityContext securityContext  = null;
 	protected Relationship dbRelationship      = null;
@@ -114,14 +113,14 @@ public abstract class AbstractRelationship<S extends NodeInterface, T extends No
 
 	public AbstractRelationship() {}
 
-	public AbstractRelationship(final SecurityContext securityContext, final Relationship dbRel, final Class entityType) {
-
-		init(securityContext, dbRel, entityType);
+	public AbstractRelationship(final SecurityContext securityContext, final Relationship dbRel, final Class entityType, final long transactionId) {
+		init(securityContext, dbRel, entityType, transactionId);
 	}
 
 	@Override
-	public final void init(final SecurityContext securityContext, final Relationship dbRel, final Class entityType) {
+	public final void init(final SecurityContext securityContext, final Relationship dbRel, final Class entityType, final long transactionId) {
 
+		this.transactionId   = transactionId;
 		this.dbRelationship  = dbRel;
 		this.entityType      = entityType;
 		this.securityContext = securityContext;
@@ -142,6 +141,11 @@ public abstract class AbstractRelationship<S extends NodeInterface, T extends No
 	@Override
 	public Class getEntityType() {
 		return entityType;
+	}
+
+	@Override
+	public long getSourceTransactionId() {
+		return transactionId;
 	}
 
 	/**
@@ -201,9 +205,6 @@ public abstract class AbstractRelationship<S extends NodeInterface, T extends No
 	public final void removeProperty(final PropertyKey key) throws FrameworkException {
 
 		dbRelationship.removeProperty(key.dbName());
-
-		// remove from index
-		removeFromIndex(key);
 	}
 
 	@Override
@@ -215,13 +216,7 @@ public abstract class AbstractRelationship<S extends NodeInterface, T extends No
 
 	@Override
 	public int hashCode() {
-
-		if (this.dbRelationship == null) {
-
-			return (super.hashCode());
-		}
-
-		return Long.valueOf(dbRelationship.getId()).hashCode();
+		return getUuid().hashCode();
 
 	}
 
@@ -234,15 +229,7 @@ public abstract class AbstractRelationship<S extends NodeInterface, T extends No
 			return -1;
 		}
 
-		return ((Long) this.getId()).compareTo((Long) rel.getId());
-	}
-
-	@Override
-	public int cascadeDelete() {
-
-		final Integer value = getProperty(AbstractRelationship.cascadeDelete);
-
-		return value != null ? value : 0;
+		return getUuid().compareTo(rel.getUuid());
 	}
 
 	/**
@@ -259,41 +246,8 @@ public abstract class AbstractRelationship<S extends NodeInterface, T extends No
 	}
 
 	@Override
-	public final PropertyKey getDefaultSortKey() {
-
-		return null;
-
-	}
-
-	@Override
-	public final String getDefaultSortOrder() {
-
-		return GraphObjectComparator.ASCENDING;
-
-	}
-
-	@Override
-	public final long getId() {
-
-		return getInternalId();
-
-	}
-
-	@Override
 	public final String getUuid() {
 		return getProperty(AbstractRelationship.id);
-	}
-
-	public final long getRelationshipId() {
-
-		return getInternalId();
-
-	}
-
-	public final long getInternalId() {
-
-		return dbRelationship.getId();
-
 	}
 
 	@Override
@@ -477,18 +431,15 @@ public abstract class AbstractRelationship<S extends NodeInterface, T extends No
 	}
 
 	@Override
-	public boolean onCreation(SecurityContext securityContext, ErrorBuffer errorBuffer) throws FrameworkException {
-		return isValid(errorBuffer);
+	public void onCreation(SecurityContext securityContext, ErrorBuffer errorBuffer) throws FrameworkException {
 	}
 
 	@Override
-	public boolean onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
-		return isValid(errorBuffer);
+	public void onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
 	}
 
 	@Override
-	public boolean onDeletion(SecurityContext securityContext, ErrorBuffer errorBuffer, PropertyMap properties) throws FrameworkException {
-		return true;
+	public void onDeletion(SecurityContext securityContext, ErrorBuffer errorBuffer, PropertyMap properties) throws FrameworkException {
 	}
 
 	@Override
@@ -532,6 +483,11 @@ public abstract class AbstractRelationship<S extends NodeInterface, T extends No
 
 	@Override
 	public void setProperties(final SecurityContext securityContext, final PropertyMap properties) throws FrameworkException {
+		setProperties(securityContext, properties, false);
+	}
+
+	@Override
+	public void setProperties(final SecurityContext securityContext, final PropertyMap properties, final boolean isCreation) throws FrameworkException {
 
 		for (final PropertyKey key : properties.keySet()) {
 
@@ -541,24 +497,32 @@ public abstract class AbstractRelationship<S extends NodeInterface, T extends No
 				if (key.isSystemInternal() && !internalSystemPropertiesUnlocked) {
 
 					throw new FrameworkException(422, "Property " + key.jsonName() + " is an internal system property", new InternalSystemPropertyToken(getClass().getSimpleName(), key));
-
 				}
 
 				// check for read-only properties
 				if ((key.isReadOnly() || key.isWriteOnce()) && !readOnlyPropertiesUnlocked && !securityContext.isSuperUser()) {
 
 					throw new FrameworkException(422, "Property " + key.jsonName() + " is read-only", new ReadOnlyPropertyToken(getClass().getSimpleName(), key));
-
 				}
-
 			}
 		}
 
-		RelationshipInterface.super.setProperties(securityContext, properties);
+		RelationshipInterface.super.setPropertiesInternal(securityContext, properties, isCreation);
 	}
 
 	@Override
 	public final <T> Object setProperty(final PropertyKey<T> key, final T value) throws FrameworkException {
+		return setProperty(key, value, false);
+	}
+
+	@Override
+	public final <T> Object setProperty(final PropertyKey<T> key, final T value, final boolean isCreation) throws FrameworkException {
+
+		// clear function property cache in security context since we are about to invalidate past results
+		if (securityContext != null) {
+
+			securityContext.getContextStore().clearFunctionPropertyCache();
+		}
 
 		if (key == null) {
 
@@ -597,38 +561,6 @@ public abstract class AbstractRelationship<S extends NodeInterface, T extends No
 			internalSystemPropertiesUnlocked = false;
 			readOnlyPropertiesUnlocked       = false;
 
-		}
-	}
-
-	@Override
-	public final void updateInIndex() {
-
-		removeFromIndex();
-		addToIndex();
-	}
-
-	@Override
-	public final void removeFromIndex() {
-
-		final Index<Relationship> index = Services.getInstance().getService(NodeService.class).getRelationshipIndex();
-		index.remove(dbRelationship);
-	}
-
-	public final void removeFromIndex(final PropertyKey key) {
-
-		final Index<Relationship> index = Services.getInstance().getService(NodeService.class).getRelationshipIndex();
-		index.remove(dbRelationship, key.dbName());
-	}
-
-	@Override
-	public final void indexPassiveProperties() {
-
-		for (PropertyKey key : StructrApp.getConfiguration().getPropertySet(entityType, PropertyView.All)) {
-
-			if (key.isPassivelyIndexed()) {
-
-				key.index(this);
-			}
 		}
 	}
 
@@ -719,6 +651,22 @@ public abstract class AbstractRelationship<S extends NodeInterface, T extends No
 		throw new UnsupportedOperationException("Invoking a method on a relationship is not supported at the moment.");
 	}
 
+	public void setSourceProperty(final PropertyKey source) {
+		this.sourceProperty = source;
+	}
+
+	public void setTargetProperty(final PropertyKey target) {
+		this.targetProperty = target;
+	}
+
+	public PropertyKey getSourceProperty() {
+		return sourceProperty;
+	}
+
+	public PropertyKey getTargetProperty() {
+		return targetProperty;
+	}
+
 	// ----- protected methods -----
 	protected final Direction getDirectionForType(final Class<S> sourceType, final Class<T> targetType, final Class<? extends NodeInterface> type) {
 
@@ -735,12 +683,22 @@ public abstract class AbstractRelationship<S extends NodeInterface, T extends No
 			return Direction.INCOMING;
 		}
 
+		/* one of these blocks is wrong...*/
+		if (sourceType.isAssignableFrom(type) && targetType.isAssignableFrom(type)) {
+			return Direction.BOTH;
+		}
+
 		if (sourceType.isAssignableFrom(type)) {
 			return Direction.OUTGOING;
 		}
 
 		if (targetType.isAssignableFrom(type)) {
 			return Direction.INCOMING;
+		}
+
+		/* one of these blocks is wrong...*/
+		if (type.isAssignableFrom(sourceType) && type.isAssignableFrom(targetType)) {
+			return Direction.BOTH;
 		}
 
 		if (type.isAssignableFrom(sourceType)) {

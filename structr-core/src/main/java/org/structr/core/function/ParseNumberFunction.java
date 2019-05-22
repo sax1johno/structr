@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -24,19 +24,15 @@ import java.util.Locale;
 import org.apache.commons.lang3.StringUtils;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class ParseNumberFunction extends Function<Object, Object> {
+public class ParseNumberFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_PARSE_NUMBER    = "Usage: ${parse_number(value, locale)}. Example: ${parse_number('12345.6789', 'en')}";
 	public static final String ERROR_MESSAGE_PARSE_NUMBER_JS = "Usage: ${{Structr.parseNumber(value, pattern)}}. Example: ${{Structr.parseNumber('12345.6789', 'en')}}";
 
 	@Override
 	public String getName() {
-		return "parse_number()";
+		return "parse_number";
 	}
 
 	@Override
@@ -48,7 +44,7 @@ public class ParseNumberFunction extends Function<Object, Object> {
 		}
 
 		try {
-		
+
 			final String numberString = sources[0].toString().replaceAll("[^\\d.,]", "");;
 
 			if (StringUtils.isBlank(numberString)) {
@@ -57,7 +53,7 @@ public class ParseNumberFunction extends Function<Object, Object> {
 
 			Locale locale = ctx.getLocale();
 			try {
-			
+
 				if (sources.length == 2) {
 
 					final String localeString = sources[1].toString();
@@ -72,7 +68,7 @@ public class ParseNumberFunction extends Function<Object, Object> {
 
 			} catch (ParseException ex) {
 
-				logException(ex, "{}: Could not parse string \"{}\" to number. Parameters: {}", new Object[] { getName(), caller, getParametersAsString(sources) });
+				logException(ex, "{}: Could not parse string \"{}\" to number. Parameters: {}", new Object[] { getReplacement(), caller, getParametersAsString(sources) });
 			}
 
 		} catch (final IllegalArgumentException e) {
@@ -95,5 +91,4 @@ public class ParseNumberFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Parses the given string using the given (optional) locale and format string";
 	}
-
 }

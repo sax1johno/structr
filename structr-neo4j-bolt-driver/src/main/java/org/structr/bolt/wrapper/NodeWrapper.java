@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,14 +18,19 @@
  */
 package org.structr.bolt.wrapper;
 
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
+import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.structr.api.NotFoundException;
+import org.structr.api.config.Settings;
 import org.structr.api.graph.Direction;
 import org.structr.api.graph.Label;
 import org.structr.api.graph.Node;
@@ -42,8 +47,16 @@ import org.structr.bolt.mapper.RelationshipRelationshipMapper;
  */
 public class NodeWrapper extends EntityWrapper<org.neo4j.driver.v1.types.Node> implements Node {
 
-	private final Map<String, Map<String, List<Relationship>>> relationshipCache = new HashMap<>();
-	private static FixedSizeCache<Long, NodeWrapper> nodeCache                   = null;
+	private static final Logger logger                                           = LoggerFactory.getLogger(NodeWrapper.class);
+	protected static FixedSizeCache<Long, NodeWrapper> nodeCache                 = null;
+
+	private final Map<String, Map<String, RelationshipResult>> relationshipCache = new HashMap<>();
+	private boolean dontUseCache                                                 = false;
+
+	protected NodeWrapper() {
+		// nop constructor for cache access
+		super();
+	}
 
 	private NodeWrapper(final BoltDatabaseService db, final org.neo4j.driver.v1.types.Node node) {
 		super(db, node);
@@ -54,53 +67,82 @@ public class NodeWrapper extends EntityWrapper<org.neo4j.driver.v1.types.Node> i
 	}
 
 	@Override
+	public String toString() {
+		return "N" + getId();
+	}
+
+	@Override
 	protected String getQueryPrefix() {
-		return "MATCH (n)";
+
+		return concat("MATCH (n", getTenantIdentifer(db), ")");
 	}
 
 	@Override
 	public void onRemoveFromCache() {
+
 		relationshipCache.clear();
 		this.stale = true;
 	}
 
 	@Override
 	public void clearCaches() {
+
+		relationshipCache.clear();
+	}
+
+	@Override
+	public void onClose() {
+
+		dontUseCache = false;
 		relationshipCache.clear();
 	}
 
 	@Override
 	public Relationship createRelationshipTo(final Node endNode, final RelationshipType relationshipType) {
-		return createRelationshipTo(endNode, relationshipType, Collections.EMPTY_MAP);
+		return createRelationshipTo(endNode, relationshipType, new LinkedHashMap<>());
 	}
 
 	@Override
 	public Relationship createRelationshipTo(final Node endNode, final RelationshipType relationshipType, final Map<String, Object> properties) {
+
+		dontUseCache = true;
 
 		assertNotStale();
 
 		final SessionTransaction tx   = db.getCurrentTransaction();
 		final Map<String, Object> map = new HashMap<>();
 		final NodeWrapper otherNode   = (NodeWrapper)endNode;
+		final String tenantIdentifier = getTenantIdentifer(db);
+		final StringBuilder buf       = new StringBuilder();
 
 		map.put("id1", id);
-		map.put("id2", endNode.getId());
+		map.put("id2", db.unwrap(endNode.getId()));
 		map.put("relProperties", properties);
 
-		final org.neo4j.driver.v1.types.Relationship rel = tx.getRelationship(
-			"MATCH (n), (m) WHERE ID(n) = {id1} AND ID(m) = {id2} "
-				+ "MERGE (n)-[r:" + relationshipType.name() + "]->(m) "
-				+ "SET r += {relProperties} RETURN r",
-			map);
+		buf.append("MATCH (n");
+		buf.append(tenantIdentifier);
+		buf.append("), (m");
+		buf.append(tenantIdentifier);
+		buf.append(") WHERE ID(n) = {id1} AND ID(m) = {id2} ");
+		buf.append("MERGE (n)-[r:");
+		buf.append(relationshipType.name());
+		buf.append("]->(m)");
+		buf.append(" SET r += $relProperties RETURN r");
 
-		tx.modified(this);
-		tx.modified(otherNode);
+		final org.neo4j.driver.v1.types.Relationship rel = tx.getRelationship(buf.toString(), map);
+
+		setModified();
+		otherNode.setModified();
 
 		// clear caches
 		((NodeWrapper)endNode).relationshipCache.clear();
 		relationshipCache.clear();
 
-		return RelationshipWrapper.newInstance(db, rel);
+		final RelationshipWrapper createdRelationship = RelationshipWrapper.newInstance(db, rel);
+
+		createdRelationship.setModified();
+
+		return createdRelationship;
 	}
 
 	@Override
@@ -110,11 +152,13 @@ public class NodeWrapper extends EntityWrapper<org.neo4j.driver.v1.types.Node> i
 
 		final SessionTransaction tx   = db.getCurrentTransaction();
 		final Map<String, Object> map = new HashMap<>();
+		final String tenantIdentifier = getTenantIdentifer(db);
 
 		map.put("id", id);
 
-		tx.set("MATCH (n) WHERE ID(n) = {id} SET n :" + label.name(), map);
-		tx.modified(this);
+		tx.set(concat("MATCH (n", tenantIdentifier, ") WHERE ID(n) = $id SET n :", label.name()), map);
+
+		setModified();
 	}
 
 	@Override
@@ -124,11 +168,12 @@ public class NodeWrapper extends EntityWrapper<org.neo4j.driver.v1.types.Node> i
 
 		final SessionTransaction tx   = db.getCurrentTransaction();
 		final Map<String, Object> map = new HashMap<>();
+		final String tenantIdentifier = getTenantIdentifer(db);
 
 		map.put("id", id);
 
-		tx.set("MATCH (n) WHERE ID(n) = {id} REMOVE n:" + label.name(), map);
-		tx.modified(this);
+		tx.set(concat("MATCH (n", tenantIdentifier, ") WHERE ID(n) = $id REMOVE n:", label.name()), map);
+		setModified();
 	}
 
 	@Override
@@ -139,11 +184,12 @@ public class NodeWrapper extends EntityWrapper<org.neo4j.driver.v1.types.Node> i
 		final SessionTransaction tx   = db.getCurrentTransaction();
 		final Map<String, Object> map = new HashMap<>();
 		final List<Label> result      = new LinkedList<>();
+		final String tenantIdentifier = getTenantIdentifer(db);
 
 		map.put("id", id);
 
 		// execute query
-		for (final String label : tx.getStrings("MATCH (n) WHERE ID(n) = {id} RETURN LABELS(n)", map)) {
+		for (final String label : tx.getStrings(concat("MATCH (n", tenantIdentifier, ") WHERE ID(n) = $id RETURN LABELS(n)"), map)) {
 			result.add(db.forName(Label.class, label));
 		}
 
@@ -155,39 +201,25 @@ public class NodeWrapper extends EntityWrapper<org.neo4j.driver.v1.types.Node> i
 
 		assertNotStale();
 
-		AssociationList list = (AssociationList)getList(Direction.OUTGOING, type);
-		if (list != null) {
+		final SessionTransaction tx      = db.getCurrentTransaction();
+		final Map<String, Object> params = new LinkedHashMap<>();
+		final String tenantIdentifier = getTenantIdentifer(db);
 
-			return list.containsAssociation(this, type, targetNode);
+		params.put("id1", id);
+		params.put("id2", db.unwrap(targetNode.getId()));
 
-		} else {
+		try {
 
-			list = (AssociationList)getList(Direction.INCOMING, type);
-			if (list != null) {
+			// try to fetch existing relationship by node ID(s)
+			// FIXME: this call can be very slow when lots of relationships exist
+			tx.getLong(concat("MATCH (n", tenantIdentifier, ")-[r:", type.name(), "]->(m", tenantIdentifier, ") WHERE id(n) = $id1 AND id(m) = $id2 RETURN id(r)"), params);
 
-				return list.containsAssociation(targetNode, type, this);
+			// success
+			return true;
 
-			} else {
+		} catch (Throwable t) {
 
-				final SessionTransaction tx      = db.getCurrentTransaction();
-				final Map<String, Object> params = new LinkedHashMap<>();
-
-				params.put("id1", getId());
-				params.put("id2", targetNode.getId());
-
-				try {
-
-					// try to fetch existing relationship by node ID(s)
-					tx.getLong("MATCH (n)-[r:" + type.name() + "]->(m) WHERE id(n) = {id1} AND id(m) = {id2} RETURN id(r)", params);
-
-					// success
-					return true;
-
-				} catch (Throwable t) {
-
-					return false;
-				}
-			}
+			return false;
 		}
 	}
 
@@ -196,23 +228,10 @@ public class NodeWrapper extends EntityWrapper<org.neo4j.driver.v1.types.Node> i
 
 		assertNotStale();
 
-		final RelationshipRelationshipMapper mapper = new RelationshipRelationshipMapper(db);
-		List<Relationship> list                     = getList(null, null);
+		final RelationshipResult cache = getRelationshipCache(null, null);
+		final String tenantIdentifier = getTenantIdentifer(db);
 
-		if (list == null) {
-
-			final SessionTransaction tx                 = db.getCurrentTransaction();
-			final Map<String, Object> map               = new HashMap<>();
-
-			map.put("id", id);
-
-			list = toList(Iterables.map(mapper, tx.getRelationships("MATCH (n)-[r]-() WHERE ID(n) = {id} RETURN r", map)));
-
-			// store in cache
-			setList(null, null, list);
-		}
-
-		return list;
+		return cache.getResult(db, id, concat("(n", tenantIdentifier, ")-[r]-(o)"), "(n)-[]-()", "RETURN r, o ORDER BY r.internalTimestamp");
 	}
 
 	@Override
@@ -220,35 +239,22 @@ public class NodeWrapper extends EntityWrapper<org.neo4j.driver.v1.types.Node> i
 
 		assertNotStale();
 
-		final RelationshipRelationshipMapper mapper = new RelationshipRelationshipMapper(db);
-		List<Relationship> list                     = getList(direction, null);
+		final RelationshipResult cache = getRelationshipCache(direction, null);
+		final String tenantIdentifier = getTenantIdentifer(db);
 
-		if (list == null) {
+		switch (direction) {
 
-			final SessionTransaction tx   = db.getCurrentTransaction();
-			final Map<String, Object> map = new HashMap<>();
+			case BOTH:
+				return getRelationships();
 
-			map.put("id", id);
+			case OUTGOING:
+				return cache.getResult(db, id, concat("(n", tenantIdentifier, ")-[r]->(t)"), "(n)-[]->()", "RETURN r, t ORDER BY r.internalTimestamp");
 
-			switch (direction) {
-
-				case BOTH:
-					return getRelationships();
-
-				case OUTGOING:
-					list = toList(Iterables.map(mapper, tx.getRelationships("MATCH (n)-[r]->() WHERE ID(n) = {id} RETURN r", map)));
-					break;
-
-				case INCOMING:
-					list = toList(Iterables.map(mapper, tx.getRelationships("MATCH (n)<-[r]-() WHERE ID(n) = {id} RETURN r", map)));
-					break;
-			}
-
-			setList(direction, null, list);
-
+			case INCOMING:
+				return cache.getResult(db, id, concat("(n", tenantIdentifier , ")<-[r]-(s)"), "(n)<-[]-()", "RETURN r, s ORDER BY r.internalTimestamp");
 		}
 
-		return list;
+		return null;
 	}
 
 	@Override
@@ -256,46 +262,107 @@ public class NodeWrapper extends EntityWrapper<org.neo4j.driver.v1.types.Node> i
 
 		assertNotStale();
 
-		final RelationshipRelationshipMapper mapper = new RelationshipRelationshipMapper(db);
-		List<Relationship> list                     = getList(direction, relationshipType);
+		final RelationshipResult cache = getRelationshipCache(direction, relationshipType);
+		final String tenantIdentifier = getTenantIdentifer(db);
+		final String rel               = relationshipType.name();
 
-		if (list == null) {
+		switch (direction) {
 
-			final SessionTransaction tx   = db.getCurrentTransaction();
-			final Map<String, Object> map = new HashMap<>();
+			case BOTH:
+				return cache.getResult(db, id, concat("(n", tenantIdentifier, ")-[r:", rel, "]-(o)"), concat("(n)-[:", rel, "]-()"), "RETURN r, o ORDER BY r.internalTimestamp");
 
-			map.put("id", id);
+			case OUTGOING:
+				return cache.getResult(db, id, concat("(n", tenantIdentifier, ")-[r:", rel, "]->(t)"), concat("(n)-[:", rel, "]->()"), "RETURN r, t ORDER BY r.internalTimestamp");
 
-			switch (direction) {
-
-				case BOTH:
-					list = toList(Iterables.map(mapper, tx.getRelationships("MATCH (n)-[r:" + relationshipType.name() + "]-() WHERE ID(n) = {id} RETURN r", map)));
-					break;
-
-				case OUTGOING:
-					list = toList(Iterables.map(mapper, tx.getRelationships("MATCH (n)-[r:" + relationshipType.name() + "]->() WHERE ID(n) = {id} RETURN r", map)));
-					break;
-
-				case INCOMING:
-					list = toList(Iterables.map(mapper, tx.getRelationships("MATCH (n)<-[r:" + relationshipType.name() + "]-() WHERE ID(n) = {id} RETURN r", map)));
-					break;
-			}
-
-			setList(direction, relationshipType, list);
+			case INCOMING:
+				return cache.getResult(db, id, concat("(n", tenantIdentifier, ")<-[r:", rel, "]-(s)"), concat("(n)<-[:", rel, "]-()"), "RETURN r, s ORDER BY r.internalTimestamp");
 		}
 
-		return list;
+		return null;
 	}
 
 	@Override
-	public void delete() {
+	public void delete(final boolean deleteRelationships) {
 
-		super.delete();
-		nodeCache.remove(id);
+		super.delete(deleteRelationships);
+
+		final SessionTransaction tx = db.getCurrentTransaction();
+		tx.deleted(this);
 	}
 
-	public static void clearCache() {
-		nodeCache.clear();
+	/**
+	 * Evaluate a custom query and return result as a boolean value
+	 *
+	 * @param customQuery
+	 * @param parameters
+	 * @return
+	 */
+	public boolean evaluateCustomQuery(final String customQuery, final Map<String, Object> parameters) {
+
+		final SessionTransaction tx = db.getCurrentTransaction();
+		boolean result              = false;
+
+		try {
+			result = tx.getBoolean(customQuery, parameters);
+
+		} catch (Exception ignore) {}
+
+		return result;
+	}
+
+	public void addToCache(final RelationshipWrapper rel) {
+
+		synchronized (relationshipCache) {
+
+			final Direction direction   = rel.getDirectionForNode(this);
+			final RelationshipType type = rel.getType();
+			RelationshipResult list = getRelationshipCache(direction, type);
+
+			list.add(rel);
+		}
+	}
+
+	// ----- protected methods -----
+	@Override
+	protected boolean isNode() {
+		return true;
+	}
+
+	// ----- private methods -----
+	private Map<String, RelationshipResult> getCache(final Direction direction) {
+
+		synchronized (relationshipCache) {
+
+			final String directionKey             = direction != null ? direction.name() : "*";
+			Map<String, RelationshipResult> cache = relationshipCache.get(directionKey);
+
+			if (cache == null) {
+
+				cache = new HashMap<>();
+				relationshipCache.put(directionKey, cache);
+			}
+
+			return cache;
+		}
+	}
+
+	private RelationshipResult getRelationshipCache(final Direction direction, final RelationshipType relType) {
+
+		synchronized (relationshipCache) {
+
+			final String relTypeKey                     = relType != null ? relType.name() : "*";
+			final Map<String, RelationshipResult> cache = getCache(direction);
+
+			RelationshipResult count = cache.get(relTypeKey);
+			if (count == null) {
+
+				count = new RelationshipResult();
+				cache.put(relTypeKey, count);
+			}
+
+			// never return null
+			return count;
+		}
 	}
 
 	// ----- public static methods -----
@@ -304,7 +371,7 @@ public class NodeWrapper extends EntityWrapper<org.neo4j.driver.v1.types.Node> i
 		synchronized (nodeCache) {
 
 			NodeWrapper wrapper = nodeCache.get(node.id());
-			if (wrapper == null) {
+			if (wrapper == null) { // || wrapper.stale) {
 
 				wrapper = new NodeWrapper(db, node);
 				nodeCache.put(node.id(), wrapper);
@@ -319,93 +386,146 @@ public class NodeWrapper extends EntityWrapper<org.neo4j.driver.v1.types.Node> i
 		synchronized (nodeCache) {
 
 			NodeWrapper wrapper = nodeCache.get(id);
-			if (wrapper == null) {
+			if (wrapper == null) { // || wrapper.stale) {
 
 				final SessionTransaction tx   = db.getCurrentTransaction();
+				final String tenantIdentifier = getTenantIdentifer(db);
 				final Map<String, Object> map = new HashMap<>();
 
 				map.put("id", id);
 
-				wrapper = new NodeWrapper(db, tx.getNode("MATCH (n) WHERE ID(n) = {id} RETURN n", map));
-				nodeCache.put(id, wrapper);
+				final Iterable<org.neo4j.driver.v1.types.Node> result   = tx.getNodes(concat("MATCH (n", tenantIdentifier, ") WHERE ID(n) = $id RETURN DISTINCT n"), map);
+				final Iterator<org.neo4j.driver.v1.types.Node> iterator = result.iterator();
+
+				if (iterator.hasNext()) {
+
+					wrapper = NodeWrapper.newInstance(db, iterator.next());
+
+					nodeCache.put(id, wrapper);
+
+				} else {
+
+					throw new NotFoundException("Node with ID " + id + " not found.");
+				}
 			}
 
 			return wrapper;
 		}
 	}
 
-	// ----- private methods -----
-	private Map<String, List<Relationship>> getCache(final Direction direction) {
+	// ----- package-private static methods
+	static FixedSizeCache<Long, NodeWrapper> getCache() {
+		return nodeCache;
+	}
 
-		final String key                      = direction != null ? direction.name() : "*";
-		Map<String, List<Relationship>> cache = relationshipCache.get(key);
+	public static void expunge(final Set<Long> toRemove) {
 
-		if (cache == null) {
+		synchronized (nodeCache) {
 
-			cache = new HashMap<>();
-			relationshipCache.put(key, cache);
+			for (final Long id : toRemove) {
+
+				expunge(id);
+			}
+		}
+	}
+
+	public static void expunge(final Long toRemove) {
+
+		synchronized (nodeCache) {
+
+			final NodeWrapper node = nodeCache.remove(toRemove);
+			if (node != null) {
+
+				node.clearCaches();
+			}
+		}
+	}
+
+	// ----- protected static methods -----
+	protected static void clearCache() {
+
+		synchronized (nodeCache) {
+
+			nodeCache.clear();
+		}
+	}
+
+	// ----- private static methods -----
+	private static String concat(final String... parts) {
+
+		final StringBuilder buf = new StringBuilder();
+
+		for (final String part : parts) {
+
+			// handle nulls gracefully (ignore)
+			if (part != null) {
+
+				buf.append(part);
+			}
 		}
 
-		return cache;
+		return buf.toString();
 	}
 
-	private List<Relationship> getList(final Direction direction, final RelationshipType relType) {
+	private static String getTenantIdentifer(final BoltDatabaseService db) {
 
-		final String key                            = relType != null ? relType.name() : "*";
-		final Map<String, List<Relationship>> cache = getCache(direction);
+		final String identifier = db.getTenantIdentifier();
 
-		return cache.get(key);
+		if (StringUtils.isNotBlank(identifier)) {
+
+			return ":" + identifier;
+		}
+
+		return "";
 	}
 
-	private void setList(final Direction direction, final RelationshipType relType, final List<Relationship> list) {
-
-		final String key                            = relType != null ? relType.name() : "*";
-		final Map<String, List<Relationship>> cache = getCache(direction);
-
-		cache.put(key, list);
-	}
-
-	private AssociationList toList(final Iterable<Relationship> source) {
-
-		final AssociationList list = new AssociationList();
-
-		Iterables.addAll(list, source);
-
-		return list;
+	@Override
+	public void removeFromCache() {
+		NodeWrapper.expunge(id);
+		dontUseCache = true;
 	}
 
 	// ----- nested classes -----
-	private class AssociationList extends LinkedList<Relationship> {
+	private class RelationshipResult {
 
-		final Set<String> associations = new HashSet<>();
+		private Set<Relationship> set = null;
 
-		@Override
-		public boolean add(final Relationship toAdd) {
+		public void add(final Relationship rel) {
 
-			associations.add(cacheKey(toAdd.getStartNode(), toAdd.getType(), toAdd.getEndNode()));
+			if (set != null) {
 
-			return super.add(toAdd);
-		}
-
-		public boolean containsAssociation(final Node sourceNode, final RelationshipType relType, final Node targetNode) {
-			return associations.contains(cacheKey(sourceNode, relType, targetNode));
-		}
-
-		// ----- private methods -----
-		public String cacheKey(final Node sourceNode, final RelationshipType relType, final Node targetNode) {
-
-			final StringBuilder buf = new StringBuilder();
-
-			if (sourceNode != null && targetNode != null) {
-
-				buf.append(sourceNode.getId());
-				buf.append("-");
-				buf.append(relType);
-				buf.append("-");
-				buf.append(targetNode.getId());
+				set.add(rel);
 			}
+		}
 
-			return buf.toString();
+		public synchronized Iterable<Relationship> getResult(final BoltDatabaseService db, final long id, final String match, final String pattern, final String returnStatement) {
+
+			final RelationshipRelationshipMapper mapper = new RelationshipRelationshipMapper(db);
+			final Map<String, Object> map               = new HashMap<>();
+			final SessionTransaction tx                 = db.getCurrentTransaction();
+			final String whereStatement                 = " WHERE ID(n) = $id ";
+
+			map.put("id", id);
+
+			if (Settings.ForceResultStreaming.getValue() || dontUseCache) {
+
+				// return streaming result
+				return Iterables.map(mapper, tx.getRelationships(concat("MATCH ", match, whereStatement, returnStatement), map));
+
+			} else {
+
+				// else: return cached result
+				if (set == null) {
+
+					// create sorted set (important if nodes are added later on)
+					set = new TreeSet<>((o1, o2) -> { return compare("internalTimestamp", o1, o2); });
+
+					// add elements
+					set.addAll(Iterables.toList(Iterables.map(mapper, tx.getRelationships(concat("MATCH ", match, whereStatement, returnStatement), map))));
+				}
+
+				return set;
+			}
 		}
 	}
 }

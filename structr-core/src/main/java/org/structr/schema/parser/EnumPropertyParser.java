@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,6 +18,7 @@
  */
 package org.structr.schema.parser;
 
+import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
@@ -66,10 +67,11 @@ public class EnumPropertyParser extends PropertySourceGenerator {
 	}
 
 	@Override
-	public void parseFormatString(final Schema entity, String expression) throws FrameworkException {
+	public void parseFormatString(final Map<String, SchemaNode> schemaNodes, final Schema entity, String expression) throws FrameworkException {
 
-		final String[] enumTypes = expression.split("[, ]+");
-		if (StringUtils.isNotBlank(expression) && enumTypes.length > 0) {
+		if (StringUtils.isNotBlank(expression)) {
+
+			final String[] enumTypes = expression.split("[, ]+");
 
 			enumTypeName = StringUtils.capitalize(getSourcePropertyName());
 
@@ -96,7 +98,7 @@ public class EnumPropertyParser extends PropertySourceGenerator {
 
 				} else {
 
-					reportError(new InvalidPropertySchemaToken(SchemaNode.class.getSimpleName(), expression, "invalid_property_definition", "Invalid enum type name, must match [a-zA-Z_]{1}[a-zA-Z0-9_]*."));
+					reportError(new InvalidPropertySchemaToken(SchemaNode.class.getSimpleName(), this.source.getPropertyName(), expression, "invalid_property_definition", "Invalid enum type name, must match [a-zA-Z_]{1}[a-zA-Z0-9_]*."));
 
 				}
 			}
@@ -104,9 +106,17 @@ public class EnumPropertyParser extends PropertySourceGenerator {
 
 			addEnumDefinition(buf.toString());
 
+		} else if (source.getFqcn() != null) {
+
+			// no enum type definition, use external type
+			enumTypeName = source.getFqcn();
+
+			// create enum type
+			enumType = ", " + enumTypeName + ".class";
+
 		} else {
 
-			reportError(new InvalidPropertySchemaToken(SchemaNode.class.getSimpleName(), expression, "invalid_property_definition", "No enum types found, please specify a list of types, e.g. (red, green, blue)"));
+			reportError(new InvalidPropertySchemaToken(SchemaNode.class.getSimpleName(), this.source.getPropertyName(), expression, "invalid_property_definition", "No enum types found, please specify a list of types, e.g. (red, green, blue)"));
 		}
 	}
 

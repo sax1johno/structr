@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,82 +18,327 @@
  */
 package org.structr.core.entity;
 
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.apache.commons.lang3.ArrayUtils;
+import org.structr.api.Predicate;
+import org.structr.api.config.Settings;
+import org.structr.api.graph.Node;
 import org.structr.common.AccessControllable;
-import org.structr.common.ValidationHelper;
-import org.structr.common.error.ErrorBuffer;
-import org.structr.common.error.SemanticErrorToken;
+import org.structr.common.EMailValidator;
+import org.structr.common.LowercaseTransformator;
+import org.structr.common.PropertyView;
+import org.structr.common.error.FrameworkException;
+import org.structr.core.app.StructrApp;
+import org.structr.core.auth.HashHelper;
+import org.structr.core.auth.exception.AuthenticationException;
 import org.structr.core.entity.relationship.PrincipalOwnsNode;
 import org.structr.core.graph.NodeInterface;
-import org.structr.core.property.ArrayProperty;
-import org.structr.core.property.BooleanProperty;
 import org.structr.core.property.EndNodes;
-import org.structr.core.property.LowercaseStringProperty;
-import org.structr.core.property.PasswordProperty;
 import org.structr.core.property.Property;
-import org.structr.core.property.StringProperty;
+import org.structr.core.property.PropertyKey;
+import org.structr.schema.SchemaService;
+import org.structr.schema.json.JsonObjectType;
+import org.structr.schema.json.JsonSchema;
 
 public interface Principal extends NodeInterface, AccessControllable {
 
-	public static final String SUPERUSER_ID =                    "00000000000000000000000000000000";
+	static class Impl { static {
+
+		final JsonSchema schema          = SchemaService.getDynamicSchema();
+		final JsonObjectType principal   = schema.addType("Principal");
+		final JsonObjectType favoritable = (JsonObjectType)schema.getType("Favoritable");
+
+		principal.setImplements(URI.create("https://structr.org/v1.1/definitions/Principal"));
+		principal.setCategory("core");
+
+		principal.addBooleanProperty("isAdmin").setIndexed(true).setReadOnly(true);
+		principal.addBooleanProperty("blocked", PropertyView.Ui);
+
+		// FIXME: indexedWhenEmpty() is not possible here, but needed?
+		principal.addStringArrayProperty("sessionIds").setIndexed(true);
+
+		principal.addStringProperty("sessionData");
+
+		principal.addStringProperty("eMail")
+			.setIndexed(true)
+			.setUnique(true)
+			.addValidator(EMailValidator.class.getName())
+			.addTransformer(LowercaseTransformator.class.getName());
+
+		principal.addPasswordProperty("password");
+
+
+		// Password Policy
+		principal.addDateProperty("passwordChangeDate");
+		principal.addPropertySetter("passwordChangeDate", Date.class);
+		principal.addPropertyGetter("passwordChangeDate", Date.class);
+
+		principal.addIntegerProperty("passwordAttempts");
+		principal.addPropertySetter("passwordAttempts", Integer.class);
+		principal.addPropertyGetter("passwordAttempts", Integer.class);
+
+
+		// Two Factor Authentication
+		principal.addStringProperty("twoFactorSecret");
+
+		principal.addStringProperty("twoFactorToken").setIndexed(true);
+		principal.addPropertySetter("twoFactorToken", String.class);
+		principal.addPropertyGetter("twoFactorToken", String.class);
+
+		principal.addBooleanProperty("isTwoFactorUser");
+		principal.addPropertySetter("isTwoFactorUser", Boolean.TYPE);
+		principal.addPropertyGetter("isTwoFactorUser", Boolean.TYPE);
+
+		principal.addBooleanProperty("twoFactorConfirmed");
+		principal.addPropertySetter("twoFactorConfirmed", Boolean.TYPE);
+		principal.addPropertyGetter("twoFactorConfirmed", Boolean.TYPE);
+
+
+		principal.addStringProperty("salt");
+		principal.addStringProperty("locale");
+		principal.addStringProperty("publicKey");
+		principal.addStringProperty("proxyUrl");
+		principal.addStringProperty("proxyUsername");
+		principal.addStringProperty("proxyPassword");
+
+		//type.addStringArrayProperty("sessionIds");
+		principal.addStringArrayProperty("publicKeys");
+
+		principal.addStringProperty("customPermissionQueryRead");
+		principal.addStringProperty("customPermissionQueryWrite");
+		principal.addStringProperty("customPermissionQueryDelete");
+		principal.addStringProperty("customPermissionQueryAccessControl");
+
+		principal.addPropertyGetter("locale", String.class);
+		principal.addPropertyGetter("sessionData", String.class);
+		principal.addPropertyGetter("favorites", Iterable.class);
+		principal.addPropertyGetter("groups", Iterable.class);
+		principal.addPropertyGetter("eMail", String.class);
+
+		principal.addPropertySetter("sessionData", String.class);
+		principal.addPropertySetter("favorites", Iterable.class);
+		principal.addPropertySetter("password", String.class);
+		principal.addPropertySetter("isAdmin", Boolean.TYPE);
+		principal.addPropertySetter("eMail", String.class);
+		principal.addPropertySetter("salt", String.class);
+
+		principal.overrideMethod("shouldSkipSecurityRelationships", false, "return false;");
+		principal.overrideMethod("isAdmin",                         false, "return getProperty(isAdminProperty);");
+		principal.overrideMethod("isBlocked",                       false, "return getProperty(blockedProperty);");
+		principal.overrideMethod("getParents",                      false, "return " + Principal.class.getName() + ".getParents(this);");
+		principal.overrideMethod("getParentsPrivileged",            false, "return " + Principal.class.getName() + ".getParentsPrivileged(this);");
+		principal.overrideMethod("isValidPassword",                 false, "return " + Principal.class.getName() + ".isValidPassword(this, arg0);");
+		principal.overrideMethod("addSessionId",                    false, Principal.class.getName() + ".addSessionId(this, arg0);");
+		principal.overrideMethod("removeSessionId",                 false, Principal.class.getName() + ".removeSessionId(this, arg0);");
+		principal.overrideMethod("onAuthenticate",                  false, "");
+
+		// override getProperty
+		principal.addMethod("getProperty")
+			.setReturnType("<T> T")
+			.addParameter("arg0", PropertyKey.class.getName() + "<T>")
+			.addParameter("arg1", Predicate.class.getName() + "<GraphObject>")
+			.setSource("if (arg0.equals(passwordProperty) || arg0.equals(saltProperty) || arg0.equals(twoFactorSecretProperty)) { return (T) Principal.HIDDEN; } else { return super.getProperty(arg0, arg1); }");
+
+		// override setProperty final PropertyKey<T> key, final T value)
+		principal.addMethod("setProperty")
+			.setReturnType("<T> java.lang.Object")
+			.addParameter("arg0", PropertyKey.class.getName() + "<T>")
+			.addParameter("arg1", "T")
+			.addException(FrameworkException.class.getName())
+			.setSource("AbstractNode.clearCaches(); return super.setProperty(arg0, arg1);");
+
+		// create relationships
+		principal.relate(favoritable, "FAVORITE", Relation.Cardinality.ManyToMany, "favoriteUsers", "favorites");
+	}}
+
+	public static final Object HIDDEN                            = "****** HIDDEN ******";
+	public static final String SUPERUSER_ID                      = "00000000000000000000000000000000";
 	public static final String ANONYMOUS                         = "anonymous";
 	public static final String ANYONE                            = "anyone";
 
-	public static final Property<String[]> sessionIds            = new ArrayProperty("sessionIds", String.class).indexedWhenEmpty();
-	public static final Property<String> sessionData             = new StringProperty("sessionData");
-	public static final Property<List<NodeInterface>> ownedNodes = new EndNodes<>("ownedNodes", PrincipalOwnsNode.class);
-	public static final Property<Boolean> blocked                = new BooleanProperty("blocked");
-	public static final Property<String> eMail                   = new LowercaseStringProperty("eMail").cmis().indexed();
-	public static final Property<String> password                = new PasswordProperty("password");
-	public static final Property<String> salt                    = new StringProperty("salt");
-	public static final Property<Boolean> isAdmin                = new BooleanProperty("isAdmin").indexed().readOnly();
-	public static final Property<String> locale                  = new StringProperty("locale");
-	public static final Property<String> publicKey               = new StringProperty("publicKey");
-	public static final Property<String[]> publicKeys            = new ArrayProperty("publicKeys", String.class);
-	public static final Property<String> proxyUrl                = new StringProperty("proxyUrl");
-	public static final Property<String> proxyUsername           = new StringProperty("proxyUsername");
-	public static final Property<String> proxyPassword           = new StringProperty("proxyPassword");
+	public static final Property<Iterable<NodeInterface>> ownedNodes   = new EndNodes<>("ownedNodes", PrincipalOwnsNode.class).partOfBuiltInSchema();
+	public static final Property<Iterable<NodeInterface>> grantedNodes = new EndNodes<>("grantedNodes", Security.class).partOfBuiltInSchema();
 
-	public List<Principal> getParents();
+	Iterable<Favoritable> getFavorites();
+	Iterable<Group> getGroups();
 
-	public boolean isValidPassword(final String password);
-	public String getEncryptedPassword();
-	public String getSalt();
+	Iterable<Principal> getParents();
+	List<Principal> getParentsPrivileged();
 
-	public void addSessionId(final String sessionId);
+	boolean isValidPassword(final String password);
 
-	public void removeSessionId(final String sessionId);
+	void addSessionId(final String sessionId);
+	void removeSessionId(final String sessionId);
 
-	public boolean isAdmin();
-	public boolean shouldSkipSecurityRelationships();
+	String getSessionData();
+	String getEMail();
+	void setSessionData(final String sessionData) throws FrameworkException;
 
-	public Set<String> getAllowedPermissions();
-	public Set<String> getDeniedPermissions();
+	boolean isAdmin();
+	boolean isBlocked();
+	boolean shouldSkipSecurityRelationships();
 
-	@Override
-	default public boolean isValid(final ErrorBuffer errorBuffer) {
+	default void onAuthenticate() {}
 
-		boolean valid = true;
+	void setFavorites(final Iterable<Favoritable> favorites) throws FrameworkException;
+	void setIsAdmin(final boolean isAdmin) throws FrameworkException;
+	void setPassword(final String password) throws FrameworkException;
+	void setEMail(final String eMail) throws FrameworkException;
+	void setSalt(final String salt) throws FrameworkException;
 
-		valid &= ValidationHelper.isValidStringNotBlank(this, name, errorBuffer);
-		valid &= ValidationHelper.isValidUniqueProperty(this, eMail, errorBuffer);
+	String getLocale();
 
-		final String _eMail = getProperty(eMail);
-		if (_eMail != null) {
+	public static Iterable<Principal> getParents(final Principal principal) {
+		return principal.getProperty(StructrApp.key(Principal.class, "groups"));
+	}
 
-			// verify that the address contains at least the @ character,
-			// which is a requirement for it to be distinguishable from
-			// a user name, so email addresses can less easily interfere
-			// with user names.
-			if (!_eMail.contains("@")) {
+	public static List<Principal> getParentsPrivileged(final Principal principal) {
 
-				valid = false;
+		try {
 
-				errorBuffer.add(new SemanticErrorToken(getClass().getSimpleName(), eMail, "must_contain_at_character", _eMail));
+			return StructrApp.getInstance().nodeQuery(Principal.class).and(StructrApp.key(Group.class, "members"), Arrays.asList(principal)).getAsList();
+
+		} catch (FrameworkException fex) {
+
+			logger.warn("Caught exception while fetching groups for user '{}' ({})", principal.getName(), principal.getUuid());
+			fex.printStackTrace();
+
+			return Collections.emptyList();
+		}
+	}
+
+	public static void addSessionId(final Principal principal, final String sessionId) {
+
+		try {
+
+			final PropertyKey<String[]> key = StructrApp.key(Principal.class, "sessionIds");
+			final String[] ids              = principal.getProperty(key);
+
+			if (ids != null) {
+
+				if (!ArrayUtils.contains(ids, sessionId)) {
+					
+					if (ids.length >= Settings.MaxSessionsPerUser.getValue()) {
+						final String errorMessage = "Not adding session id, limit " + Settings.MaxSessionsPerUser.getKey() + " exceeded.";
+						logger.warn(errorMessage);
+						throw new AuthenticationException(errorMessage);
+					}
+
+					principal.setProperty(key, (String[]) ArrayUtils.add(principal.getProperty(key), sessionId));
+				}
+
+			} else {
+
+				principal.setProperty(key, new String[] {  sessionId } );
+			}
+
+
+		} catch (FrameworkException ex) {
+			logger.error("Could not add sessionId " + sessionId + " to array of sessionIds", ex);
+		}
+	}
+
+	public static void removeSessionId(final Principal principal, final String sessionId) {
+
+		try {
+
+			final PropertyKey<String[]> key = StructrApp.key(Principal.class, "sessionIds");
+			final String[] ids              = principal.getProperty(key);
+			Set<String> sessionIds          = new HashSet<>(Arrays.asList(ids));
+
+			sessionIds.remove(sessionId);
+
+			principal.setProperty(key, (String[]) sessionIds.toArray(new String[0]));
+
+		} catch (FrameworkException ex) {
+			logger.error("Could not remove sessionId " + sessionId + " from array of sessionIds", ex);
+		}
+	}
+
+	public static boolean isValidPassword(final Principal principal, final String password) {
+
+		final String encryptedPasswordFromDatabase = getEncryptedPassword(principal);
+		if (encryptedPasswordFromDatabase != null) {
+
+			final String encryptedPasswordToCheck = HashHelper.getHash(password, getSalt(principal));
+
+			if (encryptedPasswordFromDatabase.equals(encryptedPasswordToCheck)) {
+				return true;
 			}
 		}
 
-		return valid;
+		return false;
+	}
+
+	public static String getEncryptedPassword(final Principal principal) {
+
+		final Node dbNode = principal.getNode();
+		if (dbNode.hasProperty("password")) {
+
+			return (String)dbNode.getProperty("password");
+		}
+
+		return null;
+	}
+
+	public static String getSalt(final Principal principal) {
+
+		final Node dbNode = principal.getNode();
+		if (dbNode.hasProperty("salt")) {
+
+			return (String) dbNode.getProperty("salt");
+		}
+
+		return null;
+	}
+
+	public static String getTwoFactorSecret(final Principal principal) {
+
+		final Node dbNode = principal.getNode();
+		if (dbNode.hasProperty("twoFactorSecret")) {
+
+			return (String) dbNode.getProperty("twoFactorSecret");
+		}
+
+		return null;
+	}
+
+	public static String getTwoFactorUrl(final Principal principal) {
+
+		final String twoFactorIssuer    = Settings.TwoFactorIssuer.getValue();
+		final String twoFactorAlgorithm = Settings.TwoFactorAlgorithm.getValue();
+		final Integer twoFactorDigits   = Settings.TwoFactorDigits.getValue();
+		final Integer twoFactorPeriod   = Settings.TwoFactorPeriod.getValue();
+
+		final StringBuilder path = new StringBuilder("/").append(twoFactorIssuer);
+
+		final String eMail = principal.getProperty(StructrApp.key(Principal.class, "eMail"));
+		if (eMail != null) {
+			path.append(":").append(eMail);
+		} else {
+			path.append(":").append(principal.getName());
+		}
+
+		final StringBuilder query = new StringBuilder("secret=").append(Principal.getTwoFactorSecret(principal))
+				.append("&issuer=").append(twoFactorIssuer)
+				.append("&algorithm=").append(twoFactorAlgorithm)
+				.append("&digits=").append(twoFactorDigits)
+				.append("&period=").append(twoFactorPeriod);
+
+		try {
+
+			return new URI("otpauth", null, "totp", -1, path.toString(), query.toString(), null).toString();
+
+		} catch (URISyntaxException use) {
+			logger.warn("two_factor_url(): URISyntaxException for {}?{}", path, query, use);
+			return "URISyntaxException for " + path + "?" + query;
+		}
 	}
 }

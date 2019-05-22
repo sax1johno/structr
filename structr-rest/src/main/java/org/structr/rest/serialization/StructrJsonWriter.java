@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -33,10 +33,14 @@ public class StructrJsonWriter implements RestWriter {
 
 	private SecurityContext securityContext = null;
 	private JsonWriter writer               = null;
+	private Writer rawWriter                = null;
 
 	public StructrJsonWriter(final SecurityContext securityContext, final Writer writer) {
+
 		this.securityContext = securityContext;
-		this.writer = new JsonWriter(writer);
+		this.writer          = new JsonWriter(writer);
+		this.rawWriter       = writer;
+
 		this.writer.setLenient(Settings.JsonLenient.getValue());
 	}
 
@@ -136,5 +140,17 @@ public class StructrJsonWriter implements RestWriter {
 	public RestWriter value(Number value) throws IOException {
 		writer.value(value);
 		return this;
+	}
+
+	@Override
+	public void raw(final String data) throws IOException {
+		writer.flush();
+		rawWriter.append(data);
+		rawWriter.flush();
+	}
+
+	@Override
+	public void flush() throws IOException {
+		writer.flush();
 	}
 }

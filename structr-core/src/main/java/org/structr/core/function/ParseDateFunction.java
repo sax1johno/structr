@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -21,21 +21,19 @@ package org.structr.core.function;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import org.apache.commons.lang3.StringUtils;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class ParseDateFunction extends Function<Object, Object> {
+public class ParseDateFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_PARSE_DATE    = "Usage: ${parse_date(value, pattern)}. Example: ${parse_date(\"2014-01-01\", \"yyyy-MM-dd\")}";
 	public static final String ERROR_MESSAGE_PARSE_DATE_JS = "Usage: ${{Structr.parseDate(value, pattern)}}. Example: ${{Structr.parseDate(\"2014-01-01\", \"yyyy-MM-dd\")}}";
 
 	@Override
 	public String getName() {
-		return "parse_date()";
+		return "parse_date";
 	}
 
 	@Override
@@ -47,11 +45,8 @@ public class ParseDateFunction extends Function<Object, Object> {
 		}
 
 		try {
-		
-			if (!arrayHasLengthAndAllElementsNotNull(sources, 2)) {
-				
-				return null;
-			}
+
+			assertArrayHasLengthAndAllElementsNotNull(sources, 2);
 
 			final String dateString = sources[0].toString();
 
@@ -67,16 +62,19 @@ public class ParseDateFunction extends Function<Object, Object> {
 
 			} catch (ParseException ex) {
 
-				logger.warn("{}: Could not parse string \"{}\" with pattern {} in element \"{}\". Parameters: {}", new Object[] { getName(), dateString, pattern, caller, getParametersAsString(sources) });
+				logger.warn("{}: Could not parse string \"{}\" with pattern {} in element \"{}\". Parameters: {}", new Object[] { getReplacement(), dateString, pattern, caller, getParametersAsString(sources) });
 
 			}
 
-		} catch (final IllegalArgumentException e) {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			// silently ignore null arguments
+			return null;
 
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
 
 		return "";
@@ -91,5 +89,4 @@ public class ParseDateFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Parses the given date string using the given format string";
 	}
-
 }

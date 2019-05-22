@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -48,9 +48,43 @@ public interface AccessControllable {
 	 */
 	public boolean isGranted(final Permission permission, final SecurityContext securityContext);
 
-
+	/**
+	 * Grant given permission to given principal.
+	 *
+	 * @param permission
+	 * @param principal
+	 * @throws FrameworkException
+	 */
 	public void grant(final Permission permission, final Principal principal) throws FrameworkException;
+
+	/**
+	 * Grant given permission to given principal.
+	 *
+	 * @param permission
+	 * @param principal
+	 * @param ctx
+	 * @throws FrameworkException
+	 */
+	public void grant(final Permission permission, final Principal principal, final SecurityContext ctx) throws FrameworkException;
+
+	/**
+	 * Revoke given permission from given principal.
+	 *
+	 * @param permission
+	 * @param principal
+	 * @throws FrameworkException
+	 */
 	public void revoke(final Permission permission, final Principal principal) throws FrameworkException;
+
+	/**
+	 * Revoke given permission from given principal.
+	 *
+	 * @param permission
+	 * @param principal
+	 * @param ctx
+	 * @throws FrameworkException
+	 */
+	public void revoke(final Permission permission, final Principal principal, final SecurityContext ctx) throws FrameworkException;
 
 
 	/**
@@ -67,8 +101,6 @@ public interface AccessControllable {
 	public boolean isVisibleToAuthenticatedUsers();
 	public boolean isNotHidden();
 	public boolean isHidden();
-	public Date getVisibilityStartDate();
-	public Date getVisibilityEndDate();
 
 	// access
 	public Date getCreatedDate();

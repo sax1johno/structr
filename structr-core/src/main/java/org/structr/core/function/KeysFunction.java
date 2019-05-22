@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -27,19 +27,15 @@ import org.structr.core.GraphObject;
 import org.structr.core.GraphObjectMap;
 import org.structr.core.property.PropertyKey;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class KeysFunction extends Function<Object, Object> {
+public class KeysFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_KEYS = "Usage: ${keys(entity [, viewName])}. Example: ${keys(this, \"ui\")}";
 	public static final String ERROR_MESSAGE_KEYS_JS = "Usage: ${{Structr.keys(entity [, viewName])}}. Example: ${{Structr.keys(this, \"ui\")}}";
 
 	@Override
 	public String getName() {
-		return "keys()";
+		return "keys";
 	}
 
 	@Override
@@ -70,7 +66,7 @@ public class KeysFunction extends Function<Object, Object> {
 
 				return new LinkedList<>(((Map)sources[0]).keySet());
 			} else {
-				
+
 				return null;
 			}
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -25,18 +25,16 @@ import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.MathTransform;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObjectMap;
 import org.structr.core.property.DoubleProperty;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class UTMToLatLonFunction extends Function<Object, Object> {
+public class UTMToLatLonFunction extends GeoFunction {
 
-	private static final String ERROR_MESSAGE            = "Usage: ${utmToLatLon(latitude, longitude)}. Example: ${utmToLatLon('32U 395473 5686479')}";
+	private static final String ERROR_MESSAGE            = "Usage: ${utm_to_lat_lon(utmString)}. Example: ${utm_to_lat_lon('32U 395473 5686479')}";
 	private static final Logger logger                   = LoggerFactory.getLogger(UTMToLatLonFunction.class.getName());
 	private static final String UTMHemisphere            = "SSSSSSSSSSNNNNNNNNNNN";
 	private static final String UTMzdlChars              = "CDEFGHJKLMNPQRSTUVWXX";
@@ -44,9 +42,16 @@ public class UTMToLatLonFunction extends Function<Object, Object> {
 	public static final DoubleProperty longitudeProperty = new DoubleProperty("longitude");
 
 	@Override
+	public String getName() {
+		return "utm_to_lat_lon";
+	}
+
+	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
-		if (arrayHasLengthAndAllElementsNotNull(sources, 1)) {
+		try {
+
+			assertArrayHasLengthAndAllElementsNotNull(sources, 1);
 
 			final String utmString = (String)sources[0];
 			if (utmString != null) {
@@ -84,6 +89,18 @@ public class UTMToLatLonFunction extends Function<Object, Object> {
 
 				logger.warn("Invalid argument(s), cannot convert to double: {}, {}", new Object[] { sources[0], sources[1] });
 			}
+
+		} catch (ArgumentNullException ae) {
+
+			boolean isJs = ctx != null ? ctx.isJavaScriptContext() : false;
+			logParameterError(caller, sources, ae.getMessage(), isJs);
+			return "Unsupported UTM string";
+
+		} catch (ArgumentCountException ae) {
+
+			boolean isJs = ctx != null ? ctx.isJavaScriptContext() : false;
+			logParameterError(caller, sources, ae.getMessage(), isJs);
+			return usage(isJs);
 		}
 
 		return "Unsupported UTM string";
@@ -96,12 +113,7 @@ public class UTMToLatLonFunction extends Function<Object, Object> {
 
 	@Override
 	public String shortDescription() {
-		return "Converts the given latitude/longitude coordinates into an UTM string.";
-	}
-
-	@Override
-	public String getName() {
-		return "utm_to_lat_lon";
+		return "Converts the given UTM string to latitude/longitude coordinates.";
 	}
 
 	// ----- private methods -----

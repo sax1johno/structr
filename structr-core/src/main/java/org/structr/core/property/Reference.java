@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -134,6 +134,9 @@ public class Reference<T> implements PropertyKey<T> {
 	}
 
 	@Override
+	public boolean cachingEnabled() { return propertyKey.cachingEnabled(); }
+
+	@Override
 	public SortType getSortType() {
 		return propertyKey.getSortType();
 	}
@@ -213,6 +216,11 @@ public class Reference<T> implements PropertyKey<T> {
 	}
 
 	@Override
+	public String getSourceUuid() {
+		return propertyKey.getSourceUuid();
+	}
+
+	@Override
 	public T getProperty(SecurityContext securityContext, GraphObject obj, boolean applyConverter) {
 		return getProperty(securityContext, obj, applyConverter, null);
 	}
@@ -244,16 +252,6 @@ public class Reference<T> implements PropertyKey<T> {
 	@Override
 	public String getSynchronizationKey() {
 		return propertyKey.getSynchronizationKey();
-	}
-
-	@Override
-	public void index(GraphObject entity) {
-		propertyKey.index(entity, entity.getProperty(propertyKey));
-	}
-	
-	@Override
-	public void index(GraphObject entity, Object value) {
-		propertyKey.index(entity, value);
 	}
 
 	@Override
@@ -312,6 +310,16 @@ public class Reference<T> implements PropertyKey<T> {
 	}
 
 	@Override
+	public String typeHint() {
+		return null;
+	}
+
+	@Override
+	public PropertyKey<T> typeHint(String typeHint) {
+		return null;
+	}
+
+	@Override
 	public Property<T> readFunction(final String readFunction) {
 		return null;
 	}
@@ -320,6 +328,9 @@ public class Reference<T> implements PropertyKey<T> {
 	public Property<T> writeFunction(final String writeFunction) {
 		return null;
 	}
+
+	@Override
+	public PropertyKey<T> cachingEnabled(boolean enabled) { return null; }
 
 	@Override
 	public Property<T> unique(final boolean unique) {
@@ -362,7 +373,32 @@ public class Reference<T> implements PropertyKey<T> {
 	}
 
 	@Override
-	public boolean indexable(Object value) {
-		return propertyKey.indexable(value);
+	public boolean isPropertyTypeIndexable() {
+		return propertyKey.isPropertyTypeIndexable();
+	}
+
+	@Override
+	public boolean isPropertyValueIndexable(Object value) {
+		return propertyKey.isPropertyValueIndexable(value);
+	}
+
+	@Override
+	public PropertyKey<T> transformators(String... transformators) {
+		return propertyKey.transformators(transformators);
+	}
+
+	@Override
+	public boolean isPartOfBuiltInSchema() {
+		return propertyKey.isPartOfBuiltInSchema();
+	}
+
+	@Override
+	public PropertyKey<T> partOfBuiltInSchema() {
+		return propertyKey.partOfBuiltInSchema();
+	}
+
+	@Override
+	public Object getIndexValue(Object value) {
+		return propertyKey.getIndexValue(value);
 	}
 }

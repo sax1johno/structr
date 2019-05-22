@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,52 +18,44 @@
  */
 package org.structr.core.function;
 
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class ModFunction extends Function<Object, Object> {
+public class ModFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_MODULO = "Usage: ${mod(value1, value2)}. Example: ${mod(17, 5)}";
 
 	@Override
 	public String getName() {
-		return "mod()";
+		return "mod";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
 		try {
-		
-			if (arrayHasLengthAndAllElementsNotNull(sources, 2)) {
 
-				try {
+			assertArrayHasLengthAndAllElementsNotNull(sources, 2);
 
-					return ((int)Double.parseDouble(sources[0].toString())) % ((int)Double.parseDouble(sources[1].toString()));
+			return ((int)Double.parseDouble(sources[0].toString())) % ((int)Double.parseDouble(sources[1].toString()));
 
-				} catch (NumberFormatException nfe) {
+		} catch (NumberFormatException nfe) {
 
-					logException(caller, nfe, sources);
+			logException(caller, nfe, sources);
+			return nfe.getMessage();
 
-					return nfe.getMessage();
+		} catch (ArgumentNullException pe) {
 
-				}
-			}
+			// silently ignore null arguments
+			return null;
 
-		} catch (final IllegalArgumentException e) {
+		} catch (ArgumentCountException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
-
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
-		
-		return null;
-
 	}
 
 	@Override
@@ -75,5 +67,4 @@ public class ModFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Returns the remainder of the division";
 	}
-
 }

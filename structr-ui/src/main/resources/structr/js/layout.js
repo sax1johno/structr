@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -23,6 +23,8 @@ var _Layout = {
 	topOffset: 131,
 
 	doLayout: function(nodes, rels) {
+
+console.log(nodes);
 
 		_Layout.timeout = window.setInterval(function() {
 

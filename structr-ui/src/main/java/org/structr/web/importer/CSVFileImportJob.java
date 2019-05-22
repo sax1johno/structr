@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -29,26 +29,33 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.AccessMode;
+import org.structr.common.ContextStore;
 import org.structr.common.ResultTransformer;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.JsonInput;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
+import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.Principal;
+import org.structr.core.entity.Relation;
 import org.structr.core.graph.Tx;
 import org.structr.core.property.PropertyMap;
 import org.structr.module.StructrModule;
 import org.structr.module.api.APIBuilder;
 import org.structr.rest.common.CsvHelper;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 
 public class CSVFileImportJob extends FileImportJob {
 
 	private static final Logger logger = LoggerFactory.getLogger(CSVFileImportJob.class.getName());
 
-	public CSVFileImportJob(FileBase file, Principal user, Map<String, Object> configuration) throws FrameworkException {
-		super(file, user, configuration);
+	private enum IMPORT_TYPE {
+		NODE, REL
+	}
+
+	public CSVFileImportJob(File file, Principal user, Map<String, Object> configuration, final ContextStore ctxStore) throws FrameworkException {
+		super(file, user, configuration, ctxStore);
 	}
 
 	@Override
@@ -87,6 +94,7 @@ public class CSVFileImportJob extends FileImportJob {
 			final String delimiter                   = getOrDefault(configuration.get("delimiter"), ";");
 			final String quoteChar                   = getOrDefault(configuration.get("quoteChar"), "\"");
 			final String range                       = getOrDefault(configuration.get("range"), "");
+			final boolean strictQuotes               = getOrDefault(configuration.get("strictQuotes"), false);
 			final Integer commitInterval             = parseInt(configuration.get("commitInterval"), 1000);
 
 			logger.info("Importing CSV from {} ({}) to {} using {}", filePath, fileUuid, targetType, configuration);
@@ -96,6 +104,7 @@ public class CSVFileImportJob extends FileImportJob {
 			final String importTypeName    = "ImportFromCsv" + df.format(System.currentTimeMillis());
 
 			final SecurityContext threadContext = SecurityContext.getInstance(user, AccessMode.Backend);
+			threadContext.setContextStore(ctxStore);
 			final App app                       = StructrApp.getInstance(threadContext);
 
 			// disable transaction notifications
@@ -115,10 +124,28 @@ public class CSVFileImportJob extends FileImportJob {
 				reportBegin();
 
 				final ResultTransformer mapper     = builder.createMapping(app, targetType, importTypeName, importMappings, transforms);
-				final Class targetEntityType       = StructrApp.getConfiguration().getNodeEntityClass(targetType);
+
+				IMPORT_TYPE currentImportType = IMPORT_TYPE.NODE;
+				Class targetEntityType        = StructrApp.getConfiguration().getNodeEntityClass(targetType);
+
+				Class relSourceType = null;
+				Class relTargetType = null;
+				if (targetEntityType == null) {
+					targetEntityType  = StructrApp.getConfiguration().getRelationshipEntityClass(targetType);
+					currentImportType = IMPORT_TYPE.REL;
+
+					final Relation template = (Relation)targetEntityType.newInstance();
+					relSourceType = template.getSourceType();
+					relTargetType = template.getTargetType();
+
+					if (targetEntityType == null) {
+						throw new FrameworkException(422, "Could not find type for '" + targetType + "'!");
+					}
+				}
+
 				final Character fieldSeparator     = delimiter.charAt(0);
 				final Character quoteCharacter     = StringUtils.isNotEmpty(quoteChar) ? quoteChar.charAt(0) : null;
-				final Iterable<JsonInput> iterable = CsvHelper.cleanAndParseCSV(threadContext, new InputStreamReader(is, "utf-8"), targetEntityType, fieldSeparator, quoteCharacter, range, reverse(importMappings));
+				final Iterable<JsonInput> iterable = CsvHelper.cleanAndParseCSV(threadContext, new InputStreamReader(is, "utf-8"), targetEntityType, fieldSeparator, quoteCharacter, range, reverse(importMappings), strictQuotes);
 				final Iterator<JsonInput> iterator = iterable.iterator();
 				int chunks                         = 0;
 				int overallCount                   = 0;
@@ -137,7 +164,17 @@ public class CSVFileImportJob extends FileImportJob {
 
 							mapper.transformInput(threadContext, targetEntityType, input);
 
-							app.create(targetEntityType, PropertyMap.inputTypeToJavaType(threadContext, targetEntityType, input));
+							if (currentImportType.equals(IMPORT_TYPE.NODE)) {
+
+								app.create(targetEntityType, PropertyMap.inputTypeToJavaType(threadContext, targetEntityType, input));
+
+							} else {
+
+								final AbstractNode sourceNode = (AbstractNode)app.get(relSourceType, (String)input.get("sourceId"));
+								final AbstractNode targetNode = (AbstractNode)app.get(relTargetType, (String)input.get("targetId"));
+
+								app.create(sourceNode, targetNode, targetEntityType, PropertyMap.inputTypeToJavaType(threadContext, targetEntityType, input));
+							}
 
 							overallCount++;
 						}
@@ -164,6 +201,10 @@ public class CSVFileImportJob extends FileImportJob {
 
 				reportException(fex);
 
+			} catch (InstantiationException ex) {
+				reportException(ex);
+			} catch (IllegalAccessException ex) {
+				reportException(ex);
 			} finally {
 
 				try {

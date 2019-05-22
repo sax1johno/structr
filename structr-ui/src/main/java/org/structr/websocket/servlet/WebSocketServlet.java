@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -31,11 +31,7 @@ import org.structr.websocket.WebSocketDataGSONAdapter;
 import org.structr.websocket.WebsocketController;
 import org.structr.websocket.message.WebSocketMessage;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
- *
- *
  *
  */
 public class WebSocketServlet extends org.eclipse.jetty.websocket.servlet.WebSocketServlet implements HttpServiceServlet {
@@ -53,7 +49,7 @@ public class WebSocketServlet extends org.eclipse.jetty.websocket.servlet.WebSoc
 	public String getModuleName() {
 		return "ui";
 	}
-	
+
 	@Override
 	public void configure(final WebSocketServletFactory factory) {
 

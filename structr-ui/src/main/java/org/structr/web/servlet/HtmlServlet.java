@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -25,14 +25,12 @@ import java.nio.charset.Charset;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -48,16 +46,17 @@ import javax.servlet.AsyncContext;
 import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
-import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DateUtils;
+import org.eclipse.jetty.io.EofException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.api.config.Settings;
+import org.structr.api.util.Iterables;
 import org.structr.common.AccessMode;
 import org.structr.common.GraphObjectComparator;
 import org.structr.common.PathHelper;
@@ -65,7 +64,6 @@ import org.structr.common.SecurityContext;
 import org.structr.common.ThreadLocalMatcher;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
 import org.structr.core.Services;
 import org.structr.core.app.App;
 import org.structr.core.app.Query;
@@ -75,14 +73,16 @@ import org.structr.core.auth.exception.AuthenticationException;
 import org.structr.core.converter.PropertyConverter;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.Principal;
+import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.Tx;
 import org.structr.core.property.PropertyKey;
-import org.structr.core.property.PropertyMap;
-import org.structr.dynamic.File;
+import org.structr.core.script.Scripting;
 import org.structr.rest.auth.AuthHelper;
 import org.structr.rest.service.HttpServiceServlet;
 import org.structr.rest.service.StructrHttpServiceConfig;
+import org.structr.rest.servlet.AbstractServletBase;
 import org.structr.schema.ConfigurationProvider;
+import org.structr.schema.action.ActionContext;
 import org.structr.util.Base64;
 import org.structr.web.auth.UiAuthenticator;
 import org.structr.web.common.FileHelper;
@@ -90,21 +90,18 @@ import org.structr.web.common.RenderContext;
 import org.structr.web.common.RenderContext.EditMode;
 import org.structr.web.common.StringRenderBuffer;
 import org.structr.web.entity.AbstractFile;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Linkable;
 import org.structr.web.entity.Site;
 import org.structr.web.entity.User;
 import org.structr.web.entity.dom.DOMNode;
 import org.structr.web.entity.dom.Page;
+import org.structr.websocket.command.AbstractCommand;
 
-//~--- classes ----------------------------------------------------------------
 /**
  * Main servlet for content rendering.
- *
- *
- *
  */
-public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
+public class HtmlServlet extends AbstractServletBase implements HttpServiceServlet {
 
 	private static final Logger logger = LoggerFactory.getLogger(HtmlServlet.class.getName());
 
@@ -118,10 +115,8 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 	public static final String TARGET_PAGE_KEY           = "target";
 	public static final String ERROR_PAGE_KEY            = "onerror";
 
-	public static final String CUSTOM_RESPONSE_HEADERS      = "HtmlServlet.customResponseHeaders";
 	public static final String OBJECT_RESOLUTION_PROPERTIES = "HtmlServlet.resolveProperties";
 
-	private static final List<String> customResponseHeaders        = new LinkedList<>();
 	private static final ThreadLocalMatcher threadLocalUUIDMatcher = new ThreadLocalMatcher("[a-fA-F0-9]{32}");
 	private static final ExecutorService threadPool                = Executors.newCachedThreadPool();
 
@@ -132,12 +127,6 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 	private boolean isAsync = false;
 
 	public HtmlServlet() {
-
-		final String customResponseHeadersString = Settings.HtmlCustomResponseHeaders.getValue();
-		if (StringUtils.isNotBlank(customResponseHeadersString)) {
-
-			customResponseHeaders.addAll(Arrays.asList(customResponseHeadersString.split("[ ,]+")));
-		}
 
 		// resolving properties
 		final String resolvePropertiesSource = Settings.HtmlResolveProperties.getValue();
@@ -161,6 +150,19 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 	@Override
 	public String getModuleName() {
 		return "ui";
+	}
+
+	@Override
+	public void init() {
+
+		try (final Tx tx = StructrApp.getInstance().tx()) {
+
+			AbstractCommand.getOrCreateHiddenDocument();
+			tx.success();
+
+		} catch (FrameworkException fex) {
+			logger.warn("Unable to create shadow page: {}", fex.getMessage());
+		}
 	}
 
 	@Override
@@ -267,81 +269,78 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 					}
 				}
 
+				File file = null;
+
 				if (rootElement == null) { // No page found
 
 					// In case of a file, try to find a file with the query string in the filename
 					final String queryString = request.getQueryString();
 
 					// Look for a file, first include the query string
-					FileBase file = findFile(securityContext, request, path + (queryString != null ? "?" + queryString : ""));
+					file = findFile(securityContext, request, path + (queryString != null ? "?" + queryString : ""));
 
 					// If no file with query string in the file name found, try without query string
 					if (file == null) {
 						file = findFile(securityContext, request, path);
 					}
 
-					if (file != null) {
+					if (file == null) {
 
-						streamFile(securityContext, file, request, response, edit);
-						tx.success();
-						return;
+						if (uriParts != null) {
 
-					}
+							// store remaining path parts in request
+							final Matcher matcher = threadLocalUUIDMatcher.get();
 
-					if (uriParts != null) {
+							for (int i = 0; i < uriParts.length; i++) {
 
-						// store remaining path parts in request
-						final Matcher matcher = threadLocalUUIDMatcher.get();
+								request.setAttribute(uriParts[i], i);
+								matcher.reset(uriParts[i]);
 
-						for (int i = 0; i < uriParts.length; i++) {
-
-							request.setAttribute(uriParts[i], i);
-							matcher.reset(uriParts[i]);
-
-							// set to "true" if part matches UUID pattern
-							requestUriContainsUuids |= matcher.matches();
+								// set to "true" if part matches UUID pattern
+								requestUriContainsUuids |= matcher.matches();
+							}
 						}
-					}
 
-					if (!requestUriContainsUuids) {
+						if (!requestUriContainsUuids) {
 
-						// Try to find a data node by name
-						dataNode = findFirstNodeByName(securityContext, request, path);
+							// Try to find a data node by name
+							dataNode = findFirstNodeByName(securityContext, request, path);
 
-					} else {
+						} else {
 
-						dataNode = findNodeByUuid(securityContext, PathHelper.getName(path));
+							dataNode = findNodeByUuid(securityContext, PathHelper.getName(path));
 
-					}
+						}
 
-					//if (dataNode != null && !(dataNode instanceof Linkable)) {
-					if (dataNode != null) {
+						//if (dataNode != null && !(dataNode instanceof Linkable)) {
+						if (dataNode != null) {
 
-						// Last path part matches a data node
-						// Remove last path part and try again searching for a page
-						// clear possible entry points
-						request.removeAttribute(POSSIBLE_ENTRY_POINTS_KEY);
+							// Last path part matches a data node
+							// Remove last path part and try again searching for a page
+							// clear possible entry points
+							request.removeAttribute(POSSIBLE_ENTRY_POINTS_KEY);
 
-						rootElement = findPage(securityContext, pages, StringUtils.substringBeforeLast(path, PathHelper.PATH_SEP), edit);
+							rootElement = findPage(securityContext, pages, StringUtils.substringBeforeLast(path, PathHelper.PATH_SEP), edit);
 
-						renderContext.setDetailsDataObject(dataNode);
+							renderContext.setDetailsDataObject(dataNode);
 
-						// Start rendering on data node
-						if (rootElement == null && dataNode instanceof DOMNode) {
+							// Start rendering on data node
+							if (rootElement == null && dataNode instanceof DOMNode) {
 
-							// check visibleForSite here as well
-							if (!(dataNode instanceof Page) || isVisibleForSite(request, (Page)dataNode)) {
+								// check visibleForSite here as well
+								if (!(dataNode instanceof Page) || isVisibleForSite(request, (Page)dataNode)) {
 
-								rootElement = ((DOMNode) dataNode);
+									rootElement = ((DOMNode) dataNode);
+								}
 							}
 						}
 					}
 				}
 
-				// look for pages with HTTP Basic Authentication (must be done as superuser)
-				if (rootElement == null) {
+				// Disable Basic auth for any EditMode other than NONE
+				if (EditMode.NONE.equals(edit)) {
 
-					final HttpBasicAuthResult authResult = checkHttpBasicAuth(request, response, path);
+					final HttpBasicAuthResult authResult = checkHttpBasicAuth(securityContext, request, response, ((file != null) ? file.getPath() : (dataNode == null) ? path : StringUtils.substringBeforeLast(path, PathHelper.PATH_SEP)));
 
 					switch (authResult.authState()) {
 
@@ -354,9 +353,9 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 								securityContext = authResult.getSecurityContext();
 								renderContext.pushSecurityContext(securityContext);
 
-							} else if (result instanceof FileBase) {
+							} else if (result instanceof File) {
 
-								streamFile(authResult.getSecurityContext(), (FileBase)result, request, response, EditMode.NONE);
+								streamFile(authResult.getSecurityContext(), (File)result, request, response, EditMode.NONE);
 								tx.success();
 								return;
 
@@ -366,7 +365,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 						// Page with Basic Auth found but not yet authenticated
 						case MustAuthenticate:
 
-							final Page errorPage = StructrApp.getInstance().nodeQuery(Page.class).and(Page.showOnErrorCodes, "401", false).getFirst();
+							final Page errorPage = StructrApp.getInstance().nodeQuery(Page.class).and(StructrApp.key(Page.class, "showOnErrorCodes"), "401", false).getFirst();
 							if (errorPage != null && isVisibleForSite(request, errorPage)) {
 
 								// set error page
@@ -390,7 +389,13 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 						case NoBasicAuth:
 							break;
 					}
+				}
 
+				if (file != null) {
+
+					streamFile(securityContext, file, request, response, edit);
+					tx.success();
+					return;
 				}
 
 				// Still nothing found, do error handling
@@ -405,7 +410,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 
 				// check dont cache flag on page (if root element is a page)
 				// but don't modify true to false
-				dontCache |= rootElement.getProperty(Page.dontCache);
+				dontCache |= rootElement.dontCache();
 
 				if (EditMode.WIDGET.equals(edit) || dontCache) {
 
@@ -436,7 +441,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 						// prepare response
 						response.setCharacterEncoding("UTF-8");
 
-						String contentType = rootElement.getProperty(Page.contentType);
+						String contentType = rootElement.getProperty(StructrApp.key(Page.class, "contentType"));
 
 						if (contentType == null) {
 
@@ -452,92 +457,12 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 
 						setCustomResponseHeaders(response);
 
-						final boolean createsRawData = rootElement.getProperty(Page.pageCreatesRawData);
+						final boolean createsRawData = rootElement.getProperty(StructrApp.key(Page.class, "pageCreatesRawData"));
 
 						// async or not?
 						if (isAsync && !createsRawData) {
 
-							final AsyncContext async = request.startAsync();
-							final ServletOutputStream out = async.getResponse().getOutputStream();
-							final AtomicBoolean finished = new AtomicBoolean(false);
-							final DOMNode rootNode = rootElement;
-
-							threadPool.submit(new Runnable() {
-
-								@Override
-								public void run() {
-
-									try (final Tx tx = app.tx()) {
-
-										// render
-										rootNode.render(renderContext, 0);
-										finished.set(true);
-
-										tx.success();
-
-									} catch (Throwable t) {
-
-										t.printStackTrace();
-										logger.warn("Error while rendering page {}: {}", rootNode.getName(), t.getMessage());
-
-										try {
-
-											response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-											finished.set(true);
-
-										} catch (IOException ex) {
-											logger.warn("", ex);
-										}
-									}
-								}
-
-							});
-
-							// start output write listener
-							out.setWriteListener(new WriteListener() {
-
-								@Override
-								public void onWritePossible() throws IOException {
-
-									try {
-
-										final Queue<String> queue = renderContext.getBuffer().getQueue();
-										while (out.isReady()) {
-
-											String buffer = null;
-
-											synchronized (queue) {
-												buffer = queue.poll();
-											}
-
-											if (buffer != null) {
-
-												out.print(buffer);
-
-											} else {
-
-												if (finished.get()) {
-
-													async.complete();
-
-													// prevent this block from being called again
-													break;
-												}
-
-												Thread.sleep(1);
-											}
-										}
-
-									} catch (Throwable t) {
-										logger.warn("", t);
-									}
-								}
-
-								@Override
-								public void onError(Throwable t) {
-									logger.warn("", t);
-								}
-							});
+							renderAsyncOutput(request, response, app, renderContext, rootElement);
 
 						} else {
 
@@ -549,9 +474,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 
 							try {
 
-								response.getOutputStream().write(buffer.getBuffer().toString().getBytes("utf-8"));
-								response.getOutputStream().flush();
-								response.getOutputStream().close();
+								writeOutputSteam (response, buffer);
 
 							} catch (IOException ioex) {
 								logger.warn("", ioex);
@@ -643,7 +566,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 
 				final EditMode edit = renderContext.getEditMode(user);
 
-				DOMNode rootElement = null;
+				DOMNode rootElement   = null;
 				AbstractNode dataNode = null;
 
 				String[] uriParts = PathHelper.getParts(path);
@@ -668,7 +591,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 				if (rootElement == null) { // No page found
 
 					// Look for a file
-					FileBase file = findFile(securityContext, request, path);
+					File file = findFile(securityContext, request, path);
 					if (file != null) {
 
 						//streamFile(securityContext, file, request, response, edit);
@@ -729,7 +652,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 				// look for pages with HTTP Basic Authentication (must be done as superuser)
 				if (rootElement == null) {
 
-					final HttpBasicAuthResult authResult = checkHttpBasicAuth(request, response, path);
+					final HttpBasicAuthResult authResult = checkHttpBasicAuth(securityContext, request, response, path);
 
 					switch (authResult.authState()) {
 
@@ -741,7 +664,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 								rootElement = (DOMNode)result;
 								renderContext.pushSecurityContext(authResult.getSecurityContext());
 
-							} else if (result instanceof FileBase) {
+							} else if (result instanceof File) {
 
 								//streamFile(authResult.getSecurityContext(), (File)result, request, response, EditMode.NONE);
 								tx.success();
@@ -794,7 +717,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 
 				// check dont cache flag on page (if root element is a page)
 				// but don't modify true to false
-				dontCache |= rootElement.getProperty(Page.dontCache);
+				dontCache |= rootElement.dontCache();
 
 				if (EditMode.WIDGET.equals(edit) || dontCache) {
 
@@ -824,7 +747,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 						// prepare response
 						response.setCharacterEncoding("UTF-8");
 
-						String contentType = rootElement.getProperty(Page.contentType);
+						String contentType = rootElement.getProperty(StructrApp.key(Page.class, "contentType"));
 
 						if (contentType == null) {
 
@@ -888,6 +811,116 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 		}
 	}
 
+	protected void renderAsyncOutput(HttpServletRequest request, HttpServletResponse response, App app, RenderContext renderContext, DOMNode rootElement) throws IOException {
+		final AsyncContext async = request.startAsync();
+		final ServletOutputStream out = async.getResponse().getOutputStream();
+		final AtomicBoolean finished = new AtomicBoolean(false);
+		final DOMNode rootNode = rootElement;
+
+		threadPool.submit(new Runnable() {
+
+			@Override
+			public void run() {
+
+				try (final Tx tx = app.tx()) {
+
+					// render
+					rootNode.render(renderContext, 0);
+					finished.set(true);
+
+					tx.success();
+
+				} catch (Throwable t) {
+
+					t.printStackTrace();
+					logger.warn("Error while rendering page {}: {}", rootNode.getName(), t.getMessage());
+
+					try {
+
+						response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+						finished.set(true);
+
+					} catch (IOException ex) {
+						logger.warn("", ex);
+					}
+				}
+			}
+
+		});
+
+		// start output write listener
+		out.setWriteListener(new WriteListener() {
+
+			@Override
+			public void onWritePossible() throws IOException {
+
+				try {
+
+					final Queue<String> queue = renderContext.getBuffer().getQueue();
+					while (out.isReady()) {
+
+						String buffer = null;
+
+						synchronized (queue) {
+							buffer = queue.poll();
+						}
+
+						if (buffer != null) {
+
+							out.print(buffer);
+
+						} else {
+
+							if (finished.get()) {
+
+								async.complete();
+
+								// prevent this block from being called again
+								break;
+							}
+
+							Thread.sleep(1);
+						}
+					}
+
+				} catch (EofException ee) {
+
+					final SecurityContext sc = renderContext.getSecurityContext();
+					final Principal user     = sc.getUser(false);
+					final String username    = (user != null) ? user.getName() : "anonymous";
+
+					logger.warn("Could not flush the response body content to the client, probably because the network connection was terminated.");
+					logger.warn(" -> From: {} | URI: {} | Query: {} | User: {}", request.getRemoteAddr(), request.getRequestURI(), request.getQueryString(), username);
+
+				} catch (IOException | InterruptedException t) {
+					//logger.warn("Unexpected exception", t);
+				}
+			}
+
+			@Override
+			public void onError(Throwable t) {
+				if (t instanceof EofException) {
+
+					final SecurityContext sc = renderContext.getSecurityContext();
+					final Principal user     = sc.getUser(false);
+					final String username    = (user != null) ? user.getName() : "anonymous";
+
+					logger.warn("Could not flush the response body content to the client, probably because the network connection was terminated.");
+					logger.warn(" -> From: {} | URI: {} | Query: {} | User: {}", request.getRemoteAddr(), request.getRequestURI(), request.getQueryString(), username);
+
+				} else {
+					//logger.warn("Unexpected exception", t);
+				}
+			}
+		});
+	}
+
+	protected void writeOutputSteam(HttpServletResponse response, StringRenderBuffer buffer) throws IOException {
+		response.getOutputStream().write(buffer.getBuffer().toString().getBytes("utf-8"));
+		response.getOutputStream().flush();
+		response.getOutputStream().close();
+	}
+
 	/**
 	 * Handle 404 Not Found
 	 *
@@ -903,7 +936,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 	 */
 	private Page notFound(final HttpServletResponse response, final SecurityContext securityContext) throws IOException, FrameworkException {
 
-		final List<Page> errorPages = StructrApp.getInstance(securityContext).nodeQuery(Page.class).and(Page.showOnErrorCodes, "404", false).getAsList();
+		final List<Page> errorPages = StructrApp.getInstance(securityContext).nodeQuery(Page.class).and(StructrApp.key(Page.class, "showOnErrorCodes"), "404", false).getAsList();
 
 		for (final Page errorPage : errorPages) {
 
@@ -948,10 +981,10 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 			}
 
 
-			final Result results = query.getResult();
+			final List<AbstractNode> results = Iterables.toList(query.getResultStream());
 
 			logger.debug("{} results", results.size());
-			request.setAttribute(POSSIBLE_ENTRY_POINTS_KEY, results.getResults());
+			request.setAttribute(POSSIBLE_ENTRY_POINTS_KEY, results);
 
 			return (results.size() > 0 ? (AbstractNode) results.get(0) : null);
 		}
@@ -989,7 +1022,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 	 * @return file
 	 * @throws FrameworkException
 	 */
-	private FileBase findFile(final SecurityContext securityContext, final HttpServletRequest request, final String path) throws FrameworkException {
+	private File findFile(final SecurityContext securityContext, final HttpServletRequest request, final String path) throws FrameworkException {
 
 		List<Linkable> entryPoints = findPossibleEntryPoints(securityContext, request, path);
 
@@ -1004,8 +1037,8 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 
 		for (Linkable node : entryPoints) {
 
-			if (node instanceof FileBase && (path.equals(node.getFolderPath()) || node.getUuid().equals(PathHelper.getName(path)))) {
-				return (FileBase) node;
+			if (node instanceof File && (path.equals(node.getPath()) || node.getUuid().equals(PathHelper.getName(path)))) {
+				return (File) node;
 			}
 		}
 
@@ -1029,12 +1062,12 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 		if (pages == null) {
 
 			pages = StructrApp.getInstance(securityContext).nodeQuery(Page.class).getAsList();
-			Collections.sort(pages, new GraphObjectComparator(Page.position, GraphObjectComparator.ASCENDING));
+			Collections.sort(pages, new GraphObjectComparator(StructrApp.key(Page.class, "position"), GraphObjectComparator.ASCENDING));
 		}
 
 		for (final Page page : pages) {
 
-			final String pagePath = page.getFolderPath();
+			final String pagePath = page.getPath();
 			if (pagePath != null && pagePath.equals(path) && (EditMode.CONTENT.equals(edit) || isVisibleForSite(securityContext.getRequest(), page))) {
 
 				return page;
@@ -1076,15 +1109,17 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 	 */
 	private Page findIndexPage(final SecurityContext securityContext, List<Page> pages, final EditMode edit) throws FrameworkException {
 
+		final PropertyKey<Integer> positionKey = StructrApp.key(Page.class, "position");
+
 		if (pages == null) {
 
 			pages = StructrApp.getInstance(securityContext).nodeQuery(Page.class).getAsList();
-			Collections.sort(pages, new GraphObjectComparator(Page.position, GraphObjectComparator.ASCENDING));
+			Collections.sort(pages, new GraphObjectComparator(positionKey, GraphObjectComparator.ASCENDING));
 		}
 
 		for (Page page : pages) {
 
-			if (securityContext.isVisible(page) && page.getProperty(Page.position) != null && ((EditMode.CONTENT.equals(edit) || isVisibleForSite(securityContext.getRequest(), page)) || (page.getProperty(Page.enableBasicAuth) && page.getProperty(Page.visibleToAuthenticatedUsers)))) {
+			if (securityContext.isVisible(page) && page.getProperty(positionKey) != null && ((EditMode.CONTENT.equals(edit) || isVisibleForSite(securityContext.getRequest(), page)) || (page.getEnableBasicAuth() && page.isVisibleToAuthenticatedUsers()))) {
 
 				return page;
 			}
@@ -1109,23 +1144,24 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 
 		logger.debug("Checking registration ...");
 
-		String key = request.getParameter(CONFIRM_KEY_KEY);
+		final String key = request.getParameter(CONFIRM_KEY_KEY);
 
 		if (StringUtils.isEmpty(key)) {
 			return false;
 		}
 
-		final String targetPage = filterMaliciousRedirects(request.getParameter(TARGET_PAGE_KEY));
-		final String errorPage  = filterMaliciousRedirects(request.getParameter(ERROR_PAGE_KEY));
+		final PropertyKey<String> confirmationKeyKey = StructrApp.key(User.class, "confirmationKey");
+		final String targetPage                      = filterMaliciousRedirects(request.getParameter(TARGET_PAGE_KEY));
+		final String errorPage                       = filterMaliciousRedirects(request.getParameter(ERROR_PAGE_KEY));
 
 		if (CONFIRM_REGISTRATION_PAGE.equals(path)) {
 
 			final App app = StructrApp.getInstance();
 
-			Result<Principal> results;
+			List<Principal> results;
 			try (final Tx tx = app.tx()) {
 
-				results = app.nodeQuery(Principal.class).and(User.confirmationKey, key).getResult();
+				results = app.nodeQuery(Principal.class).and(confirmationKeyKey, key).getAsList();
 
 				tx.success();
 			}
@@ -1137,11 +1173,22 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 				try (final Tx tx = app.tx()) {
 
 					// Clear confirmation key and set session id
-					user.setProperties(user.getSecurityContext(), new PropertyMap(User.confirmationKey, null));
+					user.setProperty(confirmationKeyKey, null);
 
-					if (Settings.RestUserAutologin.getValue()) {
+					if (AuthHelper.isConfirmationKeyValid(key, Settings.ConfirmationKeyRegistrationValidityPeriod.getValue())) {
 
-						AuthHelper.doLogin(request, user);
+						if (Settings.RestUserAutologin.getValue()) {
+
+							AuthHelper.doLogin(request, user);
+
+						} else {
+
+							logger.warn("Refusing login because {} is disabled", Settings.RestUserAutologin.getKey());
+						}
+
+					} else {
+
+						logger.warn("Confirmation key for user {} is not valid anymore - refusing login.", user.getName());
 					}
 
 					tx.success();
@@ -1179,24 +1226,25 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 	 */
 	private boolean checkResetPassword(final Authenticator auth, final HttpServletRequest request, final HttpServletResponse response, final String path) throws FrameworkException, IOException {
 
-		logger.debug("Checking registration ...");
+		logger.debug("Checking reset password ...");
 
-		String key = request.getParameter(CONFIRM_KEY_KEY);
+		final String key = request.getParameter(CONFIRM_KEY_KEY);
 
 		if (StringUtils.isEmpty(key)) {
 			return false;
 		}
 
-		final String targetPage = filterMaliciousRedirects(request.getParameter(TARGET_PAGE_KEY));
+		final PropertyKey<String> confirmationKeyKey = StructrApp.key(User.class, "confirmationKey");
+		final String targetPage                      = filterMaliciousRedirects(request.getParameter(TARGET_PAGE_KEY));
 
 		if (RESET_PASSWORD_PAGE.equals(path)) {
 
 			final App app = StructrApp.getInstance();
 
-			Result<Principal> results;
+			List<Principal> results;
 			try (final Tx tx = app.tx()) {
 
-				results = app.nodeQuery(Principal.class).and(User.confirmationKey, key).getResult();
+				results = app.nodeQuery(Principal.class).and(confirmationKeyKey, key).getAsList();
 
 				tx.success();
 			}
@@ -1208,11 +1256,27 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 				try (final Tx tx = app.tx()) {
 
 					// Clear confirmation key and set session id
-					user.setProperties(user.getSecurityContext(), new PropertyMap(User.confirmationKey, null));
+					user.setProperty(confirmationKeyKey, null);
 
-					if (Settings.RestUserAutologin.getValue()) {
+					if (AuthHelper.isConfirmationKeyValid(key, Settings.ConfirmationKeyPasswordResetValidityPeriod.getValue())) {
 
-						AuthHelper.doLogin(request, user);
+						if (Settings.RestUserAutologin.getValue()) {
+
+							if (Settings.PasswordResetFailedCounterOnPWReset.getValue()) {
+
+								AuthHelper.resetFailedLoginAttemptsCounter(user);
+							}
+
+							AuthHelper.doLogin(request, user);
+
+						} else {
+
+							logger.warn("Refusing login because {} is disabled", Settings.RestUserAutologin.getKey());
+						}
+
+					} else {
+
+						logger.warn("Confirmation key for user {} is not valid anymore - refusing login.", user.getName());
 					}
 
 					tx.success();
@@ -1221,7 +1285,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 
 			// Redirect to target page
 			if (StringUtils.isNotBlank(targetPage)) {
-				response.sendRedirect(targetPage);
+				response.sendRedirect("/" + targetPage);
 			}
 
 			return true;
@@ -1248,12 +1312,12 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 			query.and().orType(Page.class).orTypes(File.class);
 
 			// Searching for pages needs super user context anyway
-			Result results = query.getResult();
+			List<Linkable> results = query.getAsList();
 
 			logger.debug("{} results", results.size());
-			request.setAttribute(POSSIBLE_ENTRY_POINTS_KEY, results.getResults());
+			request.setAttribute(POSSIBLE_ENTRY_POINTS_KEY, results);
 
-			return (List<Linkable>) results.getResults();
+			return (List<Linkable>) results;
 		}
 
 		return Collections.EMPTY_LIST;
@@ -1273,18 +1337,18 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 
 			final Query pageQuery = StructrApp.getInstance(securityContext).nodeQuery();
 
-			pageQuery.and(Page.path, path).andType(Page.class);
-			final Result pages = pageQuery.getResult();
+			pageQuery.and(StructrApp.key(Page.class, "path"), path).andType(Page.class);
+			final List<Linkable> pages = pageQuery.getAsList();
 
 			final Query fileQuery = StructrApp.getInstance(securityContext).nodeQuery();
-			fileQuery.and(AbstractFile.path, path).andTypes(File.class);
+			fileQuery.and(StructrApp.key(AbstractFile.class, "path"), path).andTypes(File.class);
 
-			final Result files = fileQuery.getResult();
+			final List<Linkable> files = fileQuery.getAsList();
 
 			logger.debug("Found {} pages and {} files/folders", new Object[] { pages.size(), files.size() });
 
-			final List<Linkable> linkables = (List<Linkable>) pages.getResults();
-			linkables.addAll(files.getResults());
+			final List<Linkable> linkables = (List<Linkable>) pages;
+			linkables.addAll(files);
 
 			request.setAttribute(POSSIBLE_ENTRY_POINTS_KEY, linkables);
 
@@ -1329,18 +1393,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 
 	}
 
-	private static void setCustomResponseHeaders(final HttpServletResponse response) {
-
-		for (final String header : customResponseHeaders) {
-
-			final String[] keyValuePair = header.split("[ :]+");
-			response.setHeader(keyValuePair[0], keyValuePair[1]);
-
-			logger.debug("Set custom response header: {} {}", new Object[]{keyValuePair[0], keyValuePair[1]});
-		}
-	}
-
-	private static boolean notModifiedSince(final HttpServletRequest request, HttpServletResponse response, final AbstractNode node, final boolean dontCache) {
+	private static boolean notModifiedSince(final HttpServletRequest request, HttpServletResponse response, final NodeInterface node, final boolean dontCache) {
 
 		boolean notModified = false;
 		final Date lastModified = node.getLastModifiedDate();
@@ -1352,8 +1405,8 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 
 		response.setHeader("Date", httpDateFormat.format(new Date()));
 
-		final Calendar cal = new GregorianCalendar();
-		final Integer seconds = node.getProperty(Page.cacheForSeconds);
+		final Integer seconds = node instanceof Page ? ((Page)node).getCacheForSeconds() : (node instanceof File ? ((File)node).getCacheForSeconds() : null);
+		final Calendar cal    = new GregorianCalendar();
 
 		if (!dontCache && seconds != null) {
 
@@ -1403,7 +1456,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 		return notModified;
 	}
 
-	private void streamFile(SecurityContext securityContext, final FileBase file, HttpServletRequest request, HttpServletResponse response, final EditMode edit) throws IOException {
+	private void streamFile(SecurityContext securityContext, final File file, HttpServletRequest request, HttpServletResponse response, final EditMode edit) throws IOException {
 
 		if (!securityContext.isVisible(file)) {
 
@@ -1433,7 +1486,9 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 			callbackMap.put("requestedFileName", downloadAsFilename);
 		}
 
-		if (!EditMode.WIDGET.equals(edit) && notModifiedSince(request, response, file, false)) {
+		boolean dontCache = file.getProperty(StructrApp.key(File.class, "dontCache"));
+
+		if (!EditMode.WIDGET.equals(edit) && notModifiedSince(request, response, file, dontCache)) {
 
 			out.flush();
 			out.close();
@@ -1561,33 +1616,24 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 	 */
 	private boolean isVisibleForSite(final HttpServletRequest request, final Page page) {
 
-		logger.debug("Page: {} [{}], server name: {}, server port: {}", new Object[]{page.getName(), page.getUuid(), request.getServerName(), request.getServerPort()});
-
-		final Site site = page.getProperty(Page.site);
-
+		final Site site = page.getSite();
 		if (site == null) {
-			logger.debug("Page {} [{}] has no site assigned.", new Object[]{page.getName(), page.getUuid()});
+
 			return true;
 		}
 
-		logger.debug("Checking site: {} [{}], hostname: {}, port: {}", new Object[]{site.getName(), site.getUuid(), site.getProperty(Site.hostname), site.getProperty(Site.port)});
-
 		final String serverName = request.getServerName();
-		final int serverPort = request.getServerPort();
+		final int serverPort    = request.getServerPort();
 
-		if (StringUtils.isNotBlank(serverName) && !serverName.equals(site.getProperty(Site.hostname))) {
-			logger.debug("Server name {} does not fit site hostname {}", new Object[]{serverName, site.getProperty(Site.hostname)});
+		if (StringUtils.isNotBlank(serverName) && !serverName.equals(site.getHostname())) {
 			return false;
 		}
 
-		final Integer sitePort = site.getProperty(Site.port);
+		final Integer sitePort = site.getPort();
 
 		if (sitePort != null && serverPort != sitePort) {
-			logger.debug("Server port {} does not match site port {}", new Object[]{serverPort, sitePort});
 			return false;
 		}
-
-		logger.debug("Matching site: {} [{}], hostname: {}, port: {}", new Object[]{site.getName(), site.getUuid(), site.getProperty(Site.hostname), site.getProperty(Site.port)});
 
 		return true;
 
@@ -1618,7 +1664,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 				final Class type = config.getNodeEntityClass(className);
 				if (type != null) {
 
-					final PropertyKey key = config.getPropertyKeyForJSONName(type, keyName, false);
+					final PropertyKey key = StructrApp.key(type, keyName);
 					if (key != null) {
 
 						try {
@@ -1650,7 +1696,12 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 		}
 	}
 
-	private HttpBasicAuthResult checkHttpBasicAuth(final HttpServletRequest request, final HttpServletResponse response, final String path) throws IOException, FrameworkException {
+	private HttpBasicAuthResult checkHttpBasicAuth(final SecurityContext outerSecurityContext, final HttpServletRequest request, final HttpServletResponse response, final String path) throws IOException, FrameworkException {
+
+		final PropertyKey<Boolean> basicAuthKey     = StructrApp.key(Linkable.class, "enableBasicAuth");
+		final PropertyKey<Integer> positionKey      = StructrApp.key(Page.class, "position");
+		final PropertyKey<String> filePathKey       = StructrApp.key(File.class, "path");
+		final PropertyKey<String> pagePathKey       = StructrApp.key(Page.class, "path");
 
 		// Look for renderable objects using a SuperUserSecurityContext,
 		// but dont actually render the page. We're only interested in
@@ -1659,27 +1710,29 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 
 		// try the different methods..
 		if (possiblePage == null) {
-			possiblePage = StructrApp.getInstance().nodeQuery(Page.class).and(Page.path, path).and(Page.enableBasicAuth, true).sort(Page.position).getFirst();
+			possiblePage = StructrApp.getInstance().nodeQuery(Page.class).and(pagePathKey, path).and(basicAuthKey, true).sort(positionKey).getFirst();
 		}
 
 		if (possiblePage == null) {
-			possiblePage = StructrApp.getInstance().nodeQuery(Page.class).and(Page.name, PathHelper.getName(path)).and(Page.enableBasicAuth, true).sort(Page.position).getFirst();
+			possiblePage = StructrApp.getInstance().nodeQuery(Page.class).and(Page.name, PathHelper.getName(path)).and(basicAuthKey, true).sort(positionKey).getFirst();
 		}
 
 		if (possiblePage == null) {
-			possiblePage = StructrApp.getInstance().nodeQuery(File.class).and(File.path, path).and(File.enableBasicAuth, true).getFirst();
+			possiblePage = StructrApp.getInstance().nodeQuery(File.class).and(filePathKey, path).and(basicAuthKey, true).getFirst();
 		}
 
 		if (possiblePage == null) {
-			possiblePage = StructrApp.getInstance().nodeQuery(File.class).and(File.name, PathHelper.getName(path)).and(File.enableBasicAuth, true).getFirst();
+			possiblePage = StructrApp.getInstance().nodeQuery(File.class).and(File.name, PathHelper.getName(path)).and(basicAuthKey, true).getFirst();
 		}
 
 		if (possiblePage != null) {
 
-			String realm = possiblePage.getProperty(Page.basicAuthRealm);
+			String realm = possiblePage.getBasicAuthRealm();
 			if (realm == null) {
 
 				realm = possiblePage.getName();
+			} else {
+				realm = (String)Scripting.replaceVariables(new ActionContext(outerSecurityContext), possiblePage, realm, false);
 			}
 
 			// check Http Basic Authentication headers
@@ -1704,6 +1757,7 @@ public class HtmlServlet extends HttpServlet implements HttpServiceServlet {
 
 			// fallback: the following code will be executed if no Authorization
 			// header was sent, OR if the authentication failed
+			realm = realm.replaceAll("\"", "\\\\\"");
 			response.setHeader("WWW-Authenticate", "BASIC realm=\"" + realm + "\"");
 			response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
 

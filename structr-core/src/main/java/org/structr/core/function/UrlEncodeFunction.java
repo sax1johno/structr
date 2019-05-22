@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,40 +18,38 @@
  */
 package org.structr.core.function;
 
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class UrlEncodeFunction extends Function<Object, Object> {
+public class UrlEncodeFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_URLENCODE = "Usage: ${urlencode(string)}. Example: ${urlencode(this.email)}";
 
 	@Override
 	public String getName() {
-		return "urlencode()";
+		return "urlencode";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
 		try {
-			
-			if (!arrayHasLengthAndAllElementsNotNull(sources, 1)) {
-				
-				return null;
-			}
+
+			assertArrayHasLengthAndAllElementsNotNull(sources, 1);
 
 			return encodeURL(sources[0].toString());
 
-		} catch (final IllegalArgumentException e) {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			// silently ignore null arguments
+			return null;
 
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
 	}
 
@@ -64,6 +62,4 @@ public class UrlEncodeFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "URL-encodes the given string";
 	}
-
-
 }

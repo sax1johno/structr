@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -50,12 +50,12 @@ import org.structr.schema.Schema;
  */
 public abstract class AbstractSchemaNode extends SchemaReloadingNode implements Schema {
 
-	public static final Property<List<SchemaProperty>> schemaProperties = new EndNodes<>("schemaProperties", SchemaNodeProperty.class);
-	public static final Property<List<SchemaMethod>>   schemaMethods    = new EndNodes<>("schemaMethods", SchemaNodeMethod.class);
-	public static final Property<List<SchemaView>>     schemaViews      = new EndNodes<>("schemaViews", SchemaNodeView.class);
-	public static final Property<String>               icon             = new StringProperty("icon");
-	public static final Property<String>               description      = new StringProperty("description");
-	public static final Set<String> hiddenPropertyNames                 = new LinkedHashSet<>();
+	public static final Property<Iterable<SchemaProperty>> schemaProperties = new EndNodes<>("schemaProperties", SchemaNodeProperty.class);
+	public static final Property<Iterable<SchemaMethod>>   schemaMethods    = new EndNodes<>("schemaMethods", SchemaNodeMethod.class);
+	public static final Property<Iterable<SchemaView>>     schemaViews      = new EndNodes<>("schemaViews", SchemaNodeView.class);
+	public static final Property<String>               icon                 = new StringProperty("icon");
+	public static final Property<String>               description          = new StringProperty("description");
+	public static final Set<String> hiddenPropertyNames                     = new LinkedHashSet<>();
 
 	public static final View defaultView = new View(AbstractSchemaNode.class, PropertyView.Public,
 		name, icon
@@ -82,51 +82,51 @@ public abstract class AbstractSchemaNode extends SchemaReloadingNode implements 
 		hiddenPropertyNames.add("deleted");
 	}
 
+	private final Set<String> dynamicViews = new LinkedHashSet<>();
+
 	@Override
-	public boolean onCreation(SecurityContext securityContext, ErrorBuffer errorBuffer) throws FrameworkException {
+	public void onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
 
-		if (super.onCreation(securityContext, errorBuffer)) {
+		super.onCreation(securityContext, errorBuffer);
 
-			// register transaction post processing that recreates the schema information
-			TransactionCommand.postProcess("createDefaultProperties", new CreateBuiltInSchemaEntities(this));
-
-			return true;
-		}
-
-		return false;
+		// register transaction post processing that recreates the schema information
+		TransactionCommand.postProcess("createDefaultProperties", new CreateBuiltInSchemaEntities(this));
 	}
 
 	@Override
-	public boolean onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
+	public void onModification(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
 
-		if (super.onModification(securityContext, errorBuffer, modificationQueue)) {
+		super.onModification(securityContext, errorBuffer, modificationQueue);
 
-			// register transaction post processing that recreates the schema information
-			TransactionCommand.postProcess("createDefaultProperties", new CreateBuiltInSchemaEntities(this));
-
-			return true;
-		}
-
-		return false;
+		// register transaction post processing that recreates the schema information
+		TransactionCommand.postProcess("createDefaultProperties", new CreateBuiltInSchemaEntities(this));
 	}
 
 	@Override
-	public List<SchemaProperty> getSchemaProperties() {
+	public Iterable<SchemaProperty> getSchemaProperties() {
 		return getProperty(AbstractSchemaNode.schemaProperties);
 	}
 
 	@Override
-	public List<SchemaView> getSchemaViews() {
+	public Iterable<SchemaView> getSchemaViews() {
 		return getProperty(AbstractSchemaNode.schemaViews);
 	}
 
 	@Override
-	public List<SchemaMethod> getSchemaMethods() {
+	public Iterable<SchemaMethod> getSchemaMethods() {
 		return getProperty(AbstractSchemaNode.schemaMethods);
 	}
 
 	public void createBuiltInSchemaEntities(final ErrorBuffer errorBuffer) throws FrameworkException {
 		new CreateBuiltInSchemaEntities(this).execute(securityContext, errorBuffer);
+	}
+
+	public void addDynamicView(final String view) {
+		dynamicViews.add(view);
+	}
+
+	public Set<String> getDynamicViews() {
+		return dynamicViews;
 	}
 
 	private static class CreateBuiltInSchemaEntities implements TransactionPostProcess {
@@ -147,8 +147,7 @@ public abstract class AbstractSchemaNode extends SchemaReloadingNode implements 
 			viewNames.add(View.INTERNAL_GRAPH_VIEW);
 			viewNames.add(PropertyView.All);
 
-			// create set of existing views
-			for (final SchemaView view : node.getProperty(schemaViews)) {
+			for (final SchemaView view : StructrApp.getInstance().getNodeById(node.getUuid()).getProperty(schemaViews)) {
 				viewNames.add(view.getProperty(AbstractNode.name));
 			}
 			// determine runtime type
@@ -170,7 +169,10 @@ public abstract class AbstractSchemaNode extends SchemaReloadingNode implements 
 
 						// collect names of properties in the given view
 						for (final PropertyKey key : config.getPropertySet(builtinClass, view)) {
-							viewPropertyNames.add(key.jsonName());
+
+							if (key.isPartOfBuiltInSchema()) {
+								viewPropertyNames.add(key.jsonName());
+							}
 						}
 
 						// collect schema properties that match the view

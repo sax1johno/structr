@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -26,7 +26,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
@@ -35,11 +35,17 @@ import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.api.config.Settings;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.GraphObjectMap;
 import org.structr.core.app.StructrApp;
 import org.structr.core.function.Functions;
+import org.structr.core.property.DoubleProperty;
+import org.structr.core.property.GenericProperty;
+import org.structr.core.property.IntProperty;
+import org.structr.core.property.LongProperty;
 import org.structr.core.property.StringProperty;
 import org.structr.schema.ConfigurationProvider;
 import org.structr.schema.parser.DatePropertyParser;
@@ -54,6 +60,11 @@ public abstract class Function<S, T> extends Hint {
 
 	public abstract T apply(ActionContext ctx, Object caller, S[] sources) throws FrameworkException;
 	public abstract String usage(boolean inJavaScriptContext);
+	public abstract String getRequiredModule();
+
+	public List<String> aliases() {
+		return Collections.EMPTY_LIST;
+	}
 
 	/**
 	 * Basic logging for functions called with wrong parameter count
@@ -63,7 +74,18 @@ public abstract class Function<S, T> extends Hint {
 	 * @param inJavaScriptContext Has the function been called from a JavaScript context?
 	 */
 	protected void logParameterError(final Object caller, final Object[] parameters, final boolean inJavaScriptContext) {
-		logger.warn("{}: unsupported parameter combination/count in \"{}\". Parameters: {}. {}", new Object[] { getName(), caller, getParametersAsString(parameters), usage(inJavaScriptContext) });
+		logParameterError(caller, parameters, "Unsupported parameter combination/count in", inJavaScriptContext);
+	}
+
+	/**
+	 * Basic logging for functions called with wrong parameter count
+	 *
+	 * @param caller The element that caused the error
+	 * @param parameters The function parameters
+	 * @param inJavaScriptContext Has the function been called from a JavaScript context?
+	 */
+	protected void logParameterError(final Object caller, final Object[] parameters, final String message, final boolean inJavaScriptContext) {
+		logger.warn("{}: {} '{}'. Parameters: {}. {}", new Object[] { getReplacement(), message, caller, getParametersAsString(parameters), usage(inJavaScriptContext) });
 	}
 
 	/**
@@ -74,7 +96,7 @@ public abstract class Function<S, T> extends Hint {
 	 * @param parameters The method parameters
 	 */
 	protected void logException (final Object caller, final Throwable t, final Object[] parameters) {
-		logException(t, "{}: Exception in \"{}\" for parameters: {}", new Object[] { getName(), caller, getParametersAsString(parameters) });
+		logException(t, "{}: Exception in '{}' for parameters: {}", new Object[] { getReplacement(), caller, getParametersAsString(parameters) });
 	}
 
 	/**
@@ -88,7 +110,7 @@ public abstract class Function<S, T> extends Hint {
 		logger.error(msg, messageParams, t);
 	}
 
-	protected String getParametersAsString (final Object[] sources) {
+	protected static String getParametersAsString (final Object[] sources) {
 		return Arrays.toString(sources);
 	}
 
@@ -96,34 +118,21 @@ public abstract class Function<S, T> extends Hint {
 	 * Test if the given object array has a minimum length and all its elements are not null.
 	 *
 	 * @param array
-	 * @param minLength If null, don't do length check
-	 * @return true if array has min length and all elements are not null
+	 * @param minLength
 	 * @throws IllegalArgumentException in case of wrong number of parameters
 	 */
-	protected boolean arrayHasMinLengthAndAllElementsNotNull(final Object[] array, final Integer minLength) throws IllegalArgumentException  {
+	protected void assertArrayHasMinLengthAndAllElementsNotNull(final Object[] array, final Integer minLength) throws ArgumentCountException, ArgumentNullException  {
 
-		if (array == null) {
-			return false;
+		if (array.length < minLength) {
+			throw ArgumentCountException.tooFew(array.length, minLength);
 		}
 
-		if (minLength != null) {
+		for (final Object element : array) {
 
-			if (array.length < minLength) {
-				throw new IllegalArgumentException();
+			if (element == null) {
+				throw new ArgumentNullException();
 			}
-
-			for (final Object element : array) {
-
-				if (element == null) {
-					return false;
-				}
-
-			}
-
-			return true;
 		}
-
-		return false;
 	}
 
 	/**
@@ -132,29 +141,21 @@ public abstract class Function<S, T> extends Hint {
 	 * @param array
 	 * @param minLength
 	 * @param maxLength
-	 * @return true if array has min length and all elements are not null
-	 * @throws IllegalArgumentException in case of wrong number of parameters
+	 * @throws ArgumentCountException in case of wrong number of parameters
+	 * @throws ArgumentNullException in case of a null parameter
 	 */
-	protected boolean arrayHasMinLengthAndMaxLengthAndAllElementsNotNull(final Object[] array, final int minLength, final int maxLength) throws IllegalArgumentException {
-
-		if (array == null) {
-			return false;
-		}
+	protected void assertArrayHasMinLengthAndMaxLengthAndAllElementsNotNull(final Object[] array, final Integer minLength, final Integer maxLength) throws ArgumentCountException, ArgumentNullException {
 
 		if (array.length < minLength || array.length > maxLength) {
-
-			throw new IllegalArgumentException();
-
+			throw ArgumentCountException.notBetween(array.length, minLength, maxLength);
 		}
 
 		for (final Object element : array) {
 
 			if (element == null) {
-				return false;
+				throw new ArgumentNullException();
 			}
 		}
-
-		return true;
 	}
 
 	/**
@@ -162,27 +163,21 @@ public abstract class Function<S, T> extends Hint {
 	 *
 	 * @param array
 	 * @param length
-	 * @return true if array has exact length and all elements are not null
-	 * @throws IllegalArgumentException in case of wrong number of parameters
+	 * @throws ArgumentCountException in case of wrong number of parameters
+	 * @throws ArgumentNullException in case of a null parameter
 	 */
-	protected boolean arrayHasLengthAndAllElementsNotNull(final Object[] array, final int length) throws IllegalArgumentException {
-
-		if (array == null) {
-			return false;
-		}
+	protected void assertArrayHasLengthAndAllElementsNotNull(final Object[] array, final Integer length) throws ArgumentCountException, ArgumentNullException {
 
 		if (array.length != length) {
-			throw new IllegalArgumentException();
+			throw ArgumentCountException.notEqual(array.length, length);
 		}
 
 		for (final Object element : array) {
 
 			if (element == null) {
-				return false;
+				throw new ArgumentNullException();
 			}
 		}
-
-		return true;
 	}
 
 	protected Double getDoubleOrNull(final Object obj) {
@@ -212,7 +207,7 @@ public abstract class Function<S, T> extends Hint {
 
 		} catch (Throwable t) {
 
-			logException(t, "{}: Exception parsing \"1\"", new Object[] { getName(), obj });
+			logException(t, "{}: Exception parsing '{}'", new Object[] { getReplacement(), obj });
 		}
 
 		return null;
@@ -274,7 +269,7 @@ public abstract class Function<S, T> extends Hint {
 
 			} catch (Throwable t) {
 
-				logException(t, "{}: Exception parsing \"1\"", new Object[] { getName(), obj });
+				logException(t, "{}: Exception parsing '{}'", new Object[] { getReplacement(), obj });
 			}
 		}
 
@@ -429,7 +424,7 @@ public abstract class Function<S, T> extends Hint {
 		return null;
 	}
 
-	protected File getServerlogFile () throws IOException {
+	protected static File getServerlogFile() throws IOException {
 
 		final String basePath = Settings.getBasePath();
 
@@ -439,16 +434,21 @@ public abstract class Function<S, T> extends Hint {
 
 			final String logPath = basePath.endsWith(File.separator) ? basePath.concat("logs" + File.separator) : basePath.concat(File.separator + "logs" + File.separator);
 
-			final File logFile = new File(logPath.concat(isDebug ? "debug.log" : "server.log"));
-			if (!logFile.exists()) {
-
-				logger.warn("Server log does not exist");
-
-			} else {
+			File logFile = new File(logPath.concat(isDebug ? "debug.log" : "server.log"));
+			if (logFile.exists()) {
 
 				return logFile;
 
+			} else if (!isDebug) {
+
+				// special handling for .deb installation
+				logFile = new File("/var/log/structr.log");
+				if (logFile.exists()) {
+					return logFile;
+				}
 			}
+
+			logger.warn("Could not locate logfile");
 
 		} else {
 
@@ -456,7 +456,6 @@ public abstract class Function<S, T> extends Hint {
 		}
 
 		return null;
-
 	}
 
 	protected static String serialize(final Gson gson, final Map<String, Object> map) {
@@ -490,10 +489,10 @@ public abstract class Function<S, T> extends Hint {
 
 				recursivelyConvertMapToGraphObjectMap(obj, map, depth + 1);
 
-			} else if (value instanceof Collection) {
+			} else if (value instanceof Iterable) {
 
-				final List list = new LinkedList();
-				final Collection collection = (Collection)value;
+				final List list           = new LinkedList();
+				final Iterable collection = (Iterable)value;
 
 				for (final Object obj : collection) {
 
@@ -519,6 +518,18 @@ public abstract class Function<S, T> extends Hint {
 		}
 	}
 
+	public static GraphObjectMap recursivelyWrapIterableInMap (final Iterable list, final Integer outputDepth) {
+
+		final GraphObjectMap listWrapperObject = new GraphObjectMap();
+
+		if (outputDepth <= 20) {
+			listWrapperObject.put(new GenericProperty("values"), Function.toGraphObject(list, outputDepth + 1));
+		}
+
+		return listWrapperObject;
+
+	}
+
 	public static GraphObjectMap toGraphObjectMap(final Map<String, Object> src) {
 
 		final GraphObjectMap dest = new GraphObjectMap();
@@ -534,12 +545,11 @@ public abstract class Function<S, T> extends Hint {
 
 			return sourceObject;
 
-		} else if (sourceObject instanceof List) {
+		} else if (sourceObject instanceof Iterable) {
 
-			final List list = (List)sourceObject;
 			final List<GraphObject> res = new ArrayList<>();
 
-			for(final Object o : list){
+			for(final Object o : (Iterable)sourceObject) {
 
 				if (o instanceof Map) {
 
@@ -556,6 +566,14 @@ public abstract class Function<S, T> extends Hint {
 				} else if (o instanceof String) {
 
 					res.add(Function.wrapStringInGraphObjectMap((String)o));
+
+				} else if (o instanceof Number) {
+
+					res.add(Function.wrapNumberInGraphObjectMap((Number)o));
+
+				} else if (o instanceof Iterable) {
+
+					res.add(Function.recursivelyWrapIterableInMap((Iterable)o, outputDepth));
 
 				}
 			}
@@ -580,6 +598,14 @@ public abstract class Function<S, T> extends Hint {
 			}
 
 			return res;
+
+		} else if (sourceObject instanceof String) {
+
+			return Function.wrapStringInGraphObjectMap((String)sourceObject);
+
+		} else if (sourceObject instanceof Number) {
+
+			return Function.wrapNumberInGraphObjectMap((Number)sourceObject);
 		}
 
 		return null;
@@ -591,6 +617,24 @@ public abstract class Function<S, T> extends Hint {
 		final GraphObjectMap stringWrapperObject = new GraphObjectMap();
 		stringWrapperObject.put(new StringProperty("value"), str);
 		return stringWrapperObject;
+
+	}
+
+	public static GraphObjectMap wrapNumberInGraphObjectMap (final Number num) {
+
+		final GraphObjectMap numberWrapperObject = new GraphObjectMap();
+
+		if (num instanceof Integer) {
+			numberWrapperObject.put(new IntProperty("value"), num);
+		} else if (num instanceof Double) {
+			numberWrapperObject.put(new DoubleProperty("value"), num);
+		} else if (num instanceof Long) {
+			numberWrapperObject.put(new LongProperty("value"), num);
+		} else if (num instanceof Float) {
+			numberWrapperObject.put(new DoubleProperty("value"), num);
+		}
+
+		return numberWrapperObject;
 
 	}
 

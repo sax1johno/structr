@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -23,9 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.structr.api.Predicate;
+import org.structr.api.graph.Identity;
 import org.structr.api.graph.Node;
 import org.structr.api.graph.PropertyContainer;
-import org.structr.api.graph.Relationship;
 import org.structr.api.graph.RelationshipType;
 import org.structr.cmis.CMISInfo;
 import org.structr.common.error.ErrorBuffer;
@@ -84,7 +84,7 @@ public class EntityAndPropertiesContainer implements NodeInterface {
 
 	// dummy implementation of NodeInterface
 	@Override
-	public void init(SecurityContext securityContext, Node dbNode, Class type, boolean isCreation) {
+	public void init(SecurityContext securityContext, Node dbNode, Class type, final long transactionId) {
 		throw new UnsupportedOperationException("Not supported by this container.");
 	}
 
@@ -110,11 +110,6 @@ public class EntityAndPropertiesContainer implements NodeInterface {
 
 	@Override
 	public String getName() {
-		throw new UnsupportedOperationException("Not supported by this container.");
-	}
-
-	@Override
-	public boolean isDeleted() {
 		throw new UnsupportedOperationException("Not supported by this container.");
 	}
 
@@ -169,17 +164,7 @@ public class EntityAndPropertiesContainer implements NodeInterface {
 	}
 
 	@Override
-	public void setRawPathSegment(Relationship pathSegment) {
-		throw new UnsupportedOperationException("Not supported by this container.");
-	}
-
-	@Override
-	public Relationship getRawPathSegment() {
-		throw new UnsupportedOperationException("Not supported by this container.");
-	}
-
-	@Override
-	public long getId() {
+	public void setRawPathSegmentId(final Identity pathSegmentId) {
 		throw new UnsupportedOperationException("Not supported by this container.");
 	}
 
@@ -219,6 +204,11 @@ public class EntityAndPropertiesContainer implements NodeInterface {
 	}
 
 	@Override
+	public <T> Object setProperty(PropertyKey<T> key, T value, final boolean isCreation) throws FrameworkException {
+		throw new UnsupportedOperationException("Not supported by this container.");
+	}
+
+	@Override
 	public <T> T getProperty(PropertyKey<T> propertyKey) {
 		throw new UnsupportedOperationException("Not supported by this container.");
 	}
@@ -229,22 +219,22 @@ public class EntityAndPropertiesContainer implements NodeInterface {
 	}
 
 	@Override
+	public void setProperties(final SecurityContext securityContext, final PropertyMap properties) throws FrameworkException {
+		throw new UnsupportedOperationException("Not supported by this container.");
+	}
+
+	@Override
+	public void setProperties(final SecurityContext securityContext, final PropertyMap properties, final boolean isCreation) throws FrameworkException {
+		throw new UnsupportedOperationException("Not supported by this container.");
+	}
+
+	@Override
 	public <T> Comparable getComparableProperty(PropertyKey<T> key) {
 		throw new UnsupportedOperationException("Not supported by this container.");
 	}
 
 	@Override
 	public void removeProperty(PropertyKey key) throws FrameworkException {
-		throw new UnsupportedOperationException("Not supported by this container.");
-	}
-
-	@Override
-	public PropertyKey getDefaultSortKey() {
-		throw new UnsupportedOperationException("Not supported by this container.");
-	}
-
-	@Override
-	public String getDefaultSortOrder() {
 		throw new UnsupportedOperationException("Not supported by this container.");
 	}
 
@@ -264,17 +254,17 @@ public class EntityAndPropertiesContainer implements NodeInterface {
 	}
 
 	@Override
-	public boolean onCreation(SecurityContext securityContext, ErrorBuffer errorBuffer) throws FrameworkException {
+	public void onCreation(SecurityContext securityContext, ErrorBuffer errorBuffer) throws FrameworkException {
 		throw new UnsupportedOperationException("Not supported by this container.");
 	}
 
 	@Override
-	public boolean onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, ModificationQueue modificationQueue) throws FrameworkException {
+	public void onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, ModificationQueue modificationQueue) throws FrameworkException {
 		throw new UnsupportedOperationException("Not supported by this container.");
 	}
 
 	@Override
-	public boolean onDeletion(SecurityContext securityContext, ErrorBuffer errorBuffer, PropertyMap properties) throws FrameworkException {
+	public void onDeletion(SecurityContext securityContext, ErrorBuffer errorBuffer, PropertyMap properties) throws FrameworkException {
 		throw new UnsupportedOperationException("Not supported by this container.");
 	}
 
@@ -315,16 +305,6 @@ public class EntityAndPropertiesContainer implements NodeInterface {
 
 	@Override
 	public void addToIndex() {
-		throw new UnsupportedOperationException("Not supported by this container.");
-	}
-
-	@Override
-	public void updateInIndex() {
-		throw new UnsupportedOperationException("Not supported by this container.");
-	}
-
-	@Override
-	public void removeFromIndex() {
 		throw new UnsupportedOperationException("Not supported by this container.");
 	}
 
@@ -399,7 +379,17 @@ public class EntityAndPropertiesContainer implements NodeInterface {
 	}
 
 	@Override
+	public void grant(Permission permission, Principal principal, SecurityContext ctx) throws FrameworkException {
+		throw new UnsupportedOperationException("Not supported by this container.");
+	}
+
+	@Override
 	public void revoke(Permission permission, Principal principal) throws FrameworkException {
+		throw new UnsupportedOperationException("Not supported by this container.");
+	}
+
+	@Override
+	public void revoke(Permission permission, Principal principal, SecurityContext ctx) throws FrameworkException {
 		throw new UnsupportedOperationException("Not supported by this container.");
 	}
 
@@ -429,16 +419,6 @@ public class EntityAndPropertiesContainer implements NodeInterface {
 	}
 
 	@Override
-	public Date getVisibilityStartDate() {
-		throw new UnsupportedOperationException("Not supported by this container.");
-	}
-
-	@Override
-	public Date getVisibilityEndDate() {
-		throw new UnsupportedOperationException("Not supported by this container.");
-	}
-
-	@Override
 	public Date getCreatedDate() {
 		throw new UnsupportedOperationException("Not supported by this container.");
 	}
@@ -451,5 +431,40 @@ public class EntityAndPropertiesContainer implements NodeInterface {
 	@Override
 	public Class getEntityType() {
 		throw new UnsupportedOperationException("Not supported by this container.");
+	}
+
+	@Override
+	public List<Security> getSecurityRelationships() {
+		throw new UnsupportedOperationException("Not supported by this container.");
+	}
+
+	@Override
+	public <A extends NodeInterface, B extends NodeInterface, S extends Source, T extends Target> boolean hasRelationship(Class<? extends Relation<A, B, S, T>> type) {
+		throw new UnsupportedOperationException("Not supported by this container.");
+	}
+
+	@Override
+	public <A extends NodeInterface, B extends NodeInterface, S extends Source, T extends Target, R extends Relation<A, B, S, T>> boolean hasIncomingRelationships(Class<R> type) {
+		throw new UnsupportedOperationException("Not supported by this container.");
+	}
+
+	@Override
+	public <A extends NodeInterface, B extends NodeInterface, S extends Source, T extends Target, R extends Relation<A, B, S, T>> boolean hasOutgoingRelationships(Class<R> type) {
+		throw new UnsupportedOperationException("Not supported by this container.");
+	}
+
+	@Override
+	public <A extends NodeInterface, B extends NodeInterface, S extends Source, R extends Relation<A, B, S, OneEndpoint<B>>> R getOutgoingRelationshipAsSuperUser(Class<R> type) {
+		throw new UnsupportedOperationException("Not supported by this container.");
+	}
+
+	@Override
+	public Map<String, Object> getTemporaryStorage() {
+		throw new UnsupportedOperationException("Not supported by this container.");
+	}
+
+	@Override
+	public long getSourceTransactionId() {
+		return entity.getSourceTransactionId();
 	}
 }

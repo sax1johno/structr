@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -25,6 +25,7 @@ public interface Transaction extends AutoCloseable {
 
 	void failure();
 	void success();
+	long getTransactionId();
 
 	@Override
 	void close();

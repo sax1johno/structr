@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -23,14 +23,14 @@ import org.structr.schema.action.ActionContext;
 /**
  *
  */
-public class HttpHeadFunction extends UiFunction {
+public class HttpHeadFunction extends UiAdvancedFunction {
 
 	public static final String ERROR_MESSAGE_HEAD    = "Usage: ${HEAD(URL[, username, password])}. Example: ${HEAD('http://structr.org', 'foo', 'bar')}";
 	public static final String ERROR_MESSAGE_HEAD_JS = "Usage: ${{Structr.HEAD(URL[, username, password]])}}. Example: ${{Structr.HEAD('http://structr.org', 'foo', 'bar')}}";
 
 	@Override
 	public String getName() {
-		return "HEAD()";
+		return "HEAD";
 	}
 
 	@Override

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -26,23 +26,22 @@ import com.jayway.restassured.filter.log.ResponseLoggingFilter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-import org.junit.Test;
+import org.testng.annotations.Test;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.StructrApp;
-import org.structr.core.entity.Principal;
 import org.structr.core.graph.NodeAttribute;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.Tx;
-import org.structr.dynamic.File;
 import org.structr.schema.ConfigurationProvider;
 import org.structr.schema.export.StructrSchema;
 import org.structr.schema.json.JsonSchema;
 import org.structr.schema.json.JsonType;
+import org.structr.test.web.StructrUiTest;
 import org.structr.web.common.FileHelper;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.User;
+import static org.testng.AssertJUnit.assertEquals;
+import static org.testng.AssertJUnit.fail;
 
 /**
  */
@@ -77,7 +76,7 @@ public class XmlImportTest extends StructrUiTest {
 				+ "</items>\n";
 
 			final byte[] fileData = xmlData.getBytes("utf-8");
-			final FileBase file   = FileHelper.createFile(securityContext, fileData, "application/xml", File.class, "test.xml");
+			final File file       = FileHelper.createFile(securityContext, fileData, "application/xml", File.class, "test.xml", true);
 
 			// extract UUID for later use
 			newFileId = file.getUuid();
@@ -97,9 +96,9 @@ public class XmlImportTest extends StructrUiTest {
 
 			// create test user
 			app.create(User.class,
-				new NodeAttribute<>(Principal.name,     "admin"),
-				new NodeAttribute<>(Principal.password, "admin"),
-				new NodeAttribute<>(Principal.isAdmin,  true)
+				new NodeAttribute<>(StructrApp.key(User.class, "name"),     "admin"),
+				new NodeAttribute<>(StructrApp.key(User.class, "password"), "admin"),
+				new NodeAttribute<>(StructrApp.key(User.class, "isAdmin"),  true)
 			);
 
 			tx.success();

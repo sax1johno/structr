@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -26,7 +26,7 @@ import org.structr.api.NotInTransactionException;
  */
 public interface PropertyContainer {
 
-	long getId();
+	Identity getId();
 
 	boolean hasProperty(final String name);
 	Object getProperty(final String name);
@@ -37,7 +37,34 @@ public interface PropertyContainer {
 
 	Iterable<String> getPropertyKeys();
 
-	void delete() throws NotInTransactionException;
+	void delete(final boolean deleteRelationships) throws NotInTransactionException;
 
-	boolean isSpatialEntity();
+	boolean isDeleted();
+
+	default int compare(final String key, final PropertyContainer a, final PropertyContainer b) {
+
+		if (!a.hasProperty(key) && b.hasProperty(key)) {
+			return -1;
+		}
+
+		if (a.hasProperty(key) && !b.hasProperty(key)) {
+			return 1;
+		}
+
+		if (a.hasProperty(key) && b.hasProperty(key)) {
+
+			final String t1 = (String)a.getProperty(key);
+			final String t2 = (String)b.getProperty(key);
+
+			int result =  t1.compareTo(t2);
+
+			if (result != 0) {
+				return result;
+			}
+		}
+
+		// do not return 0 since that would cause objects without the
+		// above property to be considered equal which is not wanted.
+		return a.getId().compareTo(b.getId());
+	}
 }

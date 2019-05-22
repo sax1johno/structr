@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,18 +18,16 @@
  */
 package org.structr.websocket.command;
 
-import java.util.Map;
 import org.structr.common.SecurityContext;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
+import org.structr.core.entity.Relation;
 import org.structr.web.entity.dom.DOMNode;
-import org.structr.web.entity.relation.Sync;
 import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
 
 /**
- *
  *
  */
 public class SyncModeCommand extends AbstractCommand {
@@ -42,11 +40,16 @@ public class SyncModeCommand extends AbstractCommand {
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
+		setDoTransactionNotifications(true);
+
+		final Class<Relation> relType         = StructrApp.getConfiguration().getRelationshipEntityClass("DOMNodeSYNCDOMNode");
+
 		final SecurityContext securityContext = getWebSocket().getSecurityContext();
-		String sourceId                       = webSocketData.getId();
-		Map<String, Object> properties        = webSocketData.getNodeData();
-		String targetId                       = (String) properties.get("targetId");
-		final String syncMode                 = (String) properties.get("syncMode");
+		final String sourceId                 = webSocketData.getId();
+
+		final String targetId                 = webSocketData.getNodeDataStringValue("targetId");
+		final String syncMode                 = webSocketData.getNodeDataStringValue("syncMode");
+
 		final DOMNode sourceNode              = (DOMNode) getNode(sourceId);
 		final DOMNode targetNode              = (DOMNode) getNode(targetId);
 		final App app                         = StructrApp.getInstance(securityContext);
@@ -55,11 +58,11 @@ public class SyncModeCommand extends AbstractCommand {
 
 			try {
 
-				app.create(sourceNode, targetNode, Sync.class);
+				app.create(sourceNode, targetNode, relType);
 
 				if (syncMode.equals("bidir")) {
 
-					app.create(targetNode, sourceNode, Sync.class);
+					app.create(targetNode, sourceNode, relType);
 				}
 
 			} catch (Throwable t) {

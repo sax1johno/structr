@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,17 +19,15 @@
 package org.structr.websocket.command;
 
 import java.util.List;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.util.Iterables;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.Favoritable;
 import org.structr.core.entity.Principal;
 import org.structr.core.graph.Tx;
-import org.structr.core.property.PropertyMap;
-import org.structr.web.entity.User;
 import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
@@ -40,7 +38,7 @@ import org.structr.websocket.message.WebSocketMessage;
  */
 public class FavoritesCommand extends AbstractCommand {
 
-	private static final Logger logger                          = LoggerFactory.getLogger(LayoutsCommand.class.getName());
+	private static final Logger logger                          = LoggerFactory.getLogger(FavoritesCommand.class.getName());
 
 	static {
 
@@ -50,9 +48,10 @@ public class FavoritesCommand extends AbstractCommand {
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
-		final Map<String, Object> data        = webSocketData.getNodeData();
-		final String mode                     = (String)data.get("mode");
-		final String favoritableId            = (String)data.get("id");
+		setDoTransactionNotifications(false);
+
+		final String mode                     = webSocketData.getNodeDataStringValue("mode");
+		final String favoritableId            = webSocketData.getNodeDataStringValue("id");
 		final Principal currentUser           = webSocket.getCurrentUser();
 
 		if (mode == null) {
@@ -67,33 +66,25 @@ public class FavoritesCommand extends AbstractCommand {
 
 			final App app = StructrApp.getInstance(webSocket.getSecurityContext());
 
-			try (final Tx tx = app.tx()) {
+			try (final Tx tx = app.tx(true, true, true)) {
 
 				final Favoritable file = app.get(Favoritable.class, favoritableId);
 				if (file != null) {
+
+					final List<Favoritable> favorites = Iterables.toList(currentUser.getFavorites());
 
 					switch (mode) {
 
 						case "add": {
 
-							final List<Favoritable> favorites = currentUser.getProperty(User.favorites);
 							favorites.add((Favoritable)file);
-							currentUser.setProperties(currentUser.getSecurityContext(), new PropertyMap(User.favorites, favorites));
-
-							getWebSocket().send(MessageBuilder.finished().callback(callback).build(), true);
-
 							break;
 
 						}
 
 						case "remove": {
 
-							final List<Favoritable> favorites = currentUser.getProperty(User.favorites);
 							favorites.remove((Favoritable)file);
-							currentUser.setProperties(currentUser.getSecurityContext(), new PropertyMap(User.favorites, favorites));
-
-							getWebSocket().send(MessageBuilder.finished().callback(callback).build(), true);
-
 							break;
 
 						}
@@ -101,8 +92,12 @@ public class FavoritesCommand extends AbstractCommand {
 						default:
 
 							getWebSocket().send(MessageBuilder.status().code(422).message("Favorites Command: Invalid mode '" + mode + "'. Valid modes: add, remove").build(), true);
+							return;
 
 					}
+
+					currentUser.setFavorites(favorites);
+					getWebSocket().send(MessageBuilder.finished().callback(callback).build(), true);
 
 				} else {
 

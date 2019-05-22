@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -21,71 +21,79 @@ package org.structr.core.function;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import org.structr.api.config.Settings;
 import org.structr.api.util.FixedSizeCache;
+import org.structr.common.AccessMode;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObjectMap;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.Localization;
+import org.structr.core.property.PropertyKey;
 import org.structr.core.property.StringProperty;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class LocalizeFunction extends Function<Object, Object> {
+public class LocalizeFunction extends AdvancedScriptingFunction {
 
 	public static final String ERROR_MESSAGE_LOCALIZE    = "Usage: ${localize(key[, domain])}. Example ${localize('HELLO_WORLD', 'myDomain')}";
 	public static final String ERROR_MESSAGE_LOCALIZE_JS = "Usage: ${{Structr.localize(key[, domain])}}. Example ${{Structr.localize('HELLO_WORLD', 'myDomain')}}";
 
 	@Override
 	public String getName() {
-		return "localize()";
+		return "localize";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
-		final Locale ctxLocale  = ctx.getLocale();
+		try {
 
-		if (arrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 1, 2)) {
+			assertArrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 1, 2);
+
+			final String domain = (sources.length == 1) ? null : sources[1].toString();
 
 			if (sources[0] instanceof List) {
 
-				final List keyList = (List)sources[0];
+				final List toLocalizeList = (List)sources[0];
 
-				if (sources.length == 1) {
-					return getLocalizedList(ctxLocale, keyList);
-				} else {
-					return getLocalizedList(ctxLocale, keyList, sources[1].toString());
-				}
+				return getLocalizedList(ctx, caller, toLocalizeList, domain);
 
 			} else {
 
-				final String name = sources[0].toString();
+				final String toLocalize = sources[0].toString();
 
-				if (sources.length == 1) {
-					return getLocalization(ctxLocale, name);
-				} else {
-					return getLocalization(ctxLocale, name, sources[1].toString());
-				}
+				return getLocalization(ctx, caller, toLocalize, domain);
 
 			}
 
-		} else if (sources.length == 1 || sources.length == 2) {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			if (sources[0] == null) {
 
-			// silently ignore null values
-			return "";
+				// silently ignore case which can happen for localize(current.propertyThatCanBeNull[, domain])
+				return "";
 
-		} else {
+			} else if (sources.length <= 2) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+				logParameterError(caller, sources, ctx.isJavaScriptContext());
+
+				return "";
+
+			} else {
+
+				logParameterError(caller, sources, ctx.isJavaScriptContext());
+
+				// only show the error message for wrong parameter count
+				return usage(ctx.isJavaScriptContext());
+			}
+
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 
 			// only show the error message for wrong parameter count
 			return usage(ctx.isJavaScriptContext());
-
 		}
 	}
 
@@ -99,11 +107,7 @@ public class LocalizeFunction extends Function<Object, Object> {
 		return "";
 	}
 
-	public static List getLocalizedList(final Locale locale, final List<String> keyList) throws FrameworkException {
-		return getLocalizedList(locale, keyList, null);
-	}
-
-	public static List getLocalizedList(final Locale locale, final List<String> keyList, final String domain) throws FrameworkException {
+	public static List getLocalizedList(final ActionContext ctx, final Object caller, final List<String> keyList, final String domain) throws FrameworkException {
 
 		final ArrayList<GraphObjectMap> resultList = new ArrayList();
 
@@ -113,23 +117,17 @@ public class LocalizeFunction extends Function<Object, Object> {
 			resultList.add(localizedEntry);
 
 			localizedEntry.put(new StringProperty("name"), key);
-
-			if (domain == null) {
-				localizedEntry.put(new StringProperty("localizedName"), getLocalization(locale, key));
-			} else {
-				localizedEntry.put(new StringProperty("localizedName"), getLocalization(locale, key, domain));
-			}
-
+			localizedEntry.put(new StringProperty("localizedName"), getLocalization(ctx, caller, key, domain));
 		}
 
 		return resultList;
 	}
 
-	public static String getLocalization (final Locale locale, final String key) throws FrameworkException {
-		return getLocalization(locale, key, null);
-	}
-
 	public static String getLocalization (final Locale locale, final String requestedKey, final String requestedDomain) throws FrameworkException {
+
+		/*
+		OLD VERSION - stays like this
+		*/
 
 		final String fullLocale  = locale.toString();
 		final String lang        = locale.getLanguage();
@@ -154,13 +152,63 @@ public class LocalizeFunction extends Function<Object, Object> {
 
 			value = requestedKey;
 
+			if (Settings.logMissingLocalizations.getValue()) {
+				logger.warn("Missing localization: Key: '{}' Locale: '{}' Domain: '{}'", requestedKey, fullLocale, requestedDomain);
+			}
+
 		} else {
 
 			cacheValue(cacheKey, value);
+
 		}
 
 		return value;
+
 	}
+
+	public static String getLocalization (final ActionContext ctx, final Object caller, final String requestedKey, final String requestedDomain) throws FrameworkException {
+
+		final Locale locale      = ctx.getLocale();
+
+		// If we are accessing the function via the frontend accessmode, we use the "regular" function
+		if (AccessMode.Frontend.equals(ctx.getSecurityContext().getAccessMode())) {
+
+			return getLocalization(locale, requestedKey, requestedDomain);
+
+		}
+
+		// otherwise we do not use the cache so we retrieve the database object every time
+
+		final String fullLocale   = locale.toString();
+		final String lang         = locale.getLanguage();
+		final String finalDomain  = (requestedDomain == null) ? "" : requestedDomain;
+		Localization result = null;
+
+		// find localization with exact key, domain and (full) locale
+		if (result == null) { result = getLocalizationFromDatabase(requestedKey, finalDomain, fullLocale); }
+
+		// find localization with key, NO domain and (full) locale
+		if (result == null && !finalDomain.equals("")) { result = getLocalizationFromDatabase(requestedKey, "", fullLocale); }
+
+		// find localization with key, domain and language only
+		if (result == null) { result = getLocalizationFromDatabase(requestedKey, finalDomain, lang); }
+
+		// find localization with key, domain and language only
+		if (result == null && !finalDomain.equals("")) { result = getLocalizationFromDatabase(requestedKey, "", lang); }
+
+		String value = requestedKey;
+
+		if (result != null) {
+
+			value = result.getProperty(StructrApp.key(Localization.class, "localizedName"));
+
+		}
+
+		ctx.getContextStore().addRequestedLocalization(caller, requestedKey, finalDomain, fullLocale, result);
+
+		return value;
+	}
+
 
 	// ----- caching -----
 	private static final FixedSizeCache<String, String> localizationCache = new FixedSizeCache<>(10000);
@@ -190,12 +238,15 @@ public class LocalizeFunction extends Function<Object, Object> {
 		localizationCache.put(cacheKey, value);
 	}
 
-	private static String getLocalizedNameFromDatabase(final String key, final String domain, final String locale) throws FrameworkException {
+	private static Localization getLocalizationFromDatabase(final String key, final String domain, final String locale) throws FrameworkException {
+
+		final PropertyKey<String> domainKey        = StructrApp.key(Localization.class, "domain");
+		final PropertyKey<String> localeKey        = StructrApp.key(Localization.class, "locale");
 
 		final List<Localization> localizations = StructrApp.getInstance().nodeQuery(Localization.class)
 			.and(Localization.name,   key)
-			.and(Localization.domain, domain)
-			.and(Localization.locale, locale)
+			.and(domainKey, domain)
+			.and(localeKey, locale)
 			.getAsList();
 
 		// nothing found
@@ -211,6 +262,20 @@ public class LocalizeFunction extends Function<Object, Object> {
 		}
 
 		// return first
-		return localizations.get(0).getProperty(Localization.localizedName);
+		return localizations.get(0);
 	}
+
+	private static String getLocalizedNameFromDatabase(final String key, final String domain, final String locale) throws FrameworkException {
+
+		final Localization localization = getLocalizationFromDatabase(key, domain, locale);
+
+		// nothing found
+		if (localization == null) {
+			return null;
+		}
+
+		// return first
+		return localization.getProperty(StructrApp.key(Localization.class, "localizedName"));
+	}
+
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,43 +20,44 @@ package org.structr.core.function;
 
 import org.structr.api.config.Setting;
 import org.structr.api.config.Settings;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.entity.AbstractUser;
+import org.structr.core.entity.Principal;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class ConfigFunction extends Function<Object, Object> {
+public class ConfigFunction extends AdvancedScriptingFunction {
 
 	public static final String ERROR_MESSAGE_CONFIG    = "Usage: ${config(keyFromStructrConf[, \"default\"])}. Example: ${config(\"base.path\")}";
 	public static final String ERROR_MESSAGE_CONFIG_JS = "Usage: ${{Structr.config(keyFromStructrConf[, \"default\"])}}. Example: ${{Structr.config(\"base.path\")}}";
 
 	@Override
 	public String getName() {
-		return "config()";
+		return "config";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
 		try {
-			if (!arrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 1, 2)) {
 
-				return null;
-			}
+			assertArrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 1, 2);
 
 			final String configKey = sources[0].toString();
 
 			if (Settings.SuperUserPassword.getKey().equals(configKey)) {
 
-				return AbstractUser.HIDDEN;
-
+				return Principal.HIDDEN;
 			}
 
 			final String defaultValue = sources.length >= 2 ? sources[1].toString() : "";
-			final Setting setting     = Settings.getSetting(configKey);
+			Setting setting           = Settings.getSetting(configKey);
+
+			if (setting == null) {
+
+				setting = Settings.getCaseSensitiveSetting(configKey);
+
+			}
 
 			if (setting != null) {
 
@@ -67,13 +68,16 @@ public class ConfigFunction extends Function<Object, Object> {
 				return defaultValue;
 			}
 
-		} catch (final IllegalArgumentException e) {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			// silently ignore null arguments
+			return null;
+
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
-
 	}
 
 	@Override
@@ -85,5 +89,4 @@ public class ConfigFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Returns the structr.conf value with the given key";
 	}
-
 }

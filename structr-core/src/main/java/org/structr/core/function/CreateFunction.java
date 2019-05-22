@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -28,19 +28,15 @@ import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.schema.ConfigurationProvider;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class CreateFunction extends Function<Object, Object> {
+public class CreateFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_CREATE    = "Usage: ${create(type, key, value)}. Example: ${create(\"Feedback\", \"text\", this.text)}";
 	public static final String ERROR_MESSAGE_CREATE_JS = "Usage: ${{Structr.create(type, {key: value})}}. Example: ${{Structr.create(\"Feedback\", {text: \"Structr is awesome.\"})}}";
 
 	@Override
 	public String getName() {
-		return "create()";
+		return "create";
 	}
 
 	@Override
@@ -84,7 +80,7 @@ public class CreateFunction extends Function<Object, Object> {
 
 				for (int c = 1; c < parameter_count; c += 2) {
 
-					final PropertyKey key = config.getPropertyKeyForJSONName(type, sources[c].toString());
+					final PropertyKey key = StructrApp.key(type, sources[c].toString());
 
 					if (key != null) {
 

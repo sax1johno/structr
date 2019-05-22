@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -25,13 +25,16 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.agent.Task;
+import org.structr.api.config.Setting;
 import org.structr.api.config.Settings;
 import org.structr.api.service.Command;
 import org.structr.api.service.RunnableService;
+import org.structr.api.service.ServiceDependency;
 import org.structr.api.service.StructrServices;
 import org.structr.core.Services;
 import org.structr.core.app.StructrApp;
 import org.structr.core.graph.Tx;
+import org.structr.schema.SchemaService;
 import org.structr.schema.action.Actions;
 
 /**
@@ -40,6 +43,7 @@ import org.structr.schema.action.Actions;
  *
  *
  */
+@ServiceDependency(SchemaService.class)
 public class CronService extends Thread implements RunnableService {
 
 	private static final Logger logger           = LoggerFactory.getLogger(CronService.class.getName());
@@ -146,10 +150,10 @@ public class CronService extends Thread implements RunnableService {
 
 				if (StringUtils.isNotBlank(task)) {
 
-					String expression = Settings.getOrCreateStringSetting(task, EXPRESSION_SUFFIX).getValue();
-					if(StringUtils.isNotBlank(expression)) {
+					final Setting cronSetting = Settings.getCaseSensitiveSetting(task, EXPRESSION_SUFFIX);
+					if (cronSetting != null) {
 
-						CronEntry entry = CronEntry.parse(task, expression);
+						CronEntry entry = CronEntry.parse(task, cronSetting.getValue().toString());
 						if(entry != null) {
 
 							logger.info("Adding cron entry {} for {}", new Object[]{ entry, task });
@@ -182,6 +186,11 @@ public class CronService extends Thread implements RunnableService {
 
 	@Override
 	public boolean isVital() {
+		return false;
+	}
+
+	@Override
+	public boolean waitAndRetry() {
 		return false;
 	}
 

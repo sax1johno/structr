@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -26,25 +26,23 @@ import org.slf4j.LoggerFactory;
 import org.structr.api.DatabaseService;
 import org.structr.api.util.Iterables;
 import org.structr.common.SecurityContext;
-import org.structr.common.StructrAndSpatialPredicate;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
+import org.structr.common.fulltext.Indexable;
+import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.AbstractRelationship;
 
-//~--- classes ----------------------------------------------------------------
 /**
  * Rebuild index for nodes or relationships of given type.
  *
  * Use 'type' argument for node type, and 'relType' for relationship type.
- *
  *
  */
 public class BulkRebuildIndexCommand extends NodeServiceCommand implements MaintenanceCommand, TransactionPostProcess {
 
 	private static final Logger logger = LoggerFactory.getLogger(BulkRebuildIndexCommand.class.getName());
 
-	//~--- methods --------------------------------------------------------
 	@Override
 	public void execute(Map<String, Object> attributes) {
 
@@ -58,6 +56,10 @@ public class BulkRebuildIndexCommand extends NodeServiceCommand implements Maint
 
 		if (mode == null || "relsOnly".equals(mode)) {
 			rebuildRelationshipIndex(relType);
+		}
+
+		if ("fulltext".equals(mode)) {
+			rebuildFulltextIndex();
 		}
 	}
 
@@ -87,7 +89,7 @@ public class BulkRebuildIndexCommand extends NodeServiceCommand implements Maint
 		final DatabaseService graphDb       = (DatabaseService) arguments.get("graphDb");
 		Iterator<AbstractNode> nodeIterator = null;
 
-		nodeIterator = Iterables.map(nodeFactory, Iterables.filter(new StructrAndSpatialPredicate(true, false, false), graphDb.getNodesByTypeProperty(entityType))).iterator();
+		nodeIterator = Iterables.map(nodeFactory, graphDb.getNodesByTypeProperty(entityType)).iterator();
 
 		if (entityType == null) {
 
@@ -101,8 +103,11 @@ public class BulkRebuildIndexCommand extends NodeServiceCommand implements Maint
 		long count = bulkGraphOperation(securityContext, nodeIterator, 1000, "RebuildNodeIndex", new BulkGraphOperation<AbstractNode>() {
 
 			@Override
-			public void handleGraphObject(SecurityContext securityContext, AbstractNode node) {
-				node.updateInIndex();
+			public boolean handleGraphObject(SecurityContext securityContext, AbstractNode node) {
+
+				node.addToIndex();
+
+				return true;
 			}
 
 			@Override
@@ -123,7 +128,7 @@ public class BulkRebuildIndexCommand extends NodeServiceCommand implements Maint
 
 		final RelationshipFactory relFactory             = new RelationshipFactory(SecurityContext.getSuperUserInstance());
 		final DatabaseService graphDb                    = (DatabaseService) arguments.get("graphDb");
-		final Iterator<AbstractRelationship> relIterator = Iterables.map(relFactory, Iterables.filter(new StructrAndSpatialPredicate(true, false, false), graphDb.getRelationshipsByType(relType))).iterator();
+		final Iterator<AbstractRelationship> relIterator = Iterables.map(relFactory, graphDb.getRelationshipsByType(relType)).iterator();
 
 		if (relType == null) {
 
@@ -138,8 +143,11 @@ public class BulkRebuildIndexCommand extends NodeServiceCommand implements Maint
 		long count = bulkGraphOperation(securityContext, relIterator, 1000, "RebuildRelIndex", new BulkGraphOperation<AbstractRelationship>() {
 
 			@Override
-			public void handleGraphObject(SecurityContext securityContext, AbstractRelationship rel) {
-				rel.updateInIndex();
+			public boolean handleGraphObject(SecurityContext securityContext, AbstractRelationship rel) {
+
+				rel.addToIndex();
+
+				return true;
 			}
 
 			@Override
@@ -154,5 +162,35 @@ public class BulkRebuildIndexCommand extends NodeServiceCommand implements Maint
 		});
 
 		info("Done with (re-)indexing {} relationships", count);
+	}
+
+	private void rebuildFulltextIndex() {
+
+		final NodeFactory nodeFactory  = new NodeFactory(SecurityContext.getSuperUserInstance());
+		final DatabaseService graphDb  = (DatabaseService) arguments.get("graphDb");
+		final Iterator<Indexable> iter = Iterables.map(nodeFactory, graphDb.getNodesByLabel("Indexable")).iterator();
+
+		bulkGraphOperation(securityContext, iter, 1000, "RebuildFulltextIndex", new BulkGraphOperation<Indexable>() {
+
+			@Override
+			public boolean handleGraphObject(SecurityContext securityContext, Indexable indexable) throws FrameworkException {
+
+				StructrApp.getInstance().getFulltextIndexer().addToFulltextIndex(indexable);
+
+				return true;
+			}
+
+			@Override
+			public void handleThrowable(SecurityContext securityContext, Throwable t, Indexable rel) {
+				logger.warn("Unable to build fulltext index for {}: {}", rel.getUuid(), t.getMessage());
+			}
+
+			@Override
+			public void handleTransactionFailure(SecurityContext securityContext, Throwable t) {
+				logger.warn("Unable to build fulltext index: {}", t.getMessage());
+			}
+		});
+
+		info("Rebuilding fulltext index done.");
 	}
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,24 +19,27 @@
 package org.structr.core.function;
 
 import java.util.Date;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-public class TimerFunction extends Function<Object, Object>{
+public class TimerFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_TIMER = "Usage: ${timer(name, action)}. Example: ${timer('benchmark1', 'start')}";
 	public static final String ERROR_MESSAGE_TIMER_JS = "Usage: ${{Structr.timer(name, action)}}. Example: ${{Structr.timer('benchmark1', 'start')}}";
 
 	@Override
 	public String getName() {
-		return "timer()";
+		return "timer";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
-		if (sources.length == 2 && sources[0] instanceof String && sources[1] instanceof String) {
+		try {
+
+			assertArrayHasLengthAndAllElementsNotNull(sources, 2);
 
 			final String name = sources[0].toString();
 			final String action = sources[1].toString();
@@ -71,13 +74,14 @@ public class TimerFunction extends Function<Object, Object>{
 
 			}
 
-		} else {
+		} catch (ArgumentCountException | ArgumentNullException ace) {
 
 			logParameterError(caller, sources, ctx.isJavaScriptContext());
 
 		}
 
 		return usage(ctx.isJavaScriptContext());
+
 	}
 
 	@Override

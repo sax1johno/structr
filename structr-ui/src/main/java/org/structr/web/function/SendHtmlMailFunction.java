@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,24 +18,22 @@
  */
 package org.structr.web.function;
 
-import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.List;
+import javax.activation.FileDataSource;
 import org.apache.commons.mail.EmailAttachment;
 import org.apache.commons.mail.EmailException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.DynamicMailAttachment;
 import org.structr.common.MailHelper;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 
-/**
- *
- */
-public class SendHtmlMailFunction extends Function<Object, Object> {
+public class SendHtmlMailFunction extends UiAdvancedFunction {
 
 	private static final Logger logger = LoggerFactory.getLogger(SendHtmlMailFunction.class.getName());
 
@@ -43,19 +41,21 @@ public class SendHtmlMailFunction extends Function<Object, Object> {
 
 	@Override
 	public String getName() {
-		return "send_html_mail()";
+		return "send_html_mail";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
-		if (arrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 6, 8)) {
+		try {
 
-			final String from = sources[0].toString();
-			final String fromName = sources[1].toString();
-			final String to = sources[2].toString();
-			final String toName = sources[3].toString();
-			final String subject = sources[4].toString();
+			assertArrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 6, 8);
+
+			final String from        = sources[0].toString();
+			final String fromName    = sources[1].toString();
+			final String to          = sources[2].toString();
+			final String toName      = sources[3].toString();
+			final String subject     = sources[4].toString();
 			final String htmlContent = sources[5].toString();
 			String textContent = "";
 
@@ -63,46 +63,50 @@ public class SendHtmlMailFunction extends Function<Object, Object> {
 				textContent = sources[6].toString();
 			}
 
-			List<FileBase> fileNodes = null;
-			List<DynamicMailAttachment> attachments   = new ArrayList<>();
+			List<File> fileNodes = null;
+			List<DynamicMailAttachment> attachments = new ArrayList<>();
 
 			try {
 
-				if (sources.length == 8 && sources[7] instanceof List && ((List) sources[7]).size() > 0 && ((List) sources[7]).get(0) instanceof FileBase) {
+				if (sources.length == 8 && sources[7] instanceof List && ((List) sources[7]).size() > 0 && ((List) sources[7]).get(0) instanceof File) {
 
-					fileNodes = (List<FileBase>) sources[7];
+					fileNodes = (List<File>) sources[7];
 
-					for (FileBase fileNode : fileNodes) {
+					for (File fileNode : fileNodes) {
 
 						final DynamicMailAttachment attachment = new DynamicMailAttachment();
-						attachment.setName(fileNode.getProperty(FileBase.name));
+						attachment.setName(fileNode.getProperty(File.name));
 						attachment.setDisposition(EmailAttachment.ATTACHMENT);
 
-						if(fileNode.getProperty(FileBase.isTemplate) == true) {
-							attachment.setIsDynamic(true);
+						if (fileNode.isTemplate()) {
+
 							attachment.setDataSource(fileNode);
+
 						} else {
-							attachment.setIsDynamic(false);
-							attachment.setURL(fileNode.getFileOnDisk().toURI().toURL());
+
+							attachment.setDataSource(new FileDataSource(fileNode.getFileOnDisk()));
 						}
 
 						attachments.add(attachment);
 					}
 				}
 
-
 				return MailHelper.sendHtmlMail(from, fromName, to, toName, null, null, from, subject, htmlContent, textContent,attachments);
 
-			} catch (EmailException | MalformedURLException ex) {
+			} catch (EmailException ex) {
 
 				logException(caller, ex, sources);
 
 			}
 
-		} else {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
+			return usage(ctx.isJavaScriptContext());
 		}
 
 		return "";
@@ -117,5 +121,4 @@ public class SendHtmlMailFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Sends an HTML e-mail";
 	}
-
 }

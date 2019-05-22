@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,31 +18,32 @@
  */
 package org.structr.core.function;
 
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.StructrApp;
 import org.structr.core.property.PropertyKey;
 import org.structr.schema.ConfigurationProvider;
 import org.structr.schema.SchemaHelper;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class PropertyInfoFunction extends Function<Object, Object> {
+public class PropertyInfoFunction extends AdvancedScriptingFunction {
 
 	public static final String ERROR_MESSAGE_PROPERTY_INFO    = "Usage: ${property_info(type, name)}. Example ${property_info('User', 'name')}";
 	public static final String ERROR_MESSAGE_PROPERTY_INFO_JS = "Usage: ${Structr.propertyInfo(type, name)}. Example ${Structr.propertyInfo('User', 'name')}";
+
+
+	@Override
+	public String getName() {
+		return "property_info";
+	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
 		try {
 
-			if (!arrayHasLengthAndAllElementsNotNull(sources, 2)) {
-
-				return null;
-			}
+			assertArrayHasLengthAndAllElementsNotNull(sources, 2);
 
 			final ConfigurationProvider config = StructrApp.getConfiguration();
 			final String typeName = sources[0].toString();
@@ -56,7 +57,7 @@ public class PropertyInfoFunction extends Function<Object, Object> {
 
 			if (type != null) {
 
-				final PropertyKey key = config.getPropertyKeyForJSONName(type, keyName, false);
+				final PropertyKey key = StructrApp.key(type, keyName);
 				if (key != null) {
 
 					return SchemaHelper.getPropertyInfo(ctx.getSecurityContext(), key);
@@ -73,12 +74,15 @@ public class PropertyInfoFunction extends Function<Object, Object> {
 				return "Unknown type " + typeName;
 			}
 
-		} catch (final IllegalArgumentException e) {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			// silently ignore null arguments
+			return null;
 
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
 	}
 
@@ -91,10 +95,4 @@ public class PropertyInfoFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Returns the schema information for the given property";
 	}
-
-	@Override
-	public String getName() {
-		return "schema_property()";
-	}
-
 }

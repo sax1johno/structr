@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -24,8 +24,11 @@ import java.util.LinkedList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.util.Iterables;
+import org.structr.common.ContextStore;
+import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.common.error.UnlicensedException;
+import org.structr.common.error.UnlicensedScriptException;
 import org.structr.core.GraphObject;
 import org.structr.core.function.QueryFunction;
 import org.structr.schema.action.ActionContext;
@@ -75,11 +78,15 @@ public class SliceExpression extends Expression {
 	}
 
 	@Override
-	public Object evaluate(final ActionContext ctx, final GraphObject entity) throws FrameworkException, UnlicensedException {
+	public Object evaluate(final ActionContext ctx, final GraphObject entity) throws FrameworkException, UnlicensedScriptException {
 
 		if (listExpression == null || startExpression == null || endExpression == null) {
 			return ERROR_MESSAGE_SLICE;
 		}
+
+		// load context store
+		final SecurityContext securityContext = ctx.getSecurityContext();
+		final ContextStore contextStore       = securityContext.getContextStore();
 
 		// evaluate start and end bounds
 		final Object startObject = startExpression.evaluate(ctx, entity);
@@ -103,17 +110,16 @@ public class SliceExpression extends Expression {
 		}
 
 		// check bounds BEFORE evaluating list expression
-		if (start < 0)   { valid = false; logger.warn("Error in slice(): start index must be > 0."); }
-		if (end < 0)     { valid = false; logger.warn("Error in slice(): end index must be > 0."); }
-		if (start > end) { valid = false; logger.warn("Error in slice(): start index must be <= end index."); }
+		if (start < 0)    { valid = false; logger.warn("Error in slice(): start index must be >= 0."); }
+		if (end < 0)      { valid = false; logger.warn("Error in slice(): end index must be > 0."); }
+		if (start >= end) { valid = false; logger.warn("Error in slice(): start index must be < end index."); }
 
 		if (valid) {
 
-			if (listExpression instanceof QueryFunction) {
+			if (listExpression instanceof QueryFunction || (listExpression instanceof FunctionExpression && ((FunctionExpression)listExpression).getFunction() instanceof QueryFunction)) {
 
-				final QueryFunction queryFunction = (QueryFunction)listExpression;
-				queryFunction.setRangeStart(start);
-				queryFunction.setRangeEnd(end);
+				contextStore.setRangeStart(start);
+				contextStore.setRangeEnd(end);
 
 				return listExpression.evaluate(ctx, entity);
 
@@ -122,9 +128,14 @@ public class SliceExpression extends Expression {
 				final Object src = listExpression.evaluate(ctx, entity);
 				List list       = null;
 
-				// handle list argument
-				if (src instanceof List) {
+				if (src instanceof Iterable) {
 
+					// handle iterable argument
+					list = Iterables.toList((Iterable)src);
+
+				} else if (src instanceof List) {
+
+					// handle list argument
 					list = (List)src;
 
 				// handle array argument
@@ -156,7 +167,7 @@ public class SliceExpression extends Expression {
 	}
 
 	@Override
-	public Object transform(final ActionContext ctx, final GraphObject entity, final Object source) throws FrameworkException, UnlicensedException {
+	public Object transform(final ActionContext ctx, final GraphObject entity, final Object source) throws FrameworkException, UnlicensedScriptException {
 		return source;
 	}
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,29 +20,29 @@ package org.structr.web.function;
 
 import java.util.Collections;
 import org.structr.common.error.FrameworkException;
-import org.structr.schema.action.ActionContext;
 import org.structr.core.scheduler.JobQueueManager;
+import org.structr.schema.action.ActionContext;
 import org.structr.web.importer.ScriptJob;
 
-/**
- *
- */
-public class ScheduleFunction extends UiFunction {
+public class ScheduleFunction extends UiAdvancedFunction {
 
-	public static final String ERROR_MESSAGE_SCHEDULE    = "Usage: ${schedule(script)}. Example: ${schedule('delete(find('User'))')}";
-	public static final String ERROR_MESSAGE_SCHEDULE_JS = "Usage: ${{Structr.schedule(script)}}. Example: ${{Structr.schedule(function() {} )}}";
+	public static final String ERROR_MESSAGE_SCHEDULE    = "Usage: ${schedule(script[, title])}. Example: ${schedule(\"delete(find('User'))\", \"Delete all users!\")}";
+	public static final String ERROR_MESSAGE_SCHEDULE_JS = "Usage: ${{Structr.schedule(script[, title])}}. Example: ${{Structr.schedule(function() {}, 'This is a no-op!')}}";
 
 	@Override
 	public String getName() {
-		return "schedule()";
+		return "schedule";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) {
 
-		if (arrayHasLengthAndAllElementsNotNull(sources, 1)) {
+		try {
+			assertArrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 1, 2);
 
-			final ScriptJob job = new ScriptJob(ctx.getSecurityContext().getCachedUser(), Collections.EMPTY_MAP, sources[0]);
+			final String jobName = (sources.length == 2) ? sources[1].toString() : "Untitled script job";
+
+			final ScriptJob job = new ScriptJob(ctx.getSecurityContext().getCachedUser(), Collections.EMPTY_MAP, sources[0], ctx.getSecurityContext().getContextStore(), jobName);
 
 			try {
 
@@ -54,13 +54,11 @@ public class ScheduleFunction extends UiFunction {
 
 			return "";
 
-		} else {
+		} catch (IllegalArgumentException e) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
-
+			logParameterError(caller, sources, e.getMessage(), ctx.isJavaScriptContext());
+			return null;
 		}
-
-		return usage(ctx.isJavaScriptContext());
 	}
 
 	@Override
@@ -72,5 +70,4 @@ public class ScheduleFunction extends UiFunction {
 	public String shortDescription() {
 		return "Schedules a script or a function to be executed in a separate thread.";
 	}
-
 }

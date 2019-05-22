@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,9 +18,6 @@
  */
 package org.structr.core.rest;
 
-
-//~--- JDK imports ------------------------------------------------------------
-
 import com.google.gson.*;
 import com.google.gson.stream.JsonWriter;
 import java.util.LinkedHashMap;
@@ -31,25 +28,31 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
 import org.structr.core.GraphObject;
 import org.structr.core.Value;
 import org.structr.core.converter.PropertyConverter;
+import org.structr.core.entity.AbstractNode;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
-
-//~--- classes ----------------------------------------------------------------
 
 /**
  * Controls serialization and deserialization of graph objects (nodes
  * and relationships).
- *
- *
  */
 public class GraphObjectGSONAdapter {
 
 	private static final Logger logger                   = LoggerFactory.getLogger(GraphObjectGSONAdapter.class.getName());
 	private static final long MAX_SERIALIZATION_TIME     = TimeUnit.SECONDS.toMillis(30);
+	private static final Set<PropertyKey> idTypeNameOnly = new LinkedHashSet<>();
+
+	static {
+
+		idTypeNameOnly.add(GraphObject.id);
+		idTypeNameOnly.add(AbstractNode.type);
+		idTypeNameOnly.add(AbstractNode.name);
+	}
 
 	private final Map<String, Serializer> serializerCache = new LinkedHashMap<>(100);
 	private final Map<String, Serializer> serializers     = new LinkedHashMap<>();
@@ -59,8 +62,7 @@ public class GraphObjectGSONAdapter {
 	private SecurityContext securityContext               = null;
 	private Value<String> propertyView                    = null;
 	private JsonWriter writer                             = null;
-
-	//~--- constructors ---------------------------------------------------
+	protected boolean compactNestedProperties             = true;
 
 	public GraphObjectGSONAdapter(Value<String> propertyView, final int outputNestingDepth) {
 
@@ -279,6 +281,12 @@ public class GraphObjectGSONAdapter {
 				// property keys
 				Iterable<PropertyKey> keys = source.getPropertyKeys(localPropertyView);
 				if (keys != null) {
+
+					// speciality for the Ui view: limit recursive rendering to (id, name)
+					if (compactNestedProperties && depth > 0 && ((PropertyView.Ui.equals(localPropertyView) && !securityContext.isSuperUserSecurityContext()) || PropertyView.All.equals(localPropertyView))) {
+						keys = idTypeNameOnly;
+					}
+
 					for (PropertyKey key : keys) {
 
 						Object value = source.getProperty(key);
@@ -309,11 +317,9 @@ public class GraphObjectGSONAdapter {
 			if (depth > outputNestingDepth) {
 
 				return null;
-
 			}
 
-			JsonArray array = new JsonArray();
-
+			final JsonArray array = new JsonArray();
 			for (Object o : value) {
 
 				array.add(serializeRoot(o, localPropertyView, depth));

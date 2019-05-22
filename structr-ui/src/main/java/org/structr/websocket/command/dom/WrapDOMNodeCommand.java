@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -49,6 +49,8 @@ public class WrapDOMNodeCommand extends AbstractCommand {
 
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
+
+		setDoTransactionNotifications(true);
 
 		final Map<String, Object> nodeData   = webSocketData.getNodeData();
 		final String pageId                  = webSocketData.getPageId();

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,53 +18,45 @@
  */
 package org.structr.core.function;
 
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class MinFunction extends Function<Object, Object> {
+public class MinFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_MIN = "Usage: ${min(value1, value2)}. Example: ${min(this.children, 5)}";
 
 	@Override
 	public String getName() {
-		return "min()";
+		return "min";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
 		try {
-			if (!arrayHasLengthAndAllElementsNotNull(sources, 2)) {
-				
-				return null;
-			}
 
-			try {
+			assertArrayHasLengthAndAllElementsNotNull(sources, 2);
 
-				return Math.min(Double.parseDouble(sources[0].toString()), Double.parseDouble(sources[1].toString()));
+			return Math.min(Double.parseDouble(sources[0].toString()), Double.parseDouble(sources[1].toString()));
 
-			} catch (NumberFormatException nfe) {
+		} catch (NumberFormatException nfe) {
 
-				logException(nfe, "{}: NumberFormatException in element \"{}\" for parameters: {}", new Object[] { getName(), caller, getParametersAsString(sources) });
-
-				return usage(ctx.isJavaScriptContext());
-
-			}
-
-		} catch (final IllegalArgumentException e) {
-
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
-
+			logException(nfe, "{}: NumberFormatException in element \"{}\" for parameters: {}", new Object[] { getReplacement(), caller, getParametersAsString(sources) });
 			return usage(ctx.isJavaScriptContext());
 
+		} catch (ArgumentNullException pe) {
+
+			// silently ignore null arguments
+			return null;
+
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
+			return usage(ctx.isJavaScriptContext());
 		}
-
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {
@@ -75,5 +67,4 @@ public class MinFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Returns the smaller value of the given arguments";
 	}
-
 }

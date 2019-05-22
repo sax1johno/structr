@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -46,12 +46,14 @@ public class GetRelationshipCommand extends AbstractCommand {
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
-		final String nodeId            = (String) webSocketData.getNodeData().get("nodeId");
+		setDoTransactionNotifications(false);
+
+		final String nodeId            = webSocketData.getNodeDataStringValue("nodeId");
 		final AbstractRelationship rel = getRelationship(webSocketData.getId(), nodeId);
-		
+
 
 		if (rel != null) {
-			
+
 			webSocketData.setResult(Arrays.asList(rel));
 
 			// send only over local connection (no broadcast)

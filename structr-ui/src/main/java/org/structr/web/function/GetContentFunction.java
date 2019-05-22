@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,57 +18,68 @@
  */
 package org.structr.web.function;
 
+import java.io.IOException;
 import java.io.InputStream;
-import org.asciidoctor.internal.IOUtils;
+import java.util.Scanner;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 
-/**
- * Convenience method to render named nodes. If more than one node is found, an error message is returned that informs the user that this is not allowed and can result in unexpected
- * behavior (instead of including the node).
- */
-public class GetContentFunction extends Function<Object, Object> {
+public class GetContentFunction extends UiAdvancedFunction {
 
-	public static final String ERROR_MESSAGE_INCLUDE    = "Usage: ${get_content(file)}. Example: ${get_content(first(find('File', 'name', 'test.txt')))}";
-	public static final String ERROR_MESSAGE_INCLUDE_JS = "Usage: ${{Structr.getContent(file)}}. Example: ${{Structr.getContent(fileNode)}}";
+	public static final String ERROR_MESSAGE_GET_CONTENT    = "Usage: ${get_content(file[, encoding = \"UTF-8\"])}. Example: ${get_content(first(find('File', 'name', 'test.txt')))}";
+	public static final String ERROR_MESSAGE_GET_CONTENT_JS = "Usage: ${{Structr.getContent(file[, encoding = \"UTF-8\"])}}. Example: ${{Structr.getContent(fileNode)}}";
 
 	@Override
 	public String getName() {
-		return "include()";
+		return "get_content";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
 		try {
-			if (!(arrayHasLengthAndAllElementsNotNull(sources, 1) && sources[0] instanceof FileBase)) {
-				return null;
+
+			assertArrayHasMinLengthAndAllElementsNotNull(sources, 1);
+
+			if (sources[0] instanceof File) {
+
+				final File file = (File)sources[0];
+				final String encoding = (sources.length == 2 && sources[1] != null) ? sources[1].toString() : "UTF-8";
+
+				try (final InputStream is = file.getInputStream()) {
+
+					return new Scanner(is, encoding).useDelimiter("\\A").next();
+
+				} catch (IOException e) {
+
+					logParameterError(caller, sources, ctx.isJavaScriptContext());
+					return usage(ctx.isJavaScriptContext());
+				}
 			}
 
-			final FileBase file  = (FileBase)sources[0];
-			final InputStream is = file.getInputStream();
+		} catch (ArgumentNullException pe) {
 
-			return IOUtils.readFull(is);
+			// silently ignore null arguments
 
-		} catch (final IllegalArgumentException e) {
+		} catch (ArgumentCountException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
-
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
+
+		return null;
 	}
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {
-		return (inJavaScriptContext ? ERROR_MESSAGE_INCLUDE_JS : ERROR_MESSAGE_INCLUDE);
+		return (inJavaScriptContext ? ERROR_MESSAGE_GET_CONTENT_JS : ERROR_MESSAGE_GET_CONTENT);
 	}
 
 	@Override
 	public String shortDescription() {
 		return "Returns the content of the given file";
 	}
-
 }

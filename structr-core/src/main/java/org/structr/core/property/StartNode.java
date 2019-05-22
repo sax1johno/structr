@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -82,20 +82,14 @@ public class StartNode<S extends NodeInterface, T extends NodeInterface> extends
 
 		super(name);
 
-		try {
-
-			this.relation = relationClass.newInstance();
-
-		} catch (Throwable t) {
-			logger.warn("", t);
-		}
-
-		this.notion        = notion;
-		this.destType      = relation.getSourceType();
+		this.relation = Relation.getInstance(relationClass);
+		this.notion   = notion;
+		this.destType = relation.getSourceType();
 
 		// configure notion
 		this.notion.setType(destType);
 		this.notion.setRelationProperty(this);
+		this.relation.setSourceProperty(this);
 
 		StructrApp.getConfiguration().registerConvertedProperty(this);
 	}
@@ -146,9 +140,22 @@ public class StartNode<S extends NodeInterface, T extends NodeInterface> extends
 	@Override
 	public Object setProperty(SecurityContext securityContext, GraphObject obj, S value) throws FrameworkException {
 
-		OneStartpoint<S> startpoint = relation.getSource();
+		final OneStartpoint<S> startpoint = relation.getSource();
 
-		return startpoint.set(securityContext, (NodeInterface)obj, value);
+		try {
+
+			return startpoint.set(securityContext, (NodeInterface)obj, value);
+
+		} catch (RuntimeException r) {
+
+			final Throwable cause = r.getCause();
+			if (cause instanceof FrameworkException) {
+
+				throw (FrameworkException)cause;
+			}
+		}
+
+		return null;
 	}
 
 	@Override
@@ -177,8 +184,13 @@ public class StartNode<S extends NodeInterface, T extends NodeInterface> extends
 	}
 
 	@Override
-	public void index(GraphObject entity, Object value) {
-		// no indexing
+	public boolean isIndexed() {
+		return false;
+	}
+
+	@Override
+	public boolean isPassivelyIndexed() {
+		return false;
 	}
 
 	// ----- interface RelationProperty -----
@@ -202,53 +214,22 @@ public class StartNode<S extends NodeInterface, T extends NodeInterface> extends
 
 		final Predicate<GraphObject> predicate    = query != null ? query.toPredicate() : null;
 		final SourceSearchAttribute attr          = new SourceSearchAttribute(occur);
-		final Set<GraphObject> intersectionResult = new LinkedHashSet<>();
-		boolean alreadyAdded                      = false;
 
 		if (searchValue != null && !StringUtils.isBlank(searchValue.toString())) {
 
-			if (exactMatch) {
+			if (!Occurrence.FORBIDDEN.equals(occur)) {
 
-				switch (occur) {
-
-					case REQUIRED:
-
-						if (!alreadyAdded) {
-
-							// the first result is the basis of all subsequent intersections
-							intersectionResult.addAll(getRelatedNodesReverse(securityContext, searchValue, declaringClass, predicate));
-
-							// the next additions are intersected with this one
-							alreadyAdded = true;
-
-						} else {
-
-							intersectionResult.retainAll(getRelatedNodesReverse(securityContext, searchValue, declaringClass, predicate));
-						}
-
-						break;
-
-					case OPTIONAL:
-						intersectionResult.addAll(getRelatedNodesReverse(securityContext, searchValue, declaringClass, predicate));
-						break;
-
-					case FORBIDDEN:
-						break;
-				}
-
-			} else {
+				final Set<GraphObject> intersectionResult = new LinkedHashSet<>();
 
 				intersectionResult.addAll(getRelatedNodesReverse(securityContext, searchValue, declaringClass, predicate));
-			}
 
-			attr.setResult(intersectionResult);
+				attr.setResult(intersectionResult);
+			}
 
 		} else {
 
-			// experimental filter attribute that
-			// removes entities with a non-empty
-			// value in the given field
-			return new EmptySearchAttribute(this, null);
+			// experimental filter attribute that removes entities with a non-empty value in the given field
+			return new EmptySearchAttribute(this, null, true);
 		}
 
 		return attr;

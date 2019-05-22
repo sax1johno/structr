@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,58 +18,101 @@
  */
 package org.structr.rest.service;
 
-import java.util.Set;
-import org.apache.commons.lang3.SerializationUtils;
-import org.apache.xerces.impl.dv.util.Base64;
 import org.eclipse.jetty.server.session.AbstractSessionDataStore;
 import org.eclipse.jetty.server.session.SessionData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.config.Settings;
+import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
+import org.structr.core.Services;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
-import org.structr.core.entity.Principal;
+import org.structr.core.entity.SessionDataNode;
+import org.structr.core.graph.NodeAttribute;
 import org.structr.core.graph.Tx;
-import org.structr.rest.auth.AuthHelper;
-import org.structr.rest.auth.SessionHelper;
+import org.structr.core.property.PropertyMap;
+
+import java.util.*;
+import org.structr.core.entity.Principal;
+import org.structr.core.property.PropertyKey;
 
 /**
- *
- *
  */
 public class StructrSessionDataStore extends AbstractSessionDataStore {
 
-	private static final Logger logger = LoggerFactory.getLogger(StructrSessionDataStore.class.getName());
+	private static final Logger logger       = LoggerFactory.getLogger(StructrSessionDataStore.class.getName());
+	private static final SecurityContext ctx = SecurityContext.getSuperUserInstance();
+	private static final App app             = StructrApp.getInstance(ctx);
+	private static final Services services   = Services.getInstance();
 
-	private final App app;
-	
-	public StructrSessionDataStore() {
-		app = StructrApp.getInstance();
-	}
-	
+	private static final Map<String, SessionData> anonymousSessionCache = new HashMap<>();
+
 	@Override
 	public void doStore(final String id, final SessionData data, final long lastSaveTime) throws Exception {
-		
-		try (final Tx tx = app.tx(false, false, false)) {
-		
-			final Principal user = AuthHelper.getPrincipalForSessionId(id);
 
-			// store sessions only for authenticated users
+		assertInitialized();
+
+		try (final Tx tx = app.tx(true, false, false)) {
+
+			final PropertyKey<String[]> key = StructrApp.key(Principal.class, "sessionIds");
+			final String[] value            = new String[] { id };
+			final Principal user            = StructrApp.getInstance().nodeQuery(Principal.class).and(key, value).disableSorting().getFirst();
+
 			if (user != null) {
 
-				user.setProperty(Principal.sessionData, Base64.encode(SerializationUtils.serialize(data)));
+				final SessionDataNode node = getOrCreateSessionDataNode(app, id);
+				if (node != null) {
+
+					final PropertyMap properties = new PropertyMap();
+
+					properties.put(SessionDataNode.lastAccessed, new Date(data.getLastAccessed()));
+					properties.put(SessionDataNode.contextPath, data.getContextPath());
+					properties.put(SessionDataNode.vhost, data.getVhost());
+
+					node.setProperties(ctx, properties);
+				}
+
+				tx.success();
+
+			} else {
+				anonymousSessionCache.put(id, data);
 			}
-		
-			tx.success();
-			
+
 		} catch (FrameworkException ex) {
-			
+
 			logger.info("Unable to store session data for session id " + id + ".", ex);
 		}
 	}
 
 	@Override
 	public Set<String> doGetExpired(final Set<String> candidates) {
+		final long sessionTimeout = Settings.SessionTimeout.getValue(1800) * 1000;
+		final Date timeoutDate    = new Date(System.currentTimeMillis() - sessionTimeout);
+
+		assertInitialized();
+
+		for (Map.Entry<String,SessionData> entry : anonymousSessionCache.entrySet()) {
+			SessionData data = entry.getValue();
+			if ( (new Date().getTime() - data.getLastAccessed()) > sessionTimeout) {
+				candidates.add(entry.getKey());
+			}
+		}
+
+		try (final Tx tx = app.tx(true, false, false)) {
+
+			for (final SessionDataNode node : app.nodeQuery(SessionDataNode.class).andRange(SessionDataNode.lastAccessed, new Date(0), timeoutDate).getAsList()) {
+
+				candidates.add(node.getProperty(SessionDataNode.sessionId));
+			}
+
+			tx.success();
+
+		} catch (FrameworkException ex) {
+
+			logger.info("Unable to determine list of expired session candidates.");
+		}
+
 		return candidates;
 	}
 
@@ -80,70 +123,123 @@ public class StructrSessionDataStore extends AbstractSessionDataStore {
 
 	@Override
 	public boolean exists(final String id) throws Exception {
-		
-		try (final Tx tx = app.tx(false, false, false)) {
 
-			final boolean exists = AuthHelper.getPrincipalForSessionId(id) != null;
-			
-			tx.success();
-			
-			return exists;
-			
-		} catch (FrameworkException ex) {
-			
-			logger.info("Unable to determine if session " + id + " exists.", ex);
+		if (anonymousSessionCache.containsKey(id)) {
+			return true;
 		}
-		
+
+		assertInitialized();
+
+		try (final Tx tx = app.tx(true, false, false)) {
+
+			final SessionDataNode node = app.nodeQuery(SessionDataNode.class).and(SessionDataNode.sessionId, id).getFirst();
+
+			tx.success();
+
+			return node != null;
+
+		} catch (FrameworkException ex) {
+
+			logger.info("Unable to determine if session data for " + id + " exists.", ex);
+		}
+
 		return false;
 	}
 
 	@Override
 	public SessionData load(final String id) throws Exception {
 
-		SessionData sessionData = null;
-		
-		try (final Tx tx = app.tx(false, false, false)) {
+		if (anonymousSessionCache.containsKey(id)) {
+			return anonymousSessionCache.get(id);
+		}
 
-			final Principal user = AuthHelper.getPrincipalForSessionId(id);
+		assertInitialized();
 
-			
-			// store sessions only for authenticated users
-			if (user != null) {
+		SessionData result        = null;
 
-				final String sessionDataString = user.getProperty(Principal.sessionData);
-				
-				if (sessionDataString != null) {
-				
-					sessionData = SerializationUtils.deserialize(Base64.decode(sessionDataString));
-				}
+		try (final Tx tx = app.tx(true, false, false)) {
+
+			final SessionDataNode node = app.nodeQuery(SessionDataNode.class).and(SessionDataNode.sessionId, id).getFirst();
+			if (node != null) {
+
+				result = new SessionData(
+					id,
+					node.getProperty(SessionDataNode.contextPath),
+					node.getProperty(SessionDataNode.vhost),
+					node.getCreatedDate().getTime(),
+					node.getLastModifiedDate().getTime(),
+					node.getLastModifiedDate().getTime(),
+					-1
+				);
 			}
-			
+
 			tx.success();
-			
+
 		} catch (FrameworkException ex) {
-			
+
 			logger.info("Unable to load session data for session id " + id + ".", ex);
 		}
-		
-		return sessionData;
+
+		return result;
 	}
 
 	@Override
 	public boolean delete(final String id) throws Exception {
-		
-		try (final Tx tx = app.tx(false, false, false)) {
 
-			SessionHelper.clearSession(id);
+		if (anonymousSessionCache.containsKey(id)) {
+			anonymousSessionCache.remove(id);
+			return true;
+		}
+
+		assertInitialized();
+
+		try (final Tx tx = app.tx(true, false, false)) {
+
+			// delete nodes
+			for (final SessionDataNode node : app.nodeQuery(SessionDataNode.class).and(SessionDataNode.sessionId, id).getAsList()) {
+
+				app.delete(node);
+			}
 
 			tx.success();
-			
+
 			return true;
-		
+
 		} catch (FrameworkException ex) {
-			
+
 			logger.info("Unable to load session data for session id " + id + ".", ex);
 		}
 
 		return false;
+	}
+
+
+	// ----- private methods -----
+	private void assertInitialized() {
+
+		if (!services.isShuttingDown() && !services.isShutdownDone()) {
+
+			// wait for service layer to be initialized
+			while (!services.isInitialized()) {
+
+				try { Thread.sleep(1000); } catch (Throwable t) {}
+			}
+		}
+	}
+
+	private SessionDataNode getOrCreateSessionDataNode(final App app, final String id) throws FrameworkException {
+
+		SessionDataNode node = app.nodeQuery(SessionDataNode.class).and(SessionDataNode.sessionId, id).getFirst();
+		if (node == null) {
+
+			node= app.create(SessionDataNode.class, new NodeAttribute<>(SessionDataNode.sessionId, id));
+		}
+
+		return node;
+	}
+
+	@Override
+	public SessionData doLoad(String id) throws Exception {
+		return load(id);
 	}
 }

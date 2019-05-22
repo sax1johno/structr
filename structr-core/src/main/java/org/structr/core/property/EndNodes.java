@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -22,7 +22,6 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.api.Predicate;
@@ -31,6 +30,7 @@ import org.structr.api.search.SortType;
 import org.structr.api.util.Iterables;
 import org.structr.common.NotNullPredicate;
 import org.structr.common.SecurityContext;
+import org.structr.common.TruePredicate;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.app.Query;
@@ -51,7 +51,7 @@ import org.structr.core.notion.ObjectNotion;
  *
  *
  */
-public class EndNodes<S extends NodeInterface, T extends NodeInterface> extends Property<List<T>> implements RelationProperty<T> {
+public class EndNodes<S extends NodeInterface, T extends NodeInterface> extends Property<Iterable<T>> implements RelationProperty<T> {
 
 	private static final Logger logger = LoggerFactory.getLogger(EndNodes.class.getName());
 
@@ -80,19 +80,13 @@ public class EndNodes<S extends NodeInterface, T extends NodeInterface> extends 
 
 		super(name);
 
-		try {
-
-			this.relation = relationClass.newInstance();
-
-		} catch (Throwable t) {
-			logger.warn("", t);
-		}
-
+		this.relation = Relation.getInstance(relationClass);
 		this.notion   = notion;
 		this.destType = relation.getTargetType();
 
 		this.notion.setType(destType);
 		this.notion.setRelationProperty(this);
+		this.relation.setTargetProperty(this);
 
 		StructrApp.getConfiguration().registerConvertedProperty(this);
 	}
@@ -129,44 +123,44 @@ public class EndNodes<S extends NodeInterface, T extends NodeInterface> extends 
 	}
 
 	@Override
-	public PropertyConverter<List<T>, ?> databaseConverter(SecurityContext securityContext) {
+	public PropertyConverter<Iterable<T>, ?> databaseConverter(SecurityContext securityContext) {
 		return null;
 	}
 
 	@Override
-	public PropertyConverter<List<T>, ?> databaseConverter(SecurityContext securityContext, GraphObject entity) {
+	public PropertyConverter<Iterable<T>, ?> databaseConverter(SecurityContext securityContext, GraphObject entity) {
 		return null;
 	}
 
 	@Override
-	public PropertyConverter<?, List<T>> inputConverter(SecurityContext securityContext) {
+	public PropertyConverter<?, Iterable<T>> inputConverter(SecurityContext securityContext) {
 		return getNotion().getCollectionConverter(securityContext);
 	}
 
 	@Override
-	public List<T> getProperty(SecurityContext securityContext, GraphObject obj, boolean applyConverter) {
+	public Iterable<T> getProperty(SecurityContext securityContext, GraphObject obj, boolean applyConverter) {
 		return getProperty(securityContext, obj, applyConverter, null);
 	}
 
 	@Override
-	public List<T> getProperty(SecurityContext securityContext, GraphObject obj, boolean applyConverter, final Predicate<GraphObject> predicate) {
+	public Iterable<T> getProperty(SecurityContext securityContext, GraphObject obj, boolean applyConverter, final Predicate<GraphObject> predicate) {
 
 		ManyEndpoint<T> endpoint = relation.getTarget();
 
 		if (predicate != null) {
 
-			return Iterables.toList(Iterables.filter(predicate, Iterables.filter(new NotNullPredicate(), endpoint.get(securityContext, (NodeInterface)obj, null))));
+			return Iterables.filter(predicate, Iterables.filter(new NotNullPredicate(), endpoint.get(securityContext, (NodeInterface)obj, new TruePredicate(predicate.comparator()))));
 
 		} else {
 
-			return Iterables.toList(Iterables.filter(new NotNullPredicate(), endpoint.get(securityContext, (NodeInterface)obj, null)));
+			return Iterables.filter(new NotNullPredicate(), endpoint.get(securityContext, (NodeInterface)obj, null));
 		}
 	}
 
 	@Override
-	public Object setProperty(SecurityContext securityContext, GraphObject obj, List<T> collection) throws FrameworkException {
+	public Object setProperty(SecurityContext securityContext, GraphObject obj, Iterable<T> collection) throws FrameworkException {
 
-		ManyEndpoint<T> endpoint = relation.getTarget();
+		final ManyEndpoint<T> endpoint = relation.getTarget();
 
 		return endpoint.set(securityContext, (NodeInterface)obj, collection);
 	}
@@ -187,12 +181,12 @@ public class EndNodes<S extends NodeInterface, T extends NodeInterface> extends 
 	}
 
 	@Override
-	public Property<List<T>> indexed() {
+	public Property<Iterable<T>> indexed() {
 		return this;
 	}
 
 	@Override
-	public Property<List<T>> passivelyIndexed() {
+	public Property<Iterable<T>> passivelyIndexed() {
 		return this;
 	}
 
@@ -202,8 +196,13 @@ public class EndNodes<S extends NodeInterface, T extends NodeInterface> extends 
 	}
 
 	@Override
-	public void index(GraphObject entity, Object value) {
-		// no indexing
+	public boolean isIndexed() {
+		return false;
+	}
+
+	@Override
+	public boolean isPassivelyIndexed() {
+		return false;
 	}
 
 	// ----- interface RelationProperty -----
@@ -215,7 +214,8 @@ public class EndNodes<S extends NodeInterface, T extends NodeInterface> extends 
 	@Override
 	public void addSingleElement(final SecurityContext securityContext, final GraphObject obj, final T t) throws FrameworkException {
 
-		List<T> list = getProperty(securityContext, obj, false);
+		final List<T> list = Iterables.toList(getProperty(securityContext, obj, false));
+
 		list.add(t);
 
 		setProperty(securityContext, obj, list);
@@ -227,7 +227,7 @@ public class EndNodes<S extends NodeInterface, T extends NodeInterface> extends 
 	}
 
 	@Override
-	public List<T> convertSearchValue(SecurityContext securityContext, String requestParameter) throws FrameworkException {
+	public Iterable<T> convertSearchValue(SecurityContext securityContext, String requestParameter) throws FrameworkException {
 
 		final PropertyConverter inputConverter = inputConverter(securityContext);
 		if (inputConverter != null) {
@@ -240,71 +240,36 @@ public class EndNodes<S extends NodeInterface, T extends NodeInterface> extends 
 				}
 			}
 
-			return (List<T>)inputConverter.convert(sources);
+			return (Iterable<T>)inputConverter.convert(sources);
 		}
 
 		return null;
 	}
 
 	@Override
-	public SearchAttribute getSearchAttribute(SecurityContext securityContext, Occurrence occur, List<T> searchValue, boolean exactMatch, final Query query) {
+	public SearchAttribute getSearchAttribute(SecurityContext securityContext, Occurrence occur, Iterable<T> searchValue, boolean exactMatch, final Query query) {
 
 		final Predicate<GraphObject> predicate    = query != null ? query.toPredicate() : null;
 		final SourceSearchAttribute attr          = new SourceSearchAttribute(occur);
-		final Set<GraphObject> intersectionResult = new LinkedHashSet<>();
-		boolean alreadyAdded                      = false;
 
-		if (searchValue != null && !StringUtils.isBlank(searchValue.toString())) {
+		if (searchValue != null && searchValue.iterator().hasNext()) {
 
-			if (exactMatch) {
+			if (!Occurrence.FORBIDDEN.equals(occur)) {
 
-				for (NodeInterface node : searchValue) {
+				final Set<GraphObject> intersectionResult = new LinkedHashSet<>();
 
-					switch (occur) {
-
-						case REQUIRED:
-
-							if (!alreadyAdded) {
-
-								// the first result is the basis of all subsequent intersections
-								intersectionResult.addAll(getRelatedNodesReverse(securityContext, node, declaringClass, predicate));
-
-								// the next additions are intersected with this one
-								alreadyAdded = true;
-
-							} else {
-
-								intersectionResult.retainAll(getRelatedNodesReverse(securityContext, node, declaringClass, predicate));
-							}
-
-							break;
-
-						case OPTIONAL:
-							intersectionResult.addAll(getRelatedNodesReverse(securityContext, node, declaringClass, predicate));
-							break;
-
-						case FORBIDDEN:
-							break;
-					}
-				}
-
-			} else {
-
-				// loose search behaves differently, all results must be combined
 				for (NodeInterface node : searchValue) {
 
 					intersectionResult.addAll(getRelatedNodesReverse(securityContext, node, declaringClass, predicate));
 				}
-			}
 
-			attr.setResult(intersectionResult);
+				attr.setResult(intersectionResult);
+			}
 
 		} else {
 
-			// experimental filter attribute that
-			// removes entities with a non-empty
-			// value in the given field
-			return new EmptySearchAttribute(this, null);
+			// experimental filter attribute that removes entities with a non-empty value in the given field
+			return new EmptySearchAttribute(this, null, true);
 		}
 
 		return attr;

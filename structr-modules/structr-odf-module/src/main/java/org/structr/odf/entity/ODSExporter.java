@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,6 +18,7 @@
  */
 package org.structr.odf.entity;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -30,31 +31,43 @@ import java.util.StringJoiner;
 import org.odftoolkit.odfdom.doc.OdfSpreadsheetDocument;
 import org.odftoolkit.odfdom.doc.table.OdfTable;
 import org.odftoolkit.odfdom.doc.table.OdfTableCell;
+import org.structr.api.util.Iterables;
+import org.structr.api.util.ResultStream;
+import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.Export;
 import org.structr.core.GraphObject;
 import org.structr.core.GraphObjectMap;
-import org.structr.core.Result;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.property.StringProperty;
-import static org.structr.odf.entity.ODFExporter.logger;
-import static org.structr.odf.entity.ODFExporter.resultDocument;
 import org.structr.schema.SchemaService;
+import org.structr.schema.json.JsonObjectType;
+import org.structr.schema.json.JsonSchema;
 import org.structr.transform.VirtualType;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 
 /**
  *
  */
-public class ODSExporter extends ODFExporter {
+public interface ODSExporter extends ODFExporter {
 
-	static {
-		SchemaService.registerBuiltinTypeOverride("ODSExporter", ODSExporter.class.getName());
-	}
+	static class Impl { static {
 
-	private void writeCollectionToCells(OdfTable sheet, OdfTableCell startCell, Collection col) {
+		final JsonSchema schema   = SchemaService.getDynamicSchema();
+		final JsonObjectType type = schema.addType("ODSExporter");
+
+		type.setImplements(URI.create("https://structr.org/v1.1/definitions/ODSExporter"));
+		type.setExtends(URI.create("#/definitions/ODFExporter"));
+
+		type.addMethod("exportAttributes")
+			.addParameter("uuid", String.class.getName())
+			.setSource(ODSExporter.class.getName() + ".exportAttributes(this, uuid);")
+			.addException(FrameworkException.class.getName())
+			.setDoExport(true);
+	}}
+
+	static void writeCollectionToCells(final OdfTable sheet, final OdfTableCell startCell, final Collection col) {
 
 		int rowIndex, colIndex;
 
@@ -95,7 +108,7 @@ public class ODSExporter extends ODFExporter {
 
 	}
 
-	private void writeObjectToCell(OdfTableCell cell, Object val) {
+	static void writeObjectToCell(final OdfTableCell cell, final Object val) {
 		if (val instanceof String) {
 
 			cell.setStringValue((String) val);
@@ -127,20 +140,20 @@ public class ODSExporter extends ODFExporter {
 		}
 	}
 
-	@Export
-	public void exportAttributes(String uuid) throws FrameworkException {
+	public static void exportAttributes(final ODSExporter thisNode, final String uuid) throws FrameworkException {
 
-		FileBase output = getProperty(resultDocument);
-		VirtualType transformation = getProperty(transformationProvider);
+		final SecurityContext securityContext = thisNode.getSecurityContext();
+		final File output                     = thisNode.getResultDocument();
+		final VirtualType transformation      = thisNode.getTransformationProvider();
 
 		try {
 
 			final App app = StructrApp.getInstance();
-			final Result result = app.nodeQuery(AbstractNode.class).and(GraphObject.id, uuid).getResult();
-			final Result transformedResult = transformation.transformOutput(securityContext, AbstractNode.class, result);
+			final ResultStream result = app.nodeQuery(AbstractNode.class).and(GraphObject.id, uuid).getResultStream();
+			final ResultStream transformedResult = transformation.transformOutput(securityContext, AbstractNode.class, result);
 
 			Map<String, Object> nodeProperties = new HashMap<>();
-			GraphObjectMap node = (GraphObjectMap) transformedResult.get(0);
+			GraphObjectMap node = (GraphObjectMap) Iterables.first(transformedResult);
 			node.getPropertyKeys(null).forEach(
 				p -> nodeProperties.put(p.dbName(), node.getProperty(p))
 			);

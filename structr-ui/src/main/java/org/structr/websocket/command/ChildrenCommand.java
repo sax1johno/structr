@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -49,7 +49,9 @@ public class ChildrenCommand extends AbstractCommand {
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
-		final RelationshipFactory factory = new RelationshipFactory(this.getWebSocket().getSecurityContext());
+		setDoTransactionNotifications(false);
+
+		final RelationshipFactory factory = new RelationshipFactory(getWebSocket().getSecurityContext());
 		final AbstractNode node           = getNode(webSocketData.getId());
 
 		if (node == null) {

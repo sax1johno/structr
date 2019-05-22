@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -25,6 +25,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.common.ContextStore;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.entity.Principal;
 import org.structr.core.graph.TransactionCommand;
@@ -54,13 +55,15 @@ public abstract class ScheduledJob {
 	protected String username;
 	protected String jobName;
 	protected JobStatus currentStatus;
+	protected ContextStore ctxStore = null;
 
-	public ScheduledJob (final String jobName, final Principal user, final Map<String, Object> configuration) {
+	public ScheduledJob (final String jobName, final Principal user, final Map<String, Object> configuration, final ContextStore ctxStore) {
 
 		this.user          = user;
 		this.jobName       = jobName;
 		this.username      = user.getName();
 		this.configuration = configuration;
+		this.ctxStore      = new ContextStore(ctxStore);
 
 		this.currentStatus = JobStatus.QUEUED;
 	}

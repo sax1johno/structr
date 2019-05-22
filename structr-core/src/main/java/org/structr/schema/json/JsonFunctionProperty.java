@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -22,7 +22,7 @@ package org.structr.schema.json;
  *
  *
  */
-public interface JsonFunctionProperty extends JsonStringProperty {
+public interface JsonFunctionProperty extends JsonDynamicProperty {
 
 	public JsonFunctionProperty setReadFunction(final String readFunction);
 	public String getReadFunction();
@@ -30,8 +30,12 @@ public interface JsonFunctionProperty extends JsonStringProperty {
 	public JsonFunctionProperty setWriteFunction(final String writeFunction);
 	public String getWriteFunction();
 
+	public JsonFunctionProperty setIsCachingEnabled(final boolean enabled);
+	public Boolean getIsCachingEnabled();
+
 	@Override
 	public JsonFunctionProperty setContentType(final String contentType);
+
 	@Override
 	public String getContentType();
 

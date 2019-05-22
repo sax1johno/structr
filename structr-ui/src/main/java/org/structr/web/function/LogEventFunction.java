@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -28,56 +28,28 @@ import org.structr.rest.logging.entity.LogEvent;
 import org.structr.schema.action.ActionContext;
 import org.structr.web.entity.dom.DOMNode;
 
-/**
- *
- */
-public class LogEventFunction extends UiFunction {
+public class LogEventFunction extends UiAdvancedFunction {
 
 	public static final String ERROR_MESSAGE_LOG_EVENT    = "Usage: ${log_event(action, message)}. Example: ${log_event('read', 'Book has been read')}";
 	public static final String ERROR_MESSAGE_LOG_EVENT_JS = "Usage: ${{Structr.logEvent(action, message)}}. Example: ${{Structr.logEvent('read', 'Book has been read')}}";
 
 	@Override
 	public String getName() {
-		return "log_event()";
+		return "log_event";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
-		if (arrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 2, 4)) {
-
-			final String action = sources[0].toString();
-			final String message = sources[1].toString();
-
-			final LogEvent logEvent = StructrApp.getInstance().create(LogEvent.class,
-				new NodeAttribute(LogEvent.actionProperty, action),
-				new NodeAttribute(LogEvent.messageProperty, message),
-				new NodeAttribute(LogEvent.timestampProperty, new Date())
-			);
-
-			switch (sources.length) {
-
-				case 4:
-					final String object = sources[3].toString();
-					logEvent.setProperties(logEvent.getSecurityContext(), new PropertyMap(LogEvent.objectProperty, object));
-					// no break, next case should be included
-
-				case 3:
-					final String subject = sources[2].toString();
-					logEvent.setProperties(logEvent.getSecurityContext(), new PropertyMap(LogEvent.subjectProperty, subject));
-					break;
-			}
-
-			return logEvent;
-
-		} else if (sources.length == 1 && sources[0] instanceof Map) {
+		if (sources.length == 1 && sources[0] instanceof Map) {
 
 			// support javascript objects here
 			final Map map = (Map)sources[0];
-			final String action = DOMNode.objectToString(map.get("action"));
+
+			final String action  = DOMNode.objectToString(map.get("action"));
 			final String message = DOMNode.objectToString(map.get("message"));
 			final String subject = DOMNode.objectToString(map.get("subject"));
-			final String object = DOMNode.objectToString(map.get("object"));
+			final String object  = DOMNode.objectToString(map.get("object"));
 
 			return StructrApp.getInstance().create(LogEvent.class,
 				new NodeAttribute(LogEvent.actionProperty, action),
@@ -89,11 +61,40 @@ public class LogEventFunction extends UiFunction {
 
 		} else {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			try {
 
+				assertArrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 2, 4);
+
+				final String action = sources[0].toString();
+				final String message = sources[1].toString();
+
+				final LogEvent logEvent = StructrApp.getInstance().create(LogEvent.class,
+					new NodeAttribute(LogEvent.actionProperty, action),
+					new NodeAttribute(LogEvent.messageProperty, message),
+					new NodeAttribute(LogEvent.timestampProperty, new Date())
+				);
+
+				switch (sources.length) {
+
+					case 4:
+						final String object = sources[3].toString();
+						logEvent.setProperties(logEvent.getSecurityContext(), new PropertyMap(LogEvent.objectProperty, object));
+						// no break, next case should be included
+
+					case 3:
+						final String subject = sources[2].toString();
+						logEvent.setProperties(logEvent.getSecurityContext(), new PropertyMap(LogEvent.subjectProperty, subject));
+						break;
+				}
+
+				return logEvent;
+
+			} catch (IllegalArgumentException e) {
+
+				logParameterError(caller, sources, e.getMessage(), ctx.isJavaScriptContext());
+				return usage(ctx.isJavaScriptContext());
+			}
 		}
-
-		return "";
 	}
 
 	@Override

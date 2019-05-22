@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -35,7 +35,7 @@ import org.structr.websocket.message.WebSocketMessage;
  *
  */
 public class AppendFileCommand extends AbstractCommand {
-		
+
 	private static final Logger logger     = LoggerFactory.getLogger(AppendFileCommand.class.getName());
 
 	static {
@@ -46,9 +46,10 @@ public class AppendFileCommand extends AbstractCommand {
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
+		setDoTransactionNotifications(true);
+
 		String id                    = webSocketData.getId();
-		Map<String, Object> nodeData = webSocketData.getNodeData();
-		String parentId              = (String) nodeData.get("parentId");
+		String parentId              = webSocketData.getNodeDataStringValue("parentId");
 
 		// check node to append
 		if (id == null) {
@@ -67,7 +68,7 @@ public class AppendFileCommand extends AbstractCommand {
 			return;
 
 		}
-		
+
 		// never append to self
 		if (parentId.equals(id)) {
 
@@ -76,7 +77,7 @@ public class AppendFileCommand extends AbstractCommand {
 			return;
 
 		}
-		
+
 
 		// check if parent node with given ID exists
 		AbstractNode parentNode = getNode(parentId);
@@ -92,29 +93,29 @@ public class AppendFileCommand extends AbstractCommand {
 		if (parentNode instanceof Folder) {
 
 			Folder folder = (Folder) parentNode;
-			
+
 			AbstractFile file = (AbstractFile) getNode(id);
 
 			if (file != null) {
-				
+
 				try {
 					// Remove from existing parent
 					Folder currentParent = (Folder)file.treeGetParent();
 					if (currentParent != null) {
-						
+
 						currentParent.treeRemoveChild(file);
 					}
-					
+
 					folder.treeAppendChild(file);
-					
+
 					TransactionCommand.registerNodeCallback(file, callback);
-					
+
 				} catch (FrameworkException ex) {
 					logger.error("", ex);
 					getWebSocket().send(MessageBuilder.status().code(422).message("Cannot append file").build(), true);
 				}
 			}
-			
+
 
 		} else {
 

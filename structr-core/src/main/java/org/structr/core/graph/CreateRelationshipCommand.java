@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,10 +19,13 @@
 package org.structr.core.graph;
 
 import java.util.Date;
+import java.util.Map.Entry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.DatabaseService;
 import org.structr.api.graph.Node;
 import org.structr.api.graph.Relationship;
+import org.structr.common.PropertyView;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.Transformation;
@@ -30,21 +33,18 @@ import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractRelationship;
 import org.structr.core.entity.Principal;
 import org.structr.core.entity.Relation;
+import org.structr.core.property.AbstractPrimitiveProperty;
+import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
-
-//~--- classes ----------------------------------------------------------------
 
 /**
  * Creates a relationship between two NodeInterface instances. The execute
  * method of this command takes the following parameters.
  *
- *
  */
 public class CreateRelationshipCommand extends NodeServiceCommand {
 
 	private static final Logger logger = LoggerFactory.getLogger(CreateRelationshipCommand.class.getName());
-
-	//~--- methods --------------------------------------------------------
 
 	public <A extends NodeInterface, B extends NodeInterface, R extends Relation<A, B, ?, ?>> R execute(final A fromNode, final B toNode, final Class<R> relType) throws FrameworkException {
 		return createRelationship(fromNode, toNode, relType, null);
@@ -59,10 +59,12 @@ public class CreateRelationshipCommand extends NodeServiceCommand {
 		// disable updating access time when creating relationships
 		securityContext.disableModificationOfAccessTime();
 
+		final DatabaseService db             = (DatabaseService)this.getArgument("graphDb");
 		final RelationshipFactory<R> factory = new RelationshipFactory(securityContext);
 		final PropertyMap properties         = new PropertyMap(attributes);
-		final CreationContainer tmp          = new CreationContainer();
-		final R template                     = instantiate(relType);
+		final PropertyMap toNotify           = new PropertyMap();
+		final CreationContainer tmp          = new CreationContainer(false);
+		final R template                     = (R)Relation.getInstance(relType);
 		final Node startNode                 = fromNode.getNode();
 		final Node endNode                   = toNode.getNode();
 		final Date now                       = new Date();
@@ -71,6 +73,7 @@ public class CreateRelationshipCommand extends NodeServiceCommand {
 		template.ensureCardinality(securityContext, fromNode, toNode);
 
 		// date properties need converter
+		AbstractRelationship.internalTimestamp.setProperty(securityContext, tmp, db.getInternalTimestamp());
 		AbstractRelationship.createdDate.setProperty(securityContext, tmp, now);
 		AbstractRelationship.lastModifiedDate.setProperty(securityContext, tmp, now);
 
@@ -82,21 +85,55 @@ public class CreateRelationshipCommand extends NodeServiceCommand {
 		tmp.getData().put(AbstractRelationship.targetId.jsonName(), toNode.getUuid());
 		tmp.getData().put(AbstractRelationship.visibleToPublicUsers.jsonName(), false);
 		tmp.getData().put(AbstractRelationship.visibleToAuthenticatedUsers.jsonName(), false);
-		tmp.getData().put(AbstractRelationship.cascadeDelete.jsonName(), template.getCascadingDeleteFlag());
 
 		if (user != null) {
 			tmp.getData().put(AbstractRelationship.createdBy.jsonName(), user.getUuid());
 		}
 
+		// move properties to creation container that can be set directly on creation
+		tmp.filterIndexableForCreation(securityContext, properties, tmp, toNotify);
+
+		// collect default values and try to set them on creation
+		for (final PropertyKey key : StructrApp.getConfiguration().getPropertySet(relType, PropertyView.All)) {
+
+			if (key instanceof AbstractPrimitiveProperty && !tmp.hasProperty(key.jsonName())) {
+
+				final Object defaultValue = key.defaultValue();
+				if (defaultValue != null) {
+
+					key.setProperty(securityContext, tmp, defaultValue);
+				}
+			}
+		}
+
 		// create relationship including initial properties
 		final Relationship rel = startNode.createRelationshipTo(endNode, template, tmp.getData());
 		final R newRel         = factory.instantiateWithType(rel, relType, null, true);
-		if (newRel != null) {
 
-			newRel.setProperties(securityContext, properties);
+		if (newRel != null) {
 
 			// notify transaction handler
 			TransactionCommand.relationshipCreated(user, newRel);
+
+			securityContext.disableModificationOfAccessTime();
+			newRel.setProperties(securityContext, properties);
+			securityContext.enableModificationOfAccessTime();
+
+			// ensure modification callbacks are called (necessary for validation)
+			for (final Entry<PropertyKey, Object> entry : toNotify.entrySet()) {
+
+				final PropertyKey key = entry.getKey();
+				final Object value    = entry.getValue();
+
+				if (!key.isUnvalidated()) {
+					TransactionCommand.relationshipModified(securityContext.getCachedUser(), (AbstractRelationship)newRel, key, null, value);
+				}
+			}
+
+			properties.clear();
+
+			// ensure indexing of newly created node
+			newRel.addToIndex();
 
 			// notify relationship of its creation
 			newRel.onRelationshipCreation();
@@ -112,18 +149,5 @@ public class CreateRelationshipCommand extends NodeServiceCommand {
 		securityContext.enableModificationOfAccessTime();
 
 		return newRel;
-	}
-
-	private <T extends Relation> T instantiate(final Class<T> type) {
-
-		try {
-
-			return type.newInstance();
-
-		} catch(Throwable t) {
-			logger.warn("", t);
-		}
-
-		return null;
 	}
 }

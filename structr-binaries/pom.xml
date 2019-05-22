@@ -4,12 +4,12 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.structr</groupId>
 	<artifactId>structr-binaries</artifactId>
-	<version>2.3-SNAPSHOT</version>
+	<version>3.3-SNAPSHOT</version>
 
 	<parent>
 		<groupId>org.structr</groupId>
 		<artifactId>structr</artifactId>
-		<version>2.3-SNAPSHOT</version>
+		<version>3.3-SNAPSHOT</version>
 	</parent>
 
 	<properties>
@@ -40,7 +40,7 @@
 					<replacements>
 						<replacement>
 							<token>FINAL_NAME</token>
-							<value>${project.parent.build.finalName}</value>
+							<value>${project.build.finalName}</value>
 						</replacement>
 					</replacements>
 				</configuration>
@@ -98,16 +98,6 @@
 										<type>perm</type>
 										<prefix>/usr/lib/${project.parent.artifactId}/structr</prefix>
 										<filemode>755</filemode>
-									</mapper>
-								</data>
-
-								<data>
-									<src>${project.parent.basedir}/structr-ui/seed.zip</src>
-									<type>file</type>
-									<mapper>
-										<type>perm</type>
-										<prefix>/usr/lib/${project.parent.artifactId}/</prefix>
-										<filemode>644</filemode>
 									</mapper>
 								</data>
 
@@ -177,7 +167,7 @@
 			<plugin>
 				<groupId>com.spotify</groupId>
 				<artifactId>dockerfile-maven-plugin</artifactId>
-				<version>1.3.6</version>
+				<version>1.4.10</version>
 				<executions>
 					<execution>
 						<id>package</id>
@@ -193,10 +183,10 @@
 					<tag>${project.version}</tag>
 					<skip>${skipDocker}</skip>
 					<buildArgs>
-						<STRUCTR_VERSION>${project.version}</STRUCTR_VERSION>
+						<STRUCTR_VERSION>${project.version}-${maven.build.timestamp}.${buildNumber}</STRUCTR_VERSION>
 					</buildArgs>
 				</configuration>
-			</plugin>			
+			</plugin>
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>buildnumber-maven-plugin</artifactId>
@@ -249,7 +239,7 @@
 						<exclude>src/main/deb/**</exclude>
 					</excludes>
 					<properties>
-						<year>2017</year>
+						<year>2019</year>
 						<owner>Structr GmbH</owner>
 					</properties>
 				</configuration>
@@ -262,7 +252,7 @@
 				</executions>
 			</plugin>
 		</plugins>
-		<finalName>${project.parent.artifactId}-${project.version}</finalName>
+		<finalName>${project.parent.artifactId}-${project.version}-${maven.build.timestamp}.${buildNumber}</finalName>
 		<!-- Added to make m2e happy, thanks to http://stackoverflow.com/questions/8706017/maven-dependency-plugin-goals-copy-dependencies-unpack-is-not-supported-b -->
 		<pluginManagement>
 			<plugins>
@@ -301,7 +291,7 @@
 			<name>GNU Affero General Public License, Version 3</name>
 			<url>http://www.gnu.org/licenses/agpl-3.0-standalone.html</url>
 			<comments>
-				Copyright (C) 2010-2017 Structr GmbH
+				Copyright (C) 2010-2019 Structr GmbH
 
 				This file is part of Structr &lt;http://structr.org&gt;.
 
@@ -327,7 +317,7 @@
 		<developerConnection>scm:git:git@github.com:structr/structr.git</developerConnection>
 	</scm>
 
-<!--	<distributionManagement>
+	<!--	<distributionManagement>
 		<repository>
 			<id>sonatype-nexus-staging</id>
 			<name>Maven Central Staging</name>

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -40,7 +40,7 @@ import org.structr.schema.json.JsonSchema;
 /**
  * This class can handle Schema JSON documents
  */
-public class SchemaJsonImporter extends SchemaImporter implements MaintenanceCommand {
+public class SchemaJsonImporter implements MaintenanceCommand {
 
 	private static final Logger logger = LoggerFactory.getLogger(SchemaJsonImporter.class.getName());
 
@@ -93,8 +93,6 @@ public class SchemaJsonImporter extends SchemaImporter implements MaintenanceCom
 			//iologger.warn("", ex);
 			logger.debug("Filename: " + fileName + ", URL: " + url + ", source: " + source, ioex);
 		}
-
-		//analyzeSchema();
 	}
 
 
@@ -129,7 +127,6 @@ public class SchemaJsonImporter extends SchemaImporter implements MaintenanceCom
 
 			tx.success();
 		}
-
 	}
 
 	@Override

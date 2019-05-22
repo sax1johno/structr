@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -41,13 +41,14 @@ public class VersionHelper {
 	static {
 
 		classPath                            = System.getProperty("java.class.path");
-		final Pattern outerPattern           = Pattern.compile("(structr-.+?(?=.jar))");
+		final Pattern outerPattern           = Pattern.compile("(structr-[^:]*\\.jar)");
+		final Pattern innerPattern           = Pattern.compile("(structr-core|structr-rest|structr-ui|structr)-([^-]*(?:-SNAPSHOT|-rc\\d){0,1})-{0,1}(?:([0-9]{0,12})\\.{0,1}([0-9a-f]{0,32}))\\.jar");
+
 		final Matcher outerMatcher           = outerPattern.matcher(classPath);
 
 		while (outerMatcher.find()) {
 
 			final String group               = outerMatcher.group();
-			final Pattern innerPattern       = Pattern.compile("(structr-core|structr-rest|structr-ui)-([^-]*(?:-SNAPSHOT){0,1})-{0,1}(?:([0-9]{0,12})\\.{0,1}([0-9a-f]{0,5})).*");
 			final Matcher innerMatcher       = innerPattern.matcher(group);
 			final Map<String, String> module = new HashMap<>();
 
@@ -60,18 +61,29 @@ public class VersionHelper {
 				components.put(innerMatcher.group(1), module);
 			}
 		}
-
 	}
 
 	public static String getFullVersionInfo() {
 
+		Map<String, String> structrModule = components.get("structr");
+
+		if (structrModule != null) {
+			return VersionHelper.getFullVersionInfoFromModule(structrModule);
+		}
+
 		Map<String, String> structrUiModule = getComponents().get("structr-ui");
 
 		if (structrUiModule != null) {
-			return structrUiModule.get("version") + " " + structrUiModule.get("build") + " " + structrUiModule.get("date");
+			return VersionHelper.getFullVersionInfoFromModule(structrUiModule);
 		}
 
 		return "Could not determine version string";
+
+	}
+
+	private static String getFullVersionInfoFromModule(final Map<String, String> module) {
+
+		return module.get("version") + " " + module.get("build") + " " + module.get("date");
 
 	}
 
@@ -130,4 +142,3 @@ public class VersionHelper {
 	}
 
 }
-

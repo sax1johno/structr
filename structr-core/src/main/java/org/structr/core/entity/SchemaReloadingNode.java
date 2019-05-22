@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,7 +18,6 @@
  */
 package org.structr.core.entity;
 
-import org.apache.commons.lang3.StringUtils;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
@@ -26,7 +25,7 @@ import org.structr.core.graph.ModificationQueue;
 import static org.structr.core.graph.NodeInterface.name;
 import org.structr.core.graph.TransactionCommand;
 import org.structr.schema.ReloadSchema;
-import org.structr.schema.SchemaHelper;
+import org.structr.schema.action.Actions;
 
 /**
  *
@@ -34,46 +33,50 @@ import org.structr.schema.SchemaHelper;
  */
 public abstract class SchemaReloadingNode extends AbstractNode {
 
-	@Override
-	public boolean onCreation(SecurityContext securityContext, ErrorBuffer errorBuffer) throws FrameworkException {
+	public abstract boolean reloadSchemaOnCreate();
+	public abstract boolean reloadSchemaOnModify(final ModificationQueue modificationQueue);
+	public abstract boolean reloadSchemaOnDelete();
 
-		if (super.onCreation(securityContext, errorBuffer)) {
+	@Override
+	public void onCreation(SecurityContext securityContext, ErrorBuffer errorBuffer) throws FrameworkException {
+
+		Actions.clearCache();
+
+		super.onCreation(securityContext, errorBuffer);
+
+		if (reloadSchemaOnCreate()) {
 
 			// register transaction post processing that recreates the schema information
 			TransactionCommand.postProcess("reloadSchema", new ReloadSchema());
-
-			return true;
 		}
-
-		return false;
 	}
 
 	@Override
-	public boolean onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
+	public void onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
 
-		if (super.onModification(securityContext, errorBuffer, modificationQueue)) {
+		Actions.clearCache();
+
+		super.onModification(securityContext, errorBuffer, modificationQueue);
+
+		if (reloadSchemaOnModify(modificationQueue)) {
 
 			// register transaction post processing that recreates the schema information
 			TransactionCommand.postProcess("reloadSchema", new ReloadSchema());
-
-			return true;
 		}
-
-		return false;
 	}
 
 	@Override
 	public void onNodeDeletion() {
 
-		final String signature = getResourceSignature();
-		if (StringUtils.isNotBlank(signature)) {
+		Actions.clearCache();
 
-			SchemaHelper.removeDynamicGrants(getResourceSignature());
+		super.onNodeDeletion();
+
+		if (reloadSchemaOnDelete()) {
+
+			// register transaction post processing that recreates the schema information
+			TransactionCommand.postProcess("reloadSchema", new ReloadSchema());
 		}
-
-		// register transaction post processing that recreates the schema information
-		TransactionCommand.postProcess("reloadSchema", new ReloadSchema());
-
 	}
 
 	public String getResourceSignature() {

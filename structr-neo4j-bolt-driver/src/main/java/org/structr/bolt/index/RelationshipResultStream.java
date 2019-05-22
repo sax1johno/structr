@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,7 +20,6 @@ package org.structr.bolt.index;
 
 import java.util.Map;
 import org.neo4j.driver.v1.types.Relationship;
-import org.structr.api.QueryResult;
 import org.structr.bolt.BoltDatabaseService;
 import org.structr.bolt.SessionTransaction;
 
@@ -28,12 +27,12 @@ import org.structr.bolt.SessionTransaction;
  */
 public class RelationshipResultStream extends AbstractResultStream<Relationship> {
 
-	public RelationshipResultStream(final BoltDatabaseService db, final PageableQuery query) {
+	public RelationshipResultStream(final BoltDatabaseService db, final CypherQuery query) {
 		super(db, query);
 	}
 
 	@Override
-	protected QueryResult<Relationship> fetchData(final BoltDatabaseService db, final String statement, final Map<String, Object> data) {
+	protected Iterable<Relationship> fetchData(final BoltDatabaseService db, final String statement, final Map<String, Object> data) {
 		final SessionTransaction tx = db.getCurrentTransaction();
 		return tx.getRelationships(statement, data);
 	}

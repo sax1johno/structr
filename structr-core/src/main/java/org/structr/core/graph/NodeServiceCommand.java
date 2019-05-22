@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -107,7 +107,10 @@ public abstract class NodeServiceCommand extends Command {
 
 					try {
 
-						operation.handleGraphObject(securityContext, node);
+						boolean success = operation.handleGraphObject(securityContext, node);
+						if (success) {
+							objectCount++;
+						}
 
 					} catch (Throwable t) {
 
@@ -115,7 +118,7 @@ public abstract class NodeServiceCommand extends Command {
 					}
 
 					// commit transaction after commitCount
-					if ((++objectCount % commitCount) == 0) {
+					if ((objectCount % commitCount) == 0) {
 						break;
 					}
 				}

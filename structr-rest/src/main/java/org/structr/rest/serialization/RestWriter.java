@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -46,6 +46,9 @@ public interface RestWriter {
 	public RestWriter value(final double value) throws IOException;
 	public RestWriter value(final long value) throws IOException;
 	public RestWriter value(final Number value) throws IOException;
+
+	public void raw(final String data) throws IOException;
+	public void flush() throws IOException;
 
 	default public void increaseSerializationDepth() {
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -17,9 +17,11 @@
  * along with Structr.  If not, see <http://www.gnu.org/licenses/>.
  */
 var _Icons = {
+	application_form_add: 'icon/application_form_add.png',
 	add_icon: 'icon/add.png',
 	delete_icon: 'icon/delete.png',
 	delete_disabled_icon: 'icon/delete_gray.png',
+	add_brick_icon: 'icon/brick_add.png',
 	delete_brick_icon: 'icon/brick_delete.png',
 	edit_icon: 'icon/pencil.png',
 	wrench_icon: 'icon/wrench.png',
@@ -45,15 +47,21 @@ var _Icons = {
 	clone_icon: 'icon/page_copy.png',
 	group_icon: 'icon/group.png',
 	group_add_icon: 'icon/group_add.png',
+	group_link_icon: 'icon/group_link.png',
 	user_icon: 'icon/user.png',
+	user_gray_icon: 'icon/user_gray.png',
+	user_green_icon: 'icon/user_green.png',
+	user_orange_icon: 'icon/user_orange.png',
+	user_red_icon: 'icon/user_red.png',
+	user_suit_icon: 'icon/user_suit.png',
 	user_add_icon: 'icon/user_add.png',
 	user_delete_icon: 'icon/user_delete.png',
 	compress_icon: 'icon/compress.png',
 	accept_icon: 'icon/accept.png',
 	push_file_icon: 'icon/page_white_get.png',
 	pull_file_icon: 'icon/page_white_put.png',
-	exec_cypher_icon: 'icon/control_play_blue.png',
-	exec_rest_icon: 'icon/control_play.png',
+	exec_icon: 'icon/control_play_blue.png',
+	exec_blue_icon: 'icon/control_play.png',
 	arrow_undo_icon: 'icon/arrow_undo.png',
 	information_icon: 'icon/information.png',
 	help_icon: 'icon/help.png',
@@ -101,6 +109,10 @@ var _Icons = {
 	edition_enterprise_icon: 'icon/medal_gold_2.png',
 	import_icon: 'icon/table_lightning.png',
 	hamburger_icon: 'icon/hamburger_white.png',
+	connect_icon: 'icon/connect.png',
+	disconnect_icon: 'icon/disconnect.png',
+	folder_connect_icon: 'icon/folder_connect.png',
+	folder_disconnect_icon: 'icon/folder_disconnect.png',
 
 
 	getFullSpriteClass: function (key) {
@@ -108,7 +120,7 @@ var _Icons = {
 		return 'sprite ' + _Icons.getSpriteClassOnly(key);
 
 	},
-	updateSpritasdeClassTo: function (el, newSpriteClass) {
+	updateSpriteClassTo: function (el, newSpriteClass) {
 		el.classList.forEach(function(cls) {
 			if (cls.indexOf('sprite-') === 0) {
 				el.classList.remove(cls);
@@ -119,9 +131,11 @@ var _Icons = {
 	getSpriteClassOnly: function (key) {
 
 		switch (key) {
+			case _Icons.application_form_add:         return 'sprite-application_form_add';
 			case _Icons.add_icon:                     return 'sprite-add';
 			case _Icons.delete_icon:                  return 'sprite-delete';
 			case _Icons.delete_disabled_icon:         return 'sprite-delete_gray';
+			case _Icons.add_brick_icon:               return 'sprite-brick_add';
 			case _Icons.delete_brick_icon:            return 'sprite-brick_delete';
 			case _Icons.edit_icon:                    return 'sprite-pencil';
 			case _Icons.wrench_icon:                  return 'sprite-wrench';
@@ -147,17 +161,24 @@ var _Icons = {
 			case _Icons.clone_icon:                   return 'sprite-page_copy';
 			case _Icons.group_icon:                   return 'sprite-group';
 			case _Icons.group_add_icon:               return 'sprite-group_add';
+			case _Icons.group_link_icon:              return 'sprite-group_link';
 			case _Icons.user_icon:                    return 'sprite-user';
+			case _Icons.user_gray_icon:               return 'sprite-user_gray';
+			case _Icons.user_green_icon:              return 'sprite-user_green';
+			case _Icons.user_orange_icon:             return 'sprite-user_orange';
+			case _Icons.user_red_icon:                return 'sprite-user_red';
+			case _Icons.user_suit_icon:               return 'sprite-user_suit';
 			case _Icons.user_add_icon:                return 'sprite-user_add';
 			case _Icons.user_delete_icon:             return 'sprite-user_delete';
 			case _Icons.compress_icon:                return 'sprite-compress';
 			case _Icons.accept_icon:                  return 'sprite-accept';
 			case _Icons.push_file_icon:               return 'sprite-page_white_get';
 			case _Icons.pull_file_icon:               return 'sprite-page_white_put';
-			case _Icons.exec_cypher_icon:             return 'sprite-control_play_blue';
-			case _Icons.exec_rest_icon:               return 'sprite-control_play';
+			case _Icons.exec_blue_icon:               return 'sprite-control_play_blue';
+			case _Icons.exec_icon:                    return 'sprite-control_play';
 			case _Icons.arrow_undo_icon:              return 'sprite-arrow_undo';
 			case _Icons.information_icon:             return 'sprite-information';
+			case _Icons.help_icon:                    return 'sprite-help';
 			case _Icons.refresh_icon:                 return 'sprite-arrow_refresh';
 			case _Icons.error_icon:                   return 'sprite-error';
 			case _Icons.exclamation_icon:             return 'sprite-exclamation';
@@ -200,13 +221,17 @@ var _Icons = {
 			case _Icons.edition_enterprise_icon:      return 'sprite-medal_gold_2';
 			case _Icons.import_icon:                  return 'sprite-table_lightning';
 			case _Icons.hamburger_icon:               return 'sprite-hamburger_white';
+			case _Icons.connect_icon:                 return 'sprite-connect';
+			case _Icons.disconnect_icon:              return 'sprite-disconnect';
+			case _Icons.folder_connect_icon:          return 'sprite-folder_connect';
+			case _Icons.folder_disconnect_icon:       return 'sprite-folder_disconnect';
 
 			default:                                  return 'sprite-error';
 		}
 
 	},
 	getImageOrIcon: function(image) {
-		return (image.contentType.startsWith('image/svg') ? _Icons.getImageMarkup(image.path) : (image.tnSmall ? _Icons.getImageMarkup(image.tnSmall.path) : '<i class="icon sprite sprite-image" />'));
+		return (image.contentType && image.contentType.startsWith('image/svg') ? _Icons.getImageMarkup(image.path) : (image.tnSmall ? _Icons.getImageMarkup(image.tnSmall.path) : '<i class="icon sprite sprite-image" />'));
 	},
 	getImageMarkup: function (path) {
 		return '<img class="icon" src="' + path + '">';

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -25,6 +25,7 @@ import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.graph.Identity;
 import org.structr.common.error.CompoundToken;
 import org.structr.common.error.EmptyPropertyToken;
 import org.structr.common.error.ErrorBuffer;
@@ -164,7 +165,29 @@ public class ValidationHelper {
 	public static boolean isValidStringMatchingRegex(final GraphObject node, final PropertyKey<String> key, final String expression, final ErrorBuffer errorBuffer) {
 
 		final String value = node.getProperty(key);
-		Pattern pattern    = patterns.get(expression);
+
+		if (isValidStringMatchingRegex(value, expression)) {
+			return true;
+		}
+
+		// no match
+		errorBuffer.add(new MatchToken(node.getType(), key, expression));
+		return false;
+	}
+
+	/**
+	 * Checks whether the value of the given property key of the given node
+	 * if not null and matches the given regular expression.
+	 *
+	 * @param node
+	 * @param key
+	 * @param expression
+	 * @param errorBuffer
+	 * @return true if string matches expression
+	 */
+	public static boolean isValidStringMatchingRegex(final String value, final String expression) {
+
+		Pattern pattern = patterns.get(expression);
 
 		if (pattern == null) {
 
@@ -172,14 +195,7 @@ public class ValidationHelper {
 			patterns.put(expression, pattern);
 		}
 
-		if (value != null && pattern.matcher(value).matches()) {
-
-			return true;
-		}
-
-		// no match
-		errorBuffer.add(new MatchToken(node.getType(), key, expression));
-		return false;
+		return (value != null && pattern.matcher(value).matches());
 	}
 
 	public static boolean isValidIntegerInRange(final GraphObject node, final PropertyKey<Integer> key, final String range, final ErrorBuffer errorBuffer) {
@@ -532,6 +548,7 @@ public class ValidationHelper {
 						result = StructrApp.getInstance()
 							.nodeQuery(type)
 							.and(key, value)
+							.sortAscending(GraphObject.createdDate)
 							.getAsList();
 
 					} else {
@@ -539,6 +556,7 @@ public class ValidationHelper {
 						result = StructrApp.getInstance()
 							.relationshipQuery(type)
 							.and(key, value)
+							.sortAscending(GraphObject.createdDate)
 							.getAsList();
 
 					}
@@ -560,12 +578,14 @@ public class ValidationHelper {
 
 				if (result != null) {
 
+					final Identity identity = object.getPropertyContainer().getId();
+
 					for (final GraphObject foundNode : result) {
 
-						if (foundNode.getId() != object.getId()) {
+						if (!identity.equals(foundNode.getPropertyContainer().getId())) {
 
 							// validation is aborted when the first validation failure occurs, so
-							// we can assume that the object currently exmained is the first
+							// we can assume that the object currently examined is the first
 							// existing object, hence all others get the error message with the
 							// UUID of the first one.
 							errorBuffer.add(new UniqueToken(object.getType(), key, object.getUuid()));
@@ -614,7 +634,7 @@ public class ValidationHelper {
 					result = StructrApp.getInstance()
 						.nodeQuery(type)
 						.and(properties)
-						.disableSorting()
+						.sortAscending(GraphObject.createdDate)
 						.getAsList();
 
 				} else {
@@ -622,7 +642,7 @@ public class ValidationHelper {
 					result = StructrApp.getInstance()
 						.relationshipQuery(type)
 						.and(properties)
-						.disableSorting()
+						.sortAscending(GraphObject.createdDate)
 						.getAsList();
 
 				}
@@ -644,9 +664,11 @@ public class ValidationHelper {
 
 			if (result != null) {
 
+				final Identity identity = object.getPropertyContainer().getId();
+
 				for (final GraphObject foundNode : result) {
 
-					if (foundNode.getId() != object.getId()) {
+					if (!identity.equals(foundNode.getPropertyContainer().getId())) {
 
 						// validation is aborted when the first validation failure occurs, so
 						// we can assume that the object currently exmained is the first
@@ -679,7 +701,7 @@ public class ValidationHelper {
 					result = StructrApp.getInstance()
 						.nodeQuery(NodeInterface.class)
 						.and(key, value)
-						.disableSorting()
+						.sortAscending(GraphObject.createdDate)
 						.getAsList();
 
 				} else if (object instanceof RelationshipInterface) {
@@ -687,7 +709,7 @@ public class ValidationHelper {
 					result = StructrApp.getInstance()
 						.relationshipQuery(RelationshipInterface.class)
 						.and(key, value)
-						.disableSorting()
+						.sortAscending(GraphObject.createdDate)
 						.getAsList();
 
 				} else {
@@ -705,9 +727,11 @@ public class ValidationHelper {
 
 			if (result != null) {
 
+				final Identity identity = object.getPropertyContainer().getId();
+
 				for (final GraphObject foundNode : result) {
 
-					if (foundNode.getId() != object.getId()) {
+					if (!identity.equals(foundNode.getPropertyContainer().getId())) {
 
 						// validation is aborted when the first validation failure occurs, so
 						// we can assume that the object currently exmained is the first

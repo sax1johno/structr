@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -16,9 +16,8 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with Structr.  If not, see <http://www.gnu.org/licenses/>.
  */
-var pages, shadowPage, pageVersion = {};
+var pages, shadowPage;
 var previews, previewTabs, controls, activeTab, activeTabLeft, activeTabRight, paletteSlideout, elementsSlideout, componentsSlideout, widgetsSlideout, pagesSlideout, activeElementsSlideout, dataBindingSlideout;
-var rsw;
 var components, elements;
 var selStart, selEnd;
 var sel;
@@ -35,6 +34,7 @@ var _Pages = {
 	autoRefresh: [],
 	activeTabKey: 'structrActiveTab_' + port,
 	leftSlideoutWidthKey: 'structrLeftSlideoutWidthKey_' + port,
+	rightSlideoutWidthKey: 'structrRightSlideoutWidthKey_' + port,
 	activeTabRightKey: 'structrActiveTabRight_' + port,
 	activeTabLeftKey: 'structrActiveTabLeft_' + port,
 	selectedTypeKey: 'structrSelectedType_' + port,
@@ -110,8 +110,13 @@ var _Pages = {
 			height: windowHeight - headerOffsetHeight - 42 + 'px'
 		});
 
-		$('.ver-scrollable').css({
-			height: windowHeight - headerOffsetHeight - 42 + 'px'
+		$('.ver-scrollable').each(function(i, el) {
+
+			let topOffset = ($(this).parent().hasClass('slideOut')) ? $(this).position().top : 0;
+
+			$(this).css({
+				height: windowHeight - headerOffsetHeight - topOffset - 42 + 'px'
+			});
 		});
 	},
 	onload: function() {
@@ -131,8 +136,8 @@ var _Pages = {
 				'<div id="pages" class="slideOut slideOutLeft"><div class="compTab" id="pagesTab">Pages Tree View</div></div>'
 				+ '<div id="activeElements" class="slideOut slideOutLeft"><div class="compTab" id="activeElementsTab">Active Elements</div><div class="page inner"></div></div>'
 				+ '<div id="dataBinding" class="slideOut slideOutLeft"><div class="compTab" id="dataBindingTab">Data Binding</div></div>'
-				+ '<div id="templates" class="slideOut slideOutLeft"><div class="compTab" id="templatesTab">Templates</div></div>'
-				+ '<div id="previews"></div>'
+				+ '<div id="localizations" class="slideOut slideOutLeft"><div class="compTab" id="localizationsTab">Localizations</div><div class="page inner"><input class="locale" placeholder="Locale"><button class="refresh action button">' + _Icons.getHtmlForIcon(_Icons.refresh_icon) + ' Refresh</button><div class="results ver-scrollable"></div></div></div>'
+				+ '<div id="previews" class="no-preview"></div>'
 				+ '<div id="widgetsSlideout" class="slideOut slideOutRight"><div class="compTab" id="widgetsTab">Widgets</div></div>'
 				+ '<div id="palette" class="slideOut slideOutRight"><div class="compTab" id="paletteTab">HTML Palette</div></div>'
 				+ '<div id="components" class="slideOut slideOutRight"><div class="compTab" id="componentsTab">Shared Components</div></div>'
@@ -141,7 +146,7 @@ var _Pages = {
 		pagesSlideout = $('#pages');
 		activeElementsSlideout = $('#activeElements');
 		dataBindingSlideout = $('#dataBinding');
-		templatesSlideout = $('#templates');
+		localizationsSlideout = $('#localizations');
 
 		previews = $('#previews');
 
@@ -149,73 +154,76 @@ var _Pages = {
 		paletteSlideout = $('#palette');
 		componentsSlideout = $('#components');
 		elementsSlideout = $('#elements');
+		elementsSlideout.data('closeCallback', _Elements.clearUnattachedNodes);
 
-		rsw = widgetsSlideout.width() + 12;
-
-		$('#pagesTab').on('click', function() {
-			_Pages.leftSlideoutTrigger(this, pagesSlideout, [activeElementsSlideout, dataBindingSlideout, templatesSlideout], _Pages.activeTabLeftKey, function (params) {
+		var pagesTabSlideoutAction = function() {
+			_Pages.leftSlideoutTrigger(this, pagesSlideout, [activeElementsSlideout, dataBindingSlideout, localizationsSlideout], _Pages.activeTabLeftKey, function (params) {
 				_Pages.resize(params.sw, 0);
 				_Pages.pagesTabResizeContent();
 			}, _Pages.leftSlideoutClosedCallback);
-		}).droppable({
+		};
+		$('#pagesTab').on('click', pagesTabSlideoutAction).droppable({
 			tolerance: 'touch',
-			over: function() {
-				_Pages.leftSlideoutTrigger(this, pagesSlideout, [activeElementsSlideout, dataBindingSlideout, templatesSlideout], _Pages.activeTabLeftKey, function (params) {
-					_Pages.resize(params.sw, 0);
-					_Pages.pagesTabResizeContent();
-				}, _Pages.leftSlideoutClosedCallback);
-			}
+			over: pagesTabSlideoutAction
 		});
 
 		$('#activeElementsTab').on('click', function() {
-			_Pages.leftSlideoutTrigger(this, activeElementsSlideout, [pagesSlideout, dataBindingSlideout, templatesSlideout], _Pages.activeTabLeftKey, function(params) {
+			_Pages.leftSlideoutTrigger(this, activeElementsSlideout, [pagesSlideout, dataBindingSlideout, localizationsSlideout], _Pages.activeTabLeftKey, function(params) {
 				_Pages.refreshActiveElements();
 				_Pages.resize(params.sw, 0);
 			}, _Pages.leftSlideoutClosedCallback);
 		});
 
 		$('#dataBindingTab').on('click', function() {
-			_Pages.leftSlideoutTrigger(this, dataBindingSlideout, [pagesSlideout, activeElementsSlideout, templatesSlideout], _Pages.activeTabLeftKey, function(params) {
+			_Pages.leftSlideoutTrigger(this, dataBindingSlideout, [pagesSlideout, activeElementsSlideout, localizationsSlideout], _Pages.activeTabLeftKey, function(params) {
 				_Pages.reloadDataBindingWizard();
 				_Pages.resize(params.sw, 0);
 			}, _Pages.leftSlideoutClosedCallback);
 		});
 
-		$('#templatesTab').on('click', function() {
-			_Pages.leftSlideoutTrigger(this, templatesSlideout, [pagesSlideout, activeElementsSlideout, dataBindingSlideout], _Pages.activeTabLeftKey, function(params) {
+		$('#localizationsTab').on('click', function() {
+			_Pages.leftSlideoutTrigger(this, localizationsSlideout, [pagesSlideout, activeElementsSlideout, dataBindingSlideout], _Pages.activeTabLeftKey, function(params) {
 				_Pages.resize(params.sw, 0);
 			}, _Pages.leftSlideoutClosedCallback);
 		});
 
+		$('#localizations button.refresh').on('click', function () {
+			_Pages.refreshLocalizations();
+		});
+
+		Structr.appendInfoTextToElement({
+			element: $('#localizations button.refresh'),
+			text: "On this tab you can load the localizations requested for the given locale on the currently previewed page (including the UUID of the details object which is also used for the preview).<br><br>The retrieval process works just as rendering the page. If you request the locale \"en_US\" you might get Localizations for \"en\" as a fallback if no exact match is found.<br><br>If no Localization could be found, an empty input field is rendered where you can quickly create the missing Localization.",
+			insertAfter: true,
+			css: {
+				right: "2px",
+				top: "2px"
+			},
+			helpElementCss: {
+				width: "200px"
+			},
+			offsetX: -50
+		});
+
 		$('#widgetsTab').on('click', function() {
-			_Pages.rightSlideoutClickTrigger(this, widgetsSlideout, [paletteSlideout, componentsSlideout, elementsSlideout], false, function() {
-				_Widgets.reloadWidgets();
-			});
+			_Pages.rightSlideoutClickTrigger(this, widgetsSlideout, [paletteSlideout, componentsSlideout, elementsSlideout], false, _Widgets.reloadWidgets);
 		});
 
 		$('#paletteTab').on('click', function() {
-			_Pages.rightSlideoutClickTrigger(this, paletteSlideout, [widgetsSlideout, componentsSlideout, elementsSlideout], false, function() {
-				_Elements.reloadPalette();
-			});
+			_Pages.rightSlideoutClickTrigger(this, paletteSlideout, [widgetsSlideout, componentsSlideout, elementsSlideout], false, _Elements.reloadPalette);
 		});
 
 		$('#componentsTab').on('click', function() {
-			_Pages.rightSlideoutClickTrigger(this, componentsSlideout, [widgetsSlideout, paletteSlideout, elementsSlideout], false, function() {
-				_Elements.reloadComponents();
-			});
+			_Pages.rightSlideoutClickTrigger(this, componentsSlideout, [widgetsSlideout, paletteSlideout, elementsSlideout], false, _Elements.reloadComponents);
 		}).droppable({
 			tolerance: 'touch',
 			over: function(e, ui) {
-				_Pages.rightSlideoutClickTrigger(this, componentsSlideout, [widgetsSlideout, paletteSlideout, elementsSlideout], true, function() {
-					_Elements.reloadComponents();
-				});
+				_Pages.rightSlideoutClickTrigger(this, componentsSlideout, [widgetsSlideout, paletteSlideout, elementsSlideout], true, _Elements.reloadComponents);
 			}
 		});
 
 		$('#elementsTab').on('click', function() {
-			_Pages.rightSlideoutClickTrigger(this, elementsSlideout, [widgetsSlideout, paletteSlideout, componentsSlideout], false, function() {
-				_Elements.reloadUnattachedNodes();
-			});
+			_Pages.rightSlideoutClickTrigger(this, elementsSlideout, [widgetsSlideout, paletteSlideout, componentsSlideout], false, _Elements.reloadUnattachedNodes);
 		});
 
 		previewTabs = $('<ul id="previewTabs"></ul>');
@@ -245,24 +253,24 @@ var _Pages = {
 		});
 
 		Structr.unblockMenu(500);
-
 	},
 	clearPreviews: function() {
 
 		if (previewTabs && previewTabs.length) {
 			previewTabs.children('.page').remove();
 		}
-
 	},
 	refresh: function() {
 
 		pagesSlideout.find(':not(.compTab)').remove();
 		previewTabs.empty();
 
+		pagesSlideout.append('<div id="pagesPager"></div>');
 		pagesSlideout.append('<div class="ver-scrollable" id="pagesTree"></div>');
+		let pagesPager = $('#pagesPager', pagesSlideout);
 		pages = $('#pagesTree', pagesSlideout);
 
-		var pPager = _Pager.addPager('pages', pages, true, 'Page', null, function(pages) {
+		var pPager = _Pager.addPager('pages', pagesPager, true, 'Page', null, function(pages) {
 			pages.forEach(function(page) {
 				StructrModel.create(page);
 			});
@@ -270,7 +278,7 @@ var _Pages = {
 		});
 		pPager.cleanupFunction = function () {
 			_Pages.clearPreviews();
-			$('.node', pPager.el).remove();
+			$('.node', pages).remove();
 		};
 		pPager.pager.append('Filters: <input type="text" class="filter" data-attribute="name" placeholder="Name" title="Here you can filter the pages list by page name"/>');
 		var categoryFilter = $('<input type="text" class="filter page-label" data-attribute="category" placeholder="Category" />');
@@ -278,8 +286,8 @@ var _Pages = {
 		pPager.activateFilterElements();
 
 		$.ajax({
-			url: "/structr/rest/Page/category",
-			success:function(data) {
+			url: '/structr/rest/Page/category',
+			success: function(data) {
 				var categories = [];
 				data.result.forEach(function(page) {
 					if (page.category !== null && categories.indexOf(page.category) === -1) {
@@ -288,28 +296,23 @@ var _Pages = {
 				});
 				categories.sort();
 
-				var helpText = "Here you can filter the pages list by page category.";
-				if(categories.length > 0) {
-					helpText += "Available categories are: \n\n" + categories.join("\n");
+				var helpText = 'Here you can filter the pages list by page category.';
+				if (categories.length > 0) {
+					helpText += 'Available categories are: \n\n' + categories.join('\n');
 				}
-				helpText += "\n\nPro Tip: If category names have identical substrings you can filter for multiple categories at once.";
+				helpText += '\n\nPro Tip: If category names have identical substrings you can filter for multiple categories at once.';
 
 				categoryFilter.attr('title', helpText);
 			}
 		});
 
 		previewTabs.append('<li id="import_page" title="Import Template" class="button"><i class="add_button icon ' + _Icons.getFullSpriteClass(_Icons.pull_file_icon) + '" /></li>');
-		previewTabs.append('<li id="pull_page" title="Sync page from remote instance" class="button module-dependend" data-structr-module="cloud"><i class="pull_page_button icon ' + _Icons.getFullSpriteClass(_Icons.pull_page_icon) + '" /></li>');
 		previewTabs.append('<li id="add_page" title="Add page" class="button"><i class="add_button icon ' + _Icons.getFullSpriteClass(_Icons.add_icon) + '" /></li>');
 
 		$('#import_page', previewTabs).on('click', function(e) {
 			e.stopPropagation();
 
-			Structr.dialog('Import Template', function() {
-				return true;
-			}, function() {
-				return true;
-			});
+			Structr.dialog('Import Template', function() {}, function() {});
 
 			dialog.empty();
 			dialogMsg.empty();
@@ -321,21 +324,17 @@ var _Pages = {
 					+ '<tr><td><label for="name">Name of new page:</label></td><td><input id="_name" name="name" size="20"></td></tr>'
 					+ '<tr><td><label for="publicVisibilty">Visible to public</label></td><td><input type="checkbox" id="_publicVisible" name="publicVisibility"></td></tr>'
 					+ '<tr><td><label for="authVisibilty">Visible to authenticated users</label></td><td><input type="checkbox" id="_authVisible" name="authVisibilty"></td></tr>'
+					+ '<tr><td><label for="includeInExport">Include imported files in deployment export</label></td><td><input type="checkbox" id="_includeInExport" name="includeInExport" checked="checked"></td></tr>'
 					+ '<tr><td><label for="processDeploymentInfo">Process deployment annotations</label></td><td><input type="checkbox" id="_processDeploymentInfo" name="processDeploymentInfo"></td></tr>'
 					+ '</table>');
 
-			var addressField = $('#_address', dialog);
-
-			_Logger.log(_LogType.PAGES, 'addressField', addressField);
-
-			addressField.on('blur', function() {
+			$('#_address', dialog).on('blur', function() {
 				var addr = $(this).val().replace(/\/+$/, "");
 				_Logger.log(_LogType.PAGES, addr);
 				$('#_name', dialog).val(addr.substring(addr.lastIndexOf("/") + 1));
 			});
 
-
-			dialog.append('<button id="startImport">Start Import</button>');
+			dialog.append('<button class="action" id="startImport">Start Import</button>');
 
 			$('#startImport').on('click', function(e) {
 				e.stopPropagation();
@@ -350,10 +349,11 @@ var _Pages = {
 				var name = $('#_name', dialog).val();
 				var publicVisible = $('#_publicVisible', dialog).prop('checked');
 				var authVisible = $('#_authVisible', dialog).prop('checked');
+				var includeInExport = $('#_includeInExport', dialog).prop('checked');
 				var processDeploymentInfo = $('#_processDeploymentInfo', dialog).prop('checked');
 
 				_Logger.log(_LogType.PAGES, 'start');
-				return Command.importPage(code, address, name, publicVisible, authVisible, processDeploymentInfo);
+				return Command.importPage(code, address, name, publicVisible, authVisible, includeInExport, processDeploymentInfo);
 			});
 
 		});
@@ -372,11 +372,11 @@ var _Pages = {
 
 	},
 	addTab: function(entity) {
-		previewTabs.children().last().before('<li id="show_' + entity.id + '" class="page ' + entity.id + '_"></li>');
+		previewTabs.append('<li id="show_' + entity.id + '" class="page ' + entity.id + '_"></li>');
 
 		var tab = $('#show_' + entity.id, previews);
 
-		tab.append('<b title="' + entity.name + '" class="name_">' + fitStringToWidth(entity.name, 200) + '</b>');
+		tab.append('<div class="fill-pixel"></div><b title="' + entity.name + '" class="name_">' + fitStringToWidth(entity.name, 200) + '</b>');
 		tab.append('<i title="Edit page settings of ' + entity.name + '" class="edit_ui_properties_icon button ' + _Icons.getFullSpriteClass(_Icons.wrench_icon) + '" />');
 		tab.append('<i title="View ' + entity.name + ' in new window" class="view_icon button ' + _Icons.getFullSpriteClass(_Icons.eye_icon) + '" />');
 
@@ -384,7 +384,7 @@ var _Pages = {
 			e.stopPropagation();
 			var self = $(this);
 			var link = $.trim(self.parent().children('b.name_').attr('title'));
-			var url = viewRootUrl + link + (LSWrapper.getItem(detailsObjectId + entity.id) ? '/' + LSWrapper.getItem(detailsObjectId + entity.id) : '');
+			var url = (entity.site && entity.site.hostname ? '//' + entity.site.hostname + (entity.site.port ? ':' + entity.site.port : '') + '/' : viewRootUrl) + link + (LSWrapper.getItem(detailsObjectIdKey + entity.id) ? '/' + LSWrapper.getItem(detailsObjectIdKey + entity.id) : '');
 			window.open(url);
 		});
 
@@ -405,7 +405,7 @@ var _Pages = {
 			dialog.append('<p>With these settings you can influence the behaviour of the page previews only. They are not persisted on the Page object but only stored in the UI settings.</p>');
 
 			dialog.append('<table class="props">'
-					+ '<tr><td><label for="details-object-id">UUID of details object to append to preview URL</label></td><td><input id="_details-object-id" name="details-object-id" size="30" value="' + (LSWrapper.getItem(detailsObjectId + entity.id) ?  LSWrapper.getItem(detailsObjectId + entity.id) : '') + '"> <i id="clear-details-object-id" class="' + _Icons.getFullSpriteClass(_Icons.grey_cross_icon) + '" /></td></tr>'
+					+ '<tr><td><label for="details-object-id">UUID of details object to append to preview URL</label></td><td><input id="_details-object-id" name="details-object-id" size="30" value="' + (LSWrapper.getItem(detailsObjectIdKey + entity.id) ?  LSWrapper.getItem(detailsObjectIdKey + entity.id) : '') + '"> <i id="clear-details-object-id" class="' + _Icons.getFullSpriteClass(_Icons.grey_cross_icon) + '" /></td></tr>'
 					+ '<tr><td><label for="auto-refresh">Automatic refresh</label></td><td><input title="Auto-refresh page on changes" alt="Auto-refresh page on changes" class="auto-refresh" type="checkbox"' + (LSWrapper.getItem(autoRefreshDisabledKey + entity.id) ? '' : ' checked="checked"') + '></td></tr>'
 					+ '<tr><td><label for="page-category">Category</label></td><td><input name="page-category" id="_page-category" type="text" value="' + (entity.category || '') + '"> <i id="clear-page-category" class="' + _Icons.getFullSpriteClass(_Icons.grey_cross_icon) + '" /></td></tr>'
 					+ '</table>');
@@ -418,20 +418,20 @@ var _Pages = {
 
 			$('#clear-details-object-id').on('click', function() {
 				detailsObjectIdInput.val('');
-				var oldVal = LSWrapper.getItem(detailsObjectId + entity.id) || null;
+				var oldVal = LSWrapper.getItem(detailsObjectIdKey + entity.id) || null;
 				if (oldVal) {
 					blinkGreen(detailsObjectIdInput);
-					LSWrapper.removeItem(detailsObjectId + entity.id);
+					LSWrapper.removeItem(detailsObjectIdKey + entity.id);
 					detailsObjectIdInput.focus();
 				}
 			});
 
 			detailsObjectIdInput.on('blur', function() {
 				var inp = $(this);
-				var oldVal = LSWrapper.getItem(detailsObjectId + entity.id) || null;
+				var oldVal = LSWrapper.getItem(detailsObjectIdKey + entity.id) || null;
 				var newVal = inp.val() || null;
 				if (newVal !== oldVal) {
-					LSWrapper.setItem(detailsObjectId + entity.id, newVal);
+					LSWrapper.setItem(detailsObjectIdKey + entity.id, newVal);
 					blinkGreen(detailsObjectIdInput);
 				}
 			});
@@ -545,6 +545,7 @@ var _Pages = {
 		_Pages.loadIframe(id);
 
 		element.addClass('active');
+		previews.removeClass('no-preview');
 
 		_Logger.log(_LogType.PAGES, 'store active tab', activeTab);
 		LSWrapper.setItem(_Pages.activeTabKey, activeTab);
@@ -577,12 +578,12 @@ var _Pages = {
 						_Entities.handleActiveElement(activeElement);
 					});
 				} else {
-					activeElementsContainer.append("<br><center>Page does not contain active elements</center>");
+					activeElementsContainer.append('<br><center>Page does not contain any active elements.</center>');
 				}
 			});
 
 		} else {
-			activeElementsContainer.append('<br><center>Cannot show active elements - no preview loaded<br><br></center>');
+			activeElementsContainer.append('<br><center>Unable to show active elements - no preview loaded.<br><br></center>');
 		}
 	},
 	/**
@@ -594,9 +595,8 @@ var _Pages = {
 		}
 		_Pages.unloadIframes();
 		var iframe = $('#preview_' + id);
-		Command.get(id, "id,name,version", function(obj) {
-			pageVersion[id] = obj.version;
-			var url = viewRootUrl + obj.name + (LSWrapper.getItem(detailsObjectId + id) ? '/' + LSWrapper.getItem(detailsObjectId + id) : '') + '?edit=2';
+		Command.get(id, 'id,name', function(obj) {
+			var url = viewRootUrl + obj.name + (LSWrapper.getItem(detailsObjectIdKey + id) ? '/' + LSWrapper.getItem(detailsObjectIdKey + id) : '') + '?edit=2';
 			iframe.prop('src', url);
 			_Logger.log(_LogType.PAGES, 'iframe', id, 'activated');
 			_Pages.hideAllPreviews();
@@ -605,25 +605,22 @@ var _Pages = {
 		});
 	},
 	/**
-	 * Reload preview iframe with given id if it is the active tab
-	 * and the page's version attribute is higher than the stored version.
+	 * Reload preview iframe with given id
 	 */
 	reloadIframe: function(id) {
-		if (!id || id !== activeTab || !_Pages.isPageTabPresent(id)) {
+		if (lastMenuEntry === _Pages._moduleName && (!id || id !== activeTab || !_Pages.isPageTabPresent(id))) {
+
+			if ($('.previewBox iframe').length === 0) {
+				previews.addClass('no-preview');
+				_Pages.hideAllPreviews();
+			}
+
 			return false;
 		}
 		var autoRefreshDisabled = LSWrapper.getItem(autoRefreshDisabledKey + id);
+
 		if (!autoRefreshDisabled && id) {
-			Command.get(id, "id,name,version", function(obj) {
-				_Logger.log(_LogType.PAGES, 'reloading preview iframe', id, obj.name);
-				var v = obj.version || 0;
-				var s = pageVersion[id] || 0;
-				_Logger.log(_LogType.PAGES, 'stored version:', s, 'current version:', v);
-				if (v > s) {
-					pageVersion[id] = v;
-					_Pages.loadIframe(id);
-				}
-			});
+			_Pages.loadIframe(id);
 		}
 	},
 	/**
@@ -635,9 +632,8 @@ var _Pages = {
 	unloadIframes: function() {
 		_Logger.log(_LogType.PAGES, 'unloading all preview iframes');
 		_Pages.clearIframeDroppables();
-		$('iframe', $('#previews')).each(function() {
-			var self = $(this);
-			var pageId = self.prop('id').substring('preview_'.length);
+		$('iframe', previews).each(function() {
+			var pageId = $(this).prop('id').substring('preview_'.length);
 			var iframe = $('#preview_' + pageId);
 			try {
 				iframe.contents().empty();
@@ -646,8 +642,7 @@ var _Pages = {
 		});
 	},
 	/**
-	 * Reload all previews. This means, reload only the active preview iframe.
-	 * This method is typically called by websocket broadcasts.
+	 * Reload "all" previews. This means, reload only the active preview iframe.
 	 */
 	reloadPreviews: function() {
 		_Pages.reloadIframe(activeTab);
@@ -726,8 +721,10 @@ var _Pages = {
 			e.stopPropagation();
 		});
 
+		let pageName = (entity.name ? entity.name : '[' + entity.type + ']');
+
 		div.append('<i class="typeIcon ' + _Icons.getFullSpriteClass(_Icons.page_icon) + '" />'
-				+ '<b title="' + entity.name + '" class="name_">' + fitStringToWidth(entity.name, 200) + '</b> <span class="id">' + entity.id + '</span>' + (entity.position ? ' <span class="position">' + entity.position + '</span>' : ''));
+				+ '<b title="' + entity.name + '" class="name_">' + fitStringToWidth(pageName, 200) + '</b> <span class="id">' + entity.id + '</span>' + (entity.position ? ' <span class="position">' + entity.position + '</span>' : ''));
 
 		_Entities.appendExpandIcon(div, entity, hasChildren);
 		_Entities.appendAccessControlIcon(div, entity);
@@ -747,13 +744,6 @@ var _Pages = {
 		});
 
 		_Elements.enableContextMenuOnElement(div, entity);
-
-		div.append('<i title="Sync page \'' + entity.name + '\' to remote instance" class="push_icon button ' + _Icons.getFullSpriteClass(_Icons.push_file_icon) + '" />');
-		div.children('.push_icon').on('click', function() {
-			Structr.pushDialog(entity.id, true);
-			return false;
-		});
-
 		_Entities.setMouseOver(div);
 
 		var tab = _Pages.addTab(entity);
@@ -783,7 +773,7 @@ var _Pages = {
 			} catch (e) {}
 		});
 
-		$('#preview_' + entity.id).load(function() {
+		$('#preview_' + entity.id).on('load', function() {
 			try {
 				var doc = $(this).contents();
 				var head = $(doc).find('head');
@@ -795,7 +785,6 @@ var _Pages = {
 							+ '.structr-element-container-active:hover { -moz-box-shadow: 0 0 5px #888; -webkit-box-shadow: 0 0 5px #888; box-shadow: 0 0 5px #888; }\n'
 							+ '.structr-element-container-selected { -moz-box-shadow: 0 0 8px #860; -webkit-box-shadow: 0 0 8px #860; box-shadow: 0 0 8px #860; }\n'
 							+ '.structr-element-container-selected:hover { -moz-box-shadow: 0 0 10px #750; -webkit-box-shadow: 0 0 10px #750; box-shadow: 0 0 10px #750; }\n'
-							+ '.nodeHover { -moz-box-shadow: 0 0 5px #888; -webkit-box-shadow: 0 0 5px #888; box-shadow: 0 0 5px #888; }\n'
 							+ '.structr-editable-area { background-color: #ffe; -moz-box-shadow: 0 0 5px #888; -webkit-box-shadow: 0 0 5px yellow; box-shadow: 0 0 5px #888; }\n'
 							+ '.structr-editable-area-active { background-color: #ffe; border: 1px solid orange ! important; color: #333; }\n'
 							+ '.link-hover { border: 1px solid #00c; }\n'
@@ -811,36 +800,36 @@ var _Pages = {
 				_Pages.findDroppablesInIframe(doc, entity.id).each(function(i, element) {
 					var el = $(element);
 
-					_Dragndrop.makeDroppable(el, entity.id);
+//					_Dragndrop.makeDroppable(el, entity.id);
 
 					var structrId = el.attr('data-structr-id');
 					if (structrId) {
-
-						$('.move_icon', el).on('mousedown', function(e) {
-							e.stopPropagation();
-							var self = $(this);
-							var element = self.closest('[data-structr-id]');
-							_Logger.log(_LogType.PAGES, element);
-							var entity = Structr.entity(structrId, element.prop('data-structr-id'));
-							entity.type = element.prop('data-structr_type');
-							entity.name = element.prop('data-structr_name');
-							_Logger.log(_LogType.PAGES, 'move', entity);
-							self.parent().children('.structr-node').show();
-						});
-
-						$('.delete_icon', el).on('click', function(e) {
-							e.stopPropagation();
-							var self = $(this);
-							var element = self.closest('[data-structr-id]');
-							var entity = Structr.entity(structrId, element.prop('data-structr-id'));
-							entity.type = element.prop('data-structr_type');
-							entity.name = element.prop('data-structr_name');
-							_Logger.log(_LogType.PAGES, 'delete', entity);
-							var parentId = element.prop('data-structr-id');
-
-							Command.removeSourceFromTarget(entity.id, parentId);
-							_Entities.deleteNode(this, entity);
-						});
+//
+//						$('.move_icon', el).on('mousedown', function(e) {
+//							e.stopPropagation();
+//							var self = $(this);
+//							var element = self.closest('[data-structr-id]');
+//							_Logger.log(_LogType.PAGES, element);
+//							var entity = Structr.entity(structrId, element.prop('data-structr-id'));
+//							entity.type = element.prop('data-structr_type');
+//							entity.name = element.prop('data-structr_name');
+//							_Logger.log(_LogType.PAGES, 'move', entity);
+//							self.parent().children('.structr-node').show();
+//						});
+//
+//						$('.delete_icon', el).on('click', function(e) {
+//							e.stopPropagation();
+//							var self = $(this);
+//							var element = self.closest('[data-structr-id]');
+//							var entity = Structr.entity(structrId, element.prop('data-structr-id'));
+//							entity.type = element.prop('data-structr_type');
+//							entity.name = element.prop('data-structr_name');
+//							_Logger.log(_LogType.PAGES, 'delete', entity);
+//							var parentId = element.prop('data-structr-id');
+//
+//							Command.removeSourceFromTarget(entity.id, parentId);
+//							_Entities.deleteNode(this, entity);
+//						});
 						var offsetTop = -30;
 						var offsetLeft = 0;
 						el.on({
@@ -888,22 +877,18 @@ var _Pages = {
 								_Pages.unhighlight(structrId);
 							}
 						});
-
 					}
 				});
 
 			} catch (e) {}
 
 			_Pages.activateComments(doc);
-
 		});
 
 		_Dragndrop.makeDroppable(div);
-
 		_Pages.pagesTabResizeContent();
 
 		return div;
-
 	},
 	activateComments: function(doc, callback) {
 
@@ -965,11 +950,8 @@ var _Pages = {
 						_Pages.saveInlineElement(this, callback);
 					}
 				});
-
 			});
-
 		});
-
 	},
 	saveInlineElement: function(el, callback) {
 		var self = $(el);
@@ -1023,48 +1005,16 @@ var _Pages = {
 
 		return div;
 	},
-	zoomPreviews: function(value) {
-		$('.previewBox', previews).each(function() {
-			var val = value / 100;
-			var box = $(this);
-
-			box.css('-moz-transform', 'scale(' + val + ')');
-			box.css('-o-transform', 'scale(' + val + ')');
-			box.css('-webkit-transform', 'scale(' + val + ')');
-
-			var w = origWidth * val;
-			var h = origHeight * val;
-
-			box.width(w);
-			box.height(h);
-
-			$('iframe', box).width(w);
-			$('iframe', box).height(h);
-
-			_Logger.log(_LogType.PAGES, "box,w,h", box, w, h);
-
-		});
-
-	},
 	displayDataBinding: function(id) {
 		dataBindingSlideout.children('#data-binding-inputs').remove();
 		dataBindingSlideout.append('<div class="inner" id="data-binding-inputs"></div>');
 
 		var el = $('#data-binding-inputs');
-
 		var entity = StructrModel.obj(id);
 
-		el.append('<div id="data-binding-tabs" class="data-tabs"><ul><li class="active" id="tab-binding-rest">REST Query</li><li id="tab-binding-cypher">Cypher Query</li><li id="tab-binding-xpath">XPath Query</li><li id="tab-binding-function">Function Query</li></ul>'
-				+ '<div id="content-tab-binding-rest"></div><div id="content-tab-binding-cypher"></div><div id="content-tab-binding-xpath"></div><div id="content-tab-binding-function"></div></div>');
-
-		_Entities.appendTextarea($('#content-tab-binding-rest'), entity, 'restQuery', 'REST Query', '');
-		_Entities.appendTextarea($('#content-tab-binding-cypher'), entity, 'cypherQuery', 'Cypher Query', '');
-		_Entities.appendTextarea($('#content-tab-binding-xpath'), entity, 'xpathQuery', 'XPath Query', '');
-		_Entities.appendTextarea($('#content-tab-binding-function'), entity, 'functionQuery', 'Function Query', '');
-
-		_Entities.activateTabs(id, '#data-binding-tabs', '#content-tab-binding-rest');
-
-		_Entities.appendInput(el, entity, 'dataKey', 'Data Key', 'Query results are mapped to this key and can be accessed by ${<i>&lt;dataKey&gt;.&lt;propertyKey&gt;</i>}');
+		if (entity) {
+			_Entities.repeaterConfig(entity, el);
+		}
 
 	},
 	reloadDataBindingWizard: function() {
@@ -1094,7 +1044,7 @@ var _Pages = {
 		if (!id) {
 			return;
 		}
-		Command.get(id, "id,name", function(sourceSchemaNode) {
+		Command.get(id, 'id,name', function(sourceSchemaNode) {
 
 			var typeKey = sourceSchemaNode.name.toLowerCase();
 			LSWrapper.setItem(_Pages.selectedTypeKey, id);
@@ -1138,7 +1088,7 @@ var _Pages = {
 		lastId = lastId || id;
 		stack = stack || [];
 		stack.push(id);
-		Command.get(id, "id,parent", function(obj) {
+		Command.get(id, 'id,parent', function(obj) {
 			if (obj.parent) {
 				_Pages.expandTreeNode(obj.parent.id, stack, lastId);
 			} else {
@@ -1197,5 +1147,133 @@ var _Pages = {
 		if (wasOpen) {
 			_Pages.resize(offsetLeft, offsetRight);
 		}
+	},
+	refreshLocalizations: function() {
+		var id = activeTab;
+
+		if (_Pages.isPageTabPresent(id)) {
+
+			var localeInput = $('#localizations input.locale');
+			var locale = localeInput.val();
+
+			if (!locale) {
+				blinkRed(localeInput);
+				return;
+			}
+
+			var detailObjectId = LSWrapper.getItem(detailsObjectIdKey + id);
+
+			Command.listLocalizations(id, locale, detailObjectId, function(result) {
+
+				$('#localizations .page').prop('id', 'id_' + id);
+
+				var localizationsContainer = $('#localizations div.inner div.results');
+				localizationsContainer.empty().attr('id', 'id_' + id);
+
+				if (result.length > 0) {
+
+					result.forEach(function(res) {
+
+						var div = _Pages.getNodeForLocalization(localizationsContainer, res.node);
+
+						var tbody = $('tbody', div);
+
+						var row = $('<tr><td>' + res.key + '</td><td>' + res.domain + '</td><td>' + ((res.localization !== null) ? res.localization.locale : res.locale) + '</td><td class="input"><input class="localized-value" placeholder="..."></td></tr>');
+
+						var input = $('input.localized-value', row);
+
+						if (res.localization !== null) {
+							input.val(res.localization.localizedName).data('localizationId', res.localization.id);
+						}
+
+						input.on('blur', function() {
+							var el = $(this);
+
+							var value = el.val();
+							var localizationId = el.data('localizationId');
+							if (localizationId) {
+								Command.setProperties(localizationId, {
+									localizedName: value
+								}, function() {
+									blinkGreen(el);
+								});
+
+							} else {
+								Command.create({
+									type: 'Localization',
+									name: res.key,
+									domain: res.domain || null,
+									locale: res.locale,
+									localizedName: value
+								},
+								function(createdLocalization) {
+									el.data('localizationId', createdLocalization.id);
+									blinkGreen(el);
+								});
+							}
+						});
+
+						tbody.append(row);
+					});
+
+				} else {
+
+					localizationsContainer.append("<br><center>No localizations found in page</center>");
+				}
+			});
+
+		} else {
+			localizationsContainer.append('<br><center>Cannot show localizations - no preview loaded<br><br></center>');
+		}
+	},
+	getNodeForLocalization: function (container, entity) {
+
+		var idString = 'locNode_' + entity.id;
+
+		var existing = $('#' + idString, container);
+
+		if (existing.length) {
+			return existing;
+		}
+
+		var div = $('<div id="' + idString + '" class="node localization-element ' + (entity.tag === 'html' ? ' html_element' : '') + ' "></div>');
+
+		// add node id to enable hover effect
+		div.data('nodeId', (_Entities.isContentElement(entity) ? entity.parent.id : entity.id ));
+
+		var displayName = getElementDisplayName(entity);
+		var iconClass = _Icons.getFullSpriteClass(_Elements.getElementIcon(entity));
+
+		var detailHtml = '';
+
+		if (entity.type === 'Content') {
+			detailHtml = '<div class="content_">' + fitStringToWidth(escapeTags(entity.content), 200) + '</div>';
+		} else if (entity.type === 'Template') {
+			if (entity.name) {
+				detailHtml = '<div class="content_">' + displayName + '</div>';
+			} else {
+				detailHtml = '<div class="content_">' + escapeTags(entity.content) + '</div>';
+			}
+		} else {
+			detailHtml = '<b title="' + displayName + '" class="tag_ name_">' + fitStringToWidth(displayName, 200) + '</b>';
+		}
+
+		div.append('<i class="typeIcon ' + iconClass + '" />' + detailHtml + _Elements.classIdString(entity._html_id, entity._html_class));
+
+		if (_Entities.isContentElement(entity)) {
+
+			_Elements.appendEditContentIcon(div, entity);
+
+		}
+
+		_Entities.appendEditPropertiesIcon(div, entity, false);
+
+		div.append('<table><thead><tr><th>Key</th><th>Domain</th><th>Locale</th><th>Localization</th></tr></thead><tbody></tbody></table>');
+
+		container.append(div);
+
+		_Entities.setMouseOver(div, undefined, ((entity.syncedNodesIds&&entity.syncedNodesIds.length)?entity.syncedNodesIds:[entity.sharedComponentId]));
+
+		return div;
 	}
 };

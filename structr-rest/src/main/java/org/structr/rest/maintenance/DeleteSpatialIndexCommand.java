@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -25,7 +25,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.api.DatabaseService;
 import org.structr.api.graph.Node;
-import org.structr.api.graph.Relationship;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
@@ -53,7 +52,7 @@ public class DeleteSpatialIndexCommand extends NodeServiceCommand implements Mai
 	public void execute(Map<String, Object> attributes) throws FrameworkException {
 
 
-		final DatabaseService graphDb = StructrApp.getInstance().getService(NodeService.class).getGraphDb();
+		final DatabaseService graphDb = StructrApp.getInstance().getService(NodeService.class).getDatabaseService();
 		final List<Node> toDelete          = new LinkedList<>();
 
 		for (final Node node: graphDb.getAllNodes()) {
@@ -78,12 +77,7 @@ public class DeleteSpatialIndexCommand extends NodeServiceCommand implements Mai
 
 				try {
 
-					for (Relationship rel : node.getRelationships()) {
-
-						rel.delete();
-					}
-
-					node.delete();
+					node.delete(true);
 
 				} catch (Throwable t) {
 

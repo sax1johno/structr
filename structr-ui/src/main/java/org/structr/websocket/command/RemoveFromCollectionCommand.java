@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -21,6 +21,7 @@ package org.structr.websocket.command;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.util.Iterables;
 import org.structr.common.Permission;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
@@ -35,9 +36,7 @@ import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
 
-//~--- classes ----------------------------------------------------------------
 /**
- *
  *
  */
 public class RemoveFromCollectionCommand extends AbstractCommand {
@@ -47,15 +46,14 @@ public class RemoveFromCollectionCommand extends AbstractCommand {
 	static {
 
 		StructrWebSocket.addCommand(RemoveFromCollectionCommand.class);
-
 	}
 
-	//~--- methods --------------------------------------------------------
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
+		setDoTransactionNotifications(true);
 
-		final String keyString  = (String) webSocketData.getNodeData().get("key");
+		final String keyString  = webSocketData.getNodeDataStringValue("key");
 		if (keyString == null) {
 
 			logger.error("Unable to remove given object from collection: key is null");
@@ -63,7 +61,7 @@ public class RemoveFromCollectionCommand extends AbstractCommand {
 
 		}
 
-		final String idToRemove = (String) webSocketData.getNodeData().get("idToRemove");
+		final String idToRemove = webSocketData.getNodeDataStringValue("idToRemove");
 		if (idToRemove == null) {
 
 			logger.error("Unable to remove given object from collection: idToRemove is null");
@@ -96,10 +94,10 @@ public class RemoveFromCollectionCommand extends AbstractCommand {
 
 			try {
 
-				PropertyKey key = StructrApp.getConfiguration().getPropertyKeyForJSONName(obj.getClass(), keyString);
+				PropertyKey key = StructrApp.key(obj.getClass(), keyString);
 				if (key != null) {
 
-					List collection = (List) obj.getProperty(key);
+					List collection = Iterables.toList((Iterable) obj.getProperty(key));
 					collection.remove(objToRemove);
 					obj.setProperties(obj.getSecurityContext(), new PropertyMap(key, collection));
 

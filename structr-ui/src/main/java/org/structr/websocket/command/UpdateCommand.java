@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -39,14 +39,15 @@ import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
 
-//~--- classes ----------------------------------------------------------------
 /**
- *
  *
  */
 public class UpdateCommand extends AbstractCommand {
 
 	private static final Logger logger = LoggerFactory.getLogger(UpdateCommand.class.getName());
+
+	private static final String NODE_ID_KEY   = "nodeId";
+	private static final String RECURSIVE_KEY = "recursive";
 
 	static {
 
@@ -56,74 +57,82 @@ public class UpdateCommand extends AbstractCommand {
 
 	private int count = 0;
 
-	//~--- methods --------------------------------------------------------
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) throws FrameworkException {
 
-		final App app          = StructrApp.getInstance(getWebSocket().getSecurityContext());
-		final Boolean recValue = (Boolean) webSocketData.getNodeData().get("recursive");
-		final String nodeId    = (String) webSocketData.getNodeData().get("nodeId");
-		final boolean rec      = recValue != null ? recValue : false;
-		final GraphObject obj  = getGraphObject(webSocketData.getId(), nodeId);
+		setDoTransactionNotifications(true);
 
-		if (obj == null) {
+		try {
 
-			logger.warn("Graph object with uuid {} not found.", webSocketData.getId());
-			getWebSocket().send(MessageBuilder.status().code(404).build(), true);
+			final App app          = StructrApp.getInstance(getWebSocket().getSecurityContext());
 
-			return;
-		}
+			final String nodeId    = webSocketData.getNodeDataStringValue(NODE_ID_KEY);
+			final boolean rec      = webSocketData.getNodeDataBooleanValue(RECURSIVE_KEY);
+			final GraphObject obj  = getGraphObject(webSocketData.getId(), nodeId);
 
-		webSocketData.getNodeData().remove("recursive");
+			if (obj == null) {
 
-		// If it's a node, check permissions
-		try (final Tx tx = app.tx()) {
+				logger.warn("Graph object with uuid {} not found.", webSocketData.getId());
+				getWebSocket().send(MessageBuilder.status().code(404).build(), true);
 
-			if (obj instanceof AbstractNode) {
-
-				final AbstractNode node = (AbstractNode) obj;
-
-				if (!node.isGranted(Permission.write, getWebSocket().getSecurityContext())) {
-
-					getWebSocket().send(MessageBuilder.status().message("No write permission").code(400).build(), true);
-					logger.warn("No write permission for {} on {}", new Object[]{getWebSocket().getCurrentUser().toString(), obj.toString()});
-
-					tx.success();
-					return;
-
-				}
-
-				tx.success();
+				return;
 			}
-		}
 
-		final Set<GraphObject> entities = new LinkedHashSet<>();
-		PropertyMap properties = null;
+			webSocketData.getNodeData().remove("recursive");
 
-		try (final Tx tx = app.tx()) {
-
-			collectEntities(entities, obj, null, rec);
-
-			properties = PropertyMap.inputTypeToJavaType(this.getWebSocket().getSecurityContext(), obj.getClass(), webSocketData.getNodeData());
-
-			tx.success();
-		}
-
-		final Iterator<GraphObject> iterator = entities.iterator();
-		while (iterator.hasNext()) {
-
-			count = 0;
+			// If it's a node, check permissions
 			try (final Tx tx = app.tx()) {
 
-				while (iterator.hasNext() && count++ < 100) {
+				if (obj instanceof AbstractNode) {
 
-					setProperties(iterator.next(), properties, true);
+					final AbstractNode node = (AbstractNode) obj;
+
+					if (!node.isGranted(Permission.write, getWebSocket().getSecurityContext())) {
+
+						getWebSocket().send(MessageBuilder.status().message("No write permission").code(400).build(), true);
+						logger.warn("No write permission for {} on {}", new Object[]{getWebSocket().getCurrentUser().toString(), obj.toString()});
+
+						tx.success();
+						return;
+
+					}
+
+					tx.success();
 				}
+			}
 
-				// commit and close transaction
+			final Set<GraphObject> entities = new LinkedHashSet<>();
+			PropertyMap properties = null;
+
+			try (final Tx tx = app.tx()) {
+
+				collectEntities(entities, obj, null, rec);
+
+				properties = PropertyMap.inputTypeToJavaType(this.getWebSocket().getSecurityContext(), obj.getClass(), webSocketData.getNodeData());
+
 				tx.success();
 			}
 
+			final Iterator<GraphObject> iterator = entities.iterator();
+			while (iterator.hasNext()) {
+
+				count = 0;
+				try (final Tx tx = app.tx()) {
+
+					while (iterator.hasNext() && count++ < 100) {
+
+						setProperties(iterator.next(), properties, true);
+					}
+
+					// commit and close transaction
+					tx.success();
+				}
+
+			}
+
+		} catch (FrameworkException ex) {
+			logger.warn("Exception occured", ex);
+			getWebSocket().send(MessageBuilder.status().code(ex.getStatus()).message(ex.getMessage()).build(), true);
 		}
 
 	}
@@ -140,7 +149,6 @@ public class UpdateCommand extends AbstractCommand {
 
 	}
 
-	//~--- set methods ----------------------------------------------------
 	private void setProperties(final GraphObject obj, final PropertyMap properties, final boolean rec) throws FrameworkException {
 
 		obj.setProperties(obj.getSecurityContext(), properties);

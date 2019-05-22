@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -32,6 +32,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.api.Predicate;
 import org.structr.api.config.Settings;
+import org.structr.api.util.Iterables;
+import org.structr.common.AdvancedMailContainer;
+import org.structr.common.ContextStore;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.ErrorToken;
@@ -51,17 +54,16 @@ public class ActionContext {
 
 	private static final Logger logger = LoggerFactory.getLogger(ActionContext.class.getName());
 
-	protected SecurityContext securityContext = null;
-	protected Predicate predicate             = null;
-	protected Map<String, String> headers     = new HashMap<>();
-	protected Map<String, Object> constants   = new HashMap<>();
-	protected Map<String, Object> tmpStore    = new HashMap<>();
-	protected Map<String, Date> timerStore    = new HashMap<>();
-	protected Map<Integer, Integer> counters  = new HashMap<>();
-	protected ErrorBuffer errorBuffer         = new ErrorBuffer();
-	protected StringBuilder outputBuffer      = new StringBuilder();
-	protected Locale locale                   = Locale.getDefault();
-	private boolean javaScriptContext         = false;
+	// cache is not static => library cache is per request
+	private final Map<String, String> libraryCache = new HashMap<>();
+	protected SecurityContext securityContext      = null;
+	protected Predicate predicate                  = null;
+	protected ErrorBuffer errorBuffer              = new ErrorBuffer();
+	protected StringBuilder outputBuffer           = new StringBuilder();
+	protected Locale locale                        = Locale.getDefault();
+	private boolean javaScriptContext              = false;
+	private ContextStore temporaryContextStore     = new ContextStore();
+	private boolean disableVerboseExceptionLogging = false;
 
 	public ActionContext(final SecurityContext securityContext) {
 		this(securityContext, null);
@@ -69,24 +71,20 @@ public class ActionContext {
 
 	public ActionContext(final SecurityContext securityContext, final Map<String, Object> parameters) {
 
-		if (parameters != null) {
-			this.tmpStore.putAll(parameters);
-		}
-
 		this.securityContext = securityContext;
 
-		if (securityContext != null) {
-			this.locale = securityContext.getEffectiveLocale();
+		if (this.securityContext != null) {
+
+			this.locale = this.securityContext.getEffectiveLocale();
+
+			if (parameters != null) {
+				this.securityContext.getContextStore().setParameters(parameters);
+			}
 		}
 	}
 
 	public ActionContext(final ActionContext other) {
-
-		this.tmpStore        = other.tmpStore;
-		this.timerStore      = other.timerStore;
-		this.counters        = other.counters;
 		this.errorBuffer     = other.errorBuffer;
-		this.constants       = other.constants;
 		this.securityContext = other.securityContext;
 		this.locale          = other.locale;
 	}
@@ -103,12 +101,20 @@ public class ActionContext {
 		return false;
 	}
 
+	public void setDisableVerboseExceptionLogging(final boolean disable) {
+		this.disableVerboseExceptionLogging = disable;
+	}
+
+	public boolean getDisableVerboseExceptionLogging() {
+		return this.disableVerboseExceptionLogging;
+	}
+
 	public Object getConstant(final String name) {
-		return constants.get(name);
+		return this.temporaryContextStore.getConstant(name);
 	}
 
 	public void setConstant(final String name, final Object data) {
-		constants.put(name, data);
+		this.temporaryContextStore.setConstant(name, data);
 	}
 
 	public Object getReferencedProperty(final GraphObject entity, final String refKey, final Object initialData, final int depth) throws FrameworkException {
@@ -154,68 +160,62 @@ public class ActionContext {
 	}
 
 	public void incrementCounter(final int level) {
-
-		Integer value = counters.get(level);
-		if (value == null) {
-
-			value = 0;
-		}
-
-		counters.put(level, value+1);
+		getContextStore().incrementCounter(level);
 	}
 
 	public int getCounter(final int level) {
-
-		Integer value = counters.get(level);
-		if (value == null) {
-
-			return 0;
-		}
-
-		return value;
+		return getContextStore().getCounter(level);
 	}
 
 	public void resetCounter(final int level) {
-		counters.put(level, 0);
+		getContextStore().resetCounter(level);
 	}
 
 	public void store(final String key, final Object value) {
-		tmpStore.put(key, value);
+		getContextStore().store(key, value);
 	}
 
 	public Object retrieve(final String key) {
-		return tmpStore.get(key);
+		return getContextStore().retrieve(key);
 	}
 
 	public Map<String, Object> getAllVariables () {
-		return tmpStore;
+		return getContextStore().getAllVariables();
 	}
 
 	public void addTimer(final String key) {
-		timerStore.put(key, new Date());
+		getContextStore().addTimer(key);
 	}
 
 	public Date getTimer(final String key) {
-		return timerStore.get(key);
+		return getContextStore().getTimer(key);
 	}
 
 	public void addHeader(final String key, final String value) {
-		headers.put(key, value);
+		getContextStore().addHeader(key, value);
 	}
 
 	public Map<String, String> getHeaders() {
-		return headers;
+		return getContextStore().getHeaders();
+	}
+
+	public AdvancedMailContainer getAdvancedMailContainer() {
+		return getContextStore().getAdvancedMailContainer();
 	}
 
 	public Object evaluate(final GraphObject entity, final String key, final Object data, final String defaultValue, final int depth) throws FrameworkException {
 
-		Object value = constants.get(key);
+		Object value = getContextStore().getConstant(key);
+		if (this.temporaryContextStore.getConstant(key) != null) {
+			value = this.temporaryContextStore.getConstant(key);
+		}
+
 		if (value == null) {
 
 			// special HttpServletRequest handling
 			if (data instanceof HttpServletRequest) {
 				value = ((HttpServletRequest)data).getParameterValues(key);
-				
+
 				if (value != null && ((String[]) value).length == 1) {
 					value = ((String[]) value)[0];
 				}
@@ -240,6 +240,9 @@ public class ActionContext {
 							if (data instanceof Collection) {
 								return ((Collection)data).size();
 							}
+							if (data instanceof Iterable) {
+								return Iterables.count((Iterable)data);
+							}
 							if (data.getClass().isArray()) {
 								return ((Object[])data).length;
 							}
@@ -254,36 +257,64 @@ public class ActionContext {
 				if (securityContext != null) {
 
 					// "data-less" keywords to start the evaluation chain
+
+					// 1. keywords without special handling
 					switch (key) {
 
 						case "request":
 							return securityContext.getRequest();
 
-						case "host":
-							return securityContext.getRequest().getServerName();
+						case "baseUrl":
+						case "base_url":
+							return getBaseUrl(securityContext.getRequest());
 
-						case "port":
-							return securityContext.getRequest().getServerPort();
+						case "me":
+							return securityContext.getUser(false);
 
-						case "pathInfo":
-						case "path_info":
-							return securityContext.getRequest().getPathInfo();
+						case "depth":
+							return securityContext.getSerializationDepth() - 1;
 
-						case "parameterMap":
-						case "parameter_map":
-							return securityContext.getRequest().getParameterMap();
+					}
 
-						case "remoteAddress":
-						case "remote_address":
-							final String remoteAddress = securityContext.getRequest().getHeader("X-FORWARDED-FOR");
-							if (remoteAddress == null) {
-								return securityContext.getRequest().getRemoteAddr();
-							}
-							return remoteAddress;
+					// 2. keywords which require a request
+					final HttpServletRequest request = securityContext.getRequest();
 
-						case "response": {
-							final HttpServletResponse response = securityContext.getResponse();
-							if (response != null) {
+					if (request != null) {
+
+						switch (key) {
+
+							case "host":
+								return request.getServerName();
+
+							case "port":
+								return request.getServerPort();
+
+							case "pathInfo":
+							case "path_info":
+								return request.getPathInfo();
+
+							case "queryString":
+							case "query_string":
+								return request.getQueryString();
+
+							case "parameterMap":
+							case "parameter_map":
+								return request.getParameterMap();
+
+							case "remoteAddress":
+							case "remote_address":
+								return getRemoteAddr(request);
+						}
+					}
+
+					// 3. keywords which require a response
+					final HttpServletResponse response = securityContext.getResponse();
+
+					if (response != null) {
+
+						switch (key) {
+
+							case "response": {
 
 								try {
 									// return output stream of HTTP response for streaming
@@ -292,26 +323,14 @@ public class ActionContext {
 								} catch (IOException ioex) {
 									logger.warn("", ioex);
 								}
+								return null;
 							}
-							return null;
-						}
 
-						case "statusCode":
-						case "status_code": {
-							final HttpServletResponse response = securityContext.getResponse();
-							if (response != null) {
+							case "statusCode":
+							case "status_code":
 								return response.getStatus();
-							}
-							return null;
 						}
-
-						case "me":
-							return securityContext.getUser(false);
-
-						case "depth":
-							return securityContext.getSerializationDepth() - 1;
 					}
-
 				}
 
 				// keywords that do not need a security context
@@ -328,6 +347,10 @@ public class ActionContext {
 
 					case "locale":
 						return locale != null ? locale.toString() : null;
+
+					case "tenantIdentifier":
+					case "tenant_identifier":
+						return Settings.TenantIdentifier.getValue();
 				}
 			}
 		}
@@ -337,6 +360,50 @@ public class ActionContext {
 		}
 
 		return value;
+	}
+
+	public static String getBaseUrl () {
+		return getBaseUrl(null);
+	}
+
+	public static String getBaseUrl (final HttpServletRequest request) {
+
+		final String baseUrlOverride = Settings.BaseUrlOverride.getValue();
+
+		if (StringUtils.isNotEmpty(baseUrlOverride)) {
+			return baseUrlOverride;
+		}
+
+		final StringBuilder sb = new StringBuilder("http");
+
+		final Boolean httpsEnabled       = Settings.HttpsEnabled.getValue();
+		final String name                = (request != null) ? request.getServerName() : Settings.ApplicationHost.getValue();
+		final Integer port               = (request != null) ? request.getServerPort() : ((httpsEnabled) ? Settings.HttpsPort.getValue() : Settings.HttpPort.getValue());
+
+		if (httpsEnabled) {
+			sb.append("s");
+		}
+
+		sb.append("://");
+		sb.append(name);
+
+		// we need to specify the port if (protocol = HTTPS and port != 443 OR protocol = HTTP and port != 80)
+		if ( (httpsEnabled && port != 443) || (!httpsEnabled && port != 80) ) {
+			sb.append(":").append(port);
+		}
+
+		return sb.toString();
+	}
+
+	public static String getRemoteAddr(HttpServletRequest request) {
+
+		final String remoteAddress = request.getHeader("X-FORWARDED-FOR");
+
+		if (remoteAddress == null) {
+			return request.getRemoteAddr();
+		}
+
+		return remoteAddress;
 	}
 
 	public void print(final Object... objects) {
@@ -385,45 +452,60 @@ public class ActionContext {
 
 	public String getJavascriptLibraryCode(String fileName) {
 
-		final StringBuilder buf = new StringBuilder();
-		final App app           = StructrApp.getInstance();
+		synchronized (libraryCache) {
 
-		try (final Tx tx = app.tx()) {
+			String cachedSource = libraryCache.get(fileName);
+			if (cachedSource == null) {
 
-			final List<JavaScriptSource> jsFiles = app.nodeQuery(JavaScriptSource.class).and(JavaScriptSource.name, fileName).and(JavaScriptSource.useAsJavascriptLibrary, true).getAsList();
+				final StringBuilder buf = new StringBuilder();
+				final App app           = StructrApp.getInstance();
 
-			if (jsFiles.isEmpty()) {
-				logger.warn("No JavaScript library found with fileName: {}", fileName );
-			}
+				try (final Tx tx = app.tx()) {
 
-			for (final JavaScriptSource jsLibraryFile : jsFiles) {
+					final List<JavaScriptSource> jsFiles = app.nodeQuery(JavaScriptSource.class)
+							.and(JavaScriptSource.name, fileName)
+							.and(StructrApp.key(JavaScriptSource.class, "useAsJavascriptLibrary"), true)
+							.getAsList();
 
-				final String contentType = jsLibraryFile.getContentType();
-				if (contentType != null) {
-
-					final String lowerCaseContentType = contentType.toLowerCase();
-					if ("text/javascript".equals(lowerCaseContentType) || "application/javascript".equals(lowerCaseContentType)) {
-
-						buf.append(jsLibraryFile.getJavascriptLibraryCode());
-
-					} else {
-
-						logger.info("Ignoring file {} for use as a Javascript library, content type {} not allowed. Use text/javascript or application/javascript.", new Object[] { jsLibraryFile.getName(), contentType } );
+					if (jsFiles.isEmpty()) {
+						logger.warn("No JavaScript library file found with fileName: {}", fileName );
+					} else if (jsFiles.size() > 1) {
+						logger.warn("Multiple JavaScript library files found with fileName: {}. This may cause problems!", fileName );
 					}
 
-				} else {
+					for (final JavaScriptSource jsLibraryFile : jsFiles) {
 
-					logger.info("Ignoring file {} for use as a Javascript library, content type not set. Use text/javascript or application/javascript.", new Object[] { jsLibraryFile.getName(), contentType } );
+						final String contentType = jsLibraryFile.getContentType();
+						if (contentType != null) {
+
+							final String lowerCaseContentType = contentType.toLowerCase();
+							if ("text/javascript".equals(lowerCaseContentType) || "application/javascript".equals(lowerCaseContentType)) {
+
+								buf.append(jsLibraryFile.getJavascriptLibraryCode());
+
+							} else {
+
+								logger.info("Ignoring file {} for use as a Javascript library, content type {} not allowed. Use text/javascript or application/javascript.", new Object[] { jsLibraryFile.getName(), contentType } );
+							}
+
+						} else {
+
+							logger.info("Ignoring file {} for use as a Javascript library, content type not set. Use text/javascript or application/javascript.", new Object[] { jsLibraryFile.getName(), contentType } );
+						}
+					}
+
+					tx.success();
+
+				} catch (FrameworkException fex) {
+					logger.warn("", fex);
 				}
+
+				cachedSource = buf.toString();
+				libraryCache.put(fileName, cachedSource);
 			}
 
-			tx.success();
-
-		} catch (FrameworkException fex) {
-			logger.warn("", fex);
+			return cachedSource;
 		}
-
-		return buf.toString();
 	}
 
 	public void setPredicate(final Predicate predicate) {
@@ -432,5 +514,9 @@ public class ActionContext {
 
 	public Predicate getPredicate() {
 		return predicate;
+	}
+
+	public ContextStore getContextStore() {
+		return this.securityContext.getContextStore();
 	}
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -29,7 +29,7 @@ public class CallPrivilegedFunction extends CallFunction {
 
 	@Override
 	public String getName() {
-		return "call_privileged()";
+		return "call_privileged";
 	}
 
 	@Override
@@ -44,7 +44,10 @@ public class CallPrivilegedFunction extends CallFunction {
 
 	@Override
 	public SecurityContext getSecurityContext(final ActionContext ctx) {
-		return SecurityContext.getSuperUserInstance();
-	}
 
+		final SecurityContext superuserSecurityContext = SecurityContext.getSuperUserInstance();
+		superuserSecurityContext.setContextStore(ctx.getContextStore());
+
+		return superuserSecurityContext;
+	}
 }

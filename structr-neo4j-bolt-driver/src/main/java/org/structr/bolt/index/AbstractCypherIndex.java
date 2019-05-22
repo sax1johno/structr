@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,33 +19,19 @@
 package org.structr.bolt.index;
 
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.structr.api.QueryResult;
+import org.structr.api.DatabaseService;
 import org.structr.api.graph.PropertyContainer;
-import org.structr.api.index.Index;
-import org.structr.api.search.ArrayQuery;
-import org.structr.api.search.EmptyQuery;
-import org.structr.api.search.ExactQuery;
-import org.structr.api.search.FulltextQuery;
-import org.structr.api.search.GroupQuery;
-import org.structr.api.search.NotEmptyQuery;
-import org.structr.api.search.QueryPredicate;
-import org.structr.api.search.RangeQuery;
-import org.structr.api.search.SpatialQuery;
-import org.structr.api.search.TypeConverter;
-import org.structr.api.search.TypeQuery;
-import org.structr.api.search.UuidQuery;
-import org.structr.api.util.FixedSizeCache;
-import org.structr.api.util.Iterables;
-import org.structr.bolt.*;
+import org.structr.api.index.AbstractIndex;
+import org.structr.api.index.QueryFactory;
+import org.structr.api.search.*;
+import org.structr.bolt.BoltDatabaseService;
 import org.structr.bolt.index.converter.BooleanTypeConverter;
 import org.structr.bolt.index.converter.ByteTypeConverter;
 import org.structr.bolt.index.converter.DateTypeConverter;
@@ -55,171 +41,78 @@ import org.structr.bolt.index.converter.IntTypeConverter;
 import org.structr.bolt.index.converter.LongTypeConverter;
 import org.structr.bolt.index.converter.ShortTypeConverter;
 import org.structr.bolt.index.converter.StringTypeConverter;
-import org.structr.bolt.index.factory.ArrayQueryFactory;
-import org.structr.bolt.index.factory.EmptyQueryFactory;
-import org.structr.bolt.index.factory.GroupQueryFactory;
-import org.structr.bolt.index.factory.KeywordQueryFactory;
-import org.structr.bolt.index.factory.NotEmptyQueryFactory;
-import org.structr.bolt.index.factory.QueryFactory;
-import org.structr.bolt.index.factory.RangeQueryFactory;
-import org.structr.bolt.index.factory.SpatialQueryFactory;
-import org.structr.bolt.index.factory.TypeQueryFactory;
-import org.structr.bolt.index.factory.UuidQueryFactory;
+import org.structr.bolt.index.factory.*;
 
 /**
  *
  */
-public abstract class AbstractCypherIndex<T extends PropertyContainer> implements Index<T>, QueryFactory {
+public abstract class AbstractCypherIndex<T extends PropertyContainer> extends AbstractIndex<AdvancedCypherQuery, T> {
 
-	private static final Logger logger                       = LoggerFactory.getLogger(AbstractCypherIndex.class.getName());
-	public static final TypeConverter DEFAULT_CONVERTER      = new StringTypeConverter();
-	public static final Map<Class, TypeConverter> CONVERTERS = new HashMap<>();
-	public static final Map<Class, QueryFactory> FACTORIES   = new HashMap<>();
+	private static final Logger logger = LoggerFactory.getLogger(AbstractCypherIndex.class.getName());
 
 	public static final Set<Class> INDEXABLE = new HashSet<>(Arrays.asList(new Class[] {
 		String.class,   Boolean.class,   Short.class,   Integer.class,   Long.class,   Character.class,   Float.class,   Double.class,   byte.class,
 		String[].class, Boolean[].class, Short[].class, Integer[].class, Long[].class, Character[].class, Float[].class, Double[].class, byte[].class
 	}));
 
-	static {
+	private final Map<Class, TypeConverter> converters = new HashMap<>();
+	private final Map<Class, QueryFactory> factories   = new HashMap<>();
+	protected BoltDatabaseService db                   = null;
 
-		FACTORIES.put(NotEmptyQuery.class, new NotEmptyQueryFactory());
-		FACTORIES.put(FulltextQuery.class, new KeywordQueryFactory());
-		FACTORIES.put(SpatialQuery.class,  new SpatialQueryFactory());
-		FACTORIES.put(GroupQuery.class,    new GroupQueryFactory());
-		FACTORIES.put(RangeQuery.class,    new RangeQueryFactory());
-		FACTORIES.put(ExactQuery.class,    new KeywordQueryFactory());
-		FACTORIES.put(ArrayQuery.class,    new ArrayQueryFactory());
-		FACTORIES.put(EmptyQuery.class,    new EmptyQueryFactory());
-		FACTORIES.put(TypeQuery.class,     new TypeQueryFactory());
-		FACTORIES.put(UuidQuery.class,     new UuidQueryFactory());
-
-		CONVERTERS.put(Boolean.class, new BooleanTypeConverter());
-		CONVERTERS.put(String.class,  new StringTypeConverter());
-		CONVERTERS.put(Date.class,    new DateTypeConverter());
-		CONVERTERS.put(Long.class,    new LongTypeConverter());
-		CONVERTERS.put(Short.class,   new ShortTypeConverter());
-		CONVERTERS.put(Integer.class, new IntTypeConverter());
-		CONVERTERS.put(Float.class,   new FloatTypeConverter());
-		CONVERTERS.put(Double.class,  new DoubleTypeConverter());
-		CONVERTERS.put(byte.class,    new ByteTypeConverter());
-	}
-
-	protected final FixedSizeCache<Integer, CachedQueryResult> queryCache;
-	protected final BoltDatabaseService db;
-
-	public AbstractCypherIndex(final BoltDatabaseService db, final int queryCacheSize) {
-
-		this.queryCache = new FixedSizeCache<>(queryCacheSize);
-		this.db         = db;
-	}
-
-	public abstract QueryResult<T> getResult(final PageableQuery query);
 	public abstract String getQueryPrefix(final String mainType, final String sourceTypeLabel, final String targetTypeLabel);
-	public abstract String getQuerySuffix();
+	public abstract String getQuerySuffix(final AdvancedCypherQuery query);
 
-	@Override
-	public void add(final PropertyContainer t, final String key, final Object value, final Class typeHint) {
+	public AbstractCypherIndex(final BoltDatabaseService db) {
 
-		Object indexValue = value;
-		if (value != null) {
+		this.db = db;
 
-			final Class type = value.getClass();
-
-			if (type.isEnum()) {
-				indexValue = indexValue.toString();
-			}
-
-			if (!INDEXABLE.contains(type)) {
-				return;
-			}
-		}
-
-		t.setProperty(key, indexValue);
+		init();
 	}
 
 	@Override
-	public void remove(final PropertyContainer t) {
+	public AdvancedCypherQuery createQuery(final QueryContext context) {
+		return new AdvancedCypherQuery(context, this);
 	}
 
 	@Override
-	public void remove(final PropertyContainer t, final String key) {
+	public QueryFactory getFactoryForType(final Class type) {
+		return factories.get(type);
 	}
 
 	@Override
-	public QueryResult<T> query(final QueryPredicate predicate) {
-
-		final AdvancedCypherQuery query = new AdvancedCypherQuery(this);
-
-		createQuery(this, predicate, query, true);
-
-		final String sortKey = predicate.getSortKey();
-		if (sortKey != null) {
-
-			query.sort(predicate.getSortType(), sortKey, predicate.sortDescending());
-		}
-
-		return getResult(query);
+	public TypeConverter getConverterForType(final Class type) {
+		return converters.get(type);
 	}
 
-	public void invalidateCache() {
-
-		if (!queryCache.isEmpty()) {
-
-			queryCache.clear();
-		}
-	}
-
-	// ----- interface QueryFactory -----
 	@Override
-	public boolean createQuery(final QueryFactory parent, final QueryPredicate predicate, final AdvancedCypherQuery query, final boolean isFirst) {
-
-		final Class type = predicate.getQueryType();
-		if (type != null) {
-
-			final QueryFactory factory = FACTORIES.get(type);
-			if (factory != null) {
-
-				return factory.createQuery(this, predicate, query, isFirst);
-
-			} else {
-
-				logger.warn("No query factory registered for type {}", type);
-			}
-		}
-
-		return false;
+	public DatabaseService getDatabaseService() {
+		return db;
 	}
 
-	// ----- nested classes -----
-	protected class CachedQueryResult implements QueryResult<T> {
+	// ----- private methods -----
+	private void init() {
 
-		private Collection<T> result = null;
+		factories.put(NotEmptyQuery.class,     new NotEmptyQueryFactory(this));
+		factories.put(FulltextQuery.class,     new KeywordQueryFactory(this));
+		factories.put(SpatialQuery.class,      new SpatialQueryFactory(this));
+		factories.put(GroupQuery.class,        new GroupQueryFactory(this));
+		factories.put(RangeQuery.class,        new RangeQueryFactory(this));
+		factories.put(ExactQuery.class,        new KeywordQueryFactory(this));
+		factories.put(ArrayQuery.class,        new ArrayQueryFactory(this));
+		factories.put(EmptyQuery.class,        new EmptyQueryFactory(this));
+		factories.put(TypeQuery.class,         new TypeQueryFactory(this));
+		factories.put(UuidQuery.class,         new UuidQueryFactory(this));
+		factories.put(RelationshipQuery.class, new RelationshipQueryFactory(this));
+		factories.put(ComparisonQuery.class,   new ComparisonQueryFactory(this));
 
-		public CachedQueryResult(final Iterable<T> source) {
-
-			if (source instanceof Collection) {
-
-				this.result = (Collection)source;
-
-			} else {
-
-				this.result = Iterables.toList(source);
-
-			}
-		}
-
-		@Override
-		public void close() {
-		}
-
-		@Override
-		public Iterator<T> iterator() {
-			return result.iterator();
-		}
-
-		public boolean isEmpty() {
-			return result.isEmpty();
-		}
+		converters.put(Boolean.class, new BooleanTypeConverter());
+		converters.put(String.class,  new StringTypeConverter());
+		converters.put(Date.class,    new DateTypeConverter());
+		converters.put(Long.class,    new LongTypeConverter());
+		converters.put(Short.class,   new ShortTypeConverter());
+		converters.put(Integer.class, new IntTypeConverter());
+		converters.put(Float.class,   new FloatTypeConverter());
+		converters.put(Double.class,  new DoubleTypeConverter());
+		converters.put(byte.class,    new ByteTypeConverter());
 	}
 }

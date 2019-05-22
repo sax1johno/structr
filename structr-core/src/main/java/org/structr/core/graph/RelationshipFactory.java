@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,22 +19,18 @@
 package org.structr.core.graph;
 
 
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.graph.Identity;
 import org.structr.api.graph.Relationship;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.GraphObject;
 import org.structr.core.app.StructrApp;
-
-//~--- classes ----------------------------------------------------------------
 
 /**
  * A factory for structr relationships. This class exists because we need a fast
  * way to instantiate and initialize structr relationships, as this is the most-
  * used operation.
- *
  *
  * @param <T>
  */
@@ -42,21 +38,20 @@ public class RelationshipFactory<T extends RelationshipInterface> extends Factor
 
 	private static final Logger logger = LoggerFactory.getLogger(RelationshipFactory.class.getName());
 
-	// private Map<String, Class> nodeTypeCache = new ConcurrentHashMap<String, Class>();
 	public RelationshipFactory(final SecurityContext securityContext) {
 		super(securityContext);
 	}
 
-	public RelationshipFactory(final SecurityContext securityContext, final boolean includeDeletedAndHidden, final boolean publicOnly) {
-		super(securityContext, includeDeletedAndHidden, publicOnly);
+	public RelationshipFactory(final SecurityContext securityContext, final boolean includeHidden, final boolean publicOnly) {
+		super(securityContext, includeHidden, publicOnly);
 	}
 
 	public RelationshipFactory(final SecurityContext securityContext, final int pageSize, final int page) {
 		super(securityContext, pageSize, page);
 	}
 
-	public RelationshipFactory(final SecurityContext securityContext, final boolean includeDeletedAndHidden, final boolean publicOnly, final int pageSize, final int page) {
-		super(securityContext, includeDeletedAndHidden, publicOnly, pageSize, page);
+	public RelationshipFactory(final SecurityContext securityContext, final boolean includeHidden, final boolean publicOnly, final int pageSize, final int page) {
+		super(securityContext, includeHidden, publicOnly, pageSize, page);
 	}
 
 	@Override
@@ -65,17 +60,22 @@ public class RelationshipFactory<T extends RelationshipInterface> extends Factor
 	}
 
 	@Override
-	public T instantiate(final Relationship relationship, final Relationship pathSegment) {
+	public T instantiate(final Relationship relationship, final Identity pathSegmentId) {
 
 		if (relationship == null || TransactionCommand.isDeleted(relationship)) {
 			return null;
 		}
 
-		return (T) instantiateWithType(relationship, factoryDefinition.determineRelationshipType(relationship), null, false);
+		final Class relationshipType = factoryDefinition.determineRelationshipType(relationship);
+		if (relationshipType == null) {
+			return null;
+		}
+
+		return (T) instantiateWithType(relationship, relationshipType, pathSegmentId, false);
 	}
 
 	@Override
-	public T instantiateWithType(final Relationship relationship, final Class<T> relClass, final Relationship pathSegment, final boolean isCreation) {
+	public T instantiateWithType(final Relationship relationship, final Class<T> relClass, final Identity pathSegmentId, final boolean isCreation) {
 
 		// cannot instantiate relationship without type
 		if (relClass == null) {
@@ -101,7 +101,7 @@ public class RelationshipFactory<T extends RelationshipInterface> extends Factor
 			newRel = (T)StructrApp.getConfiguration().getFactoryDefinition().createGenericRelationship();
 		}
 
-		newRel.init(securityContext, relationship, relClass);
+		newRel.init(securityContext, relationship, relClass, TransactionCommand.getCurrentTransactionId());
 		newRel.onRelationshipInstantiation();
 
 		return newRel;
@@ -113,40 +113,11 @@ public class RelationshipFactory<T extends RelationshipInterface> extends Factor
 	}
 
 	@Override
-	public T instantiate(final Relationship obj, final boolean includeDeletedAndHidden, final boolean publicOnly) throws FrameworkException {
+	public T instantiate(final Relationship obj, final boolean includeHidden, final boolean publicOnly) throws FrameworkException {
 
-		factoryProfile.setIncludeDeletedAndHidden(includeDeletedAndHidden);
+		factoryProfile.setIncludeHidden(includeHidden);
 		factoryProfile.setPublicOnly(publicOnly);
 
 		return instantiate(obj);
-	}
-
-	@Override
-	public T instantiateDummy(final Relationship entity, final String entityType) throws FrameworkException {
-
-		Map<String, Class<? extends RelationshipInterface>> entities = StructrApp.getConfiguration().getRelationshipEntities();
-		Class<T> relClass                                            = (Class<T>)entities.get(entityType);
-		T newRel                                                     = null;
-
-		if (relClass != null) {
-
-			try {
-
-				newRel = relClass.newInstance();
-				newRel.init(factoryProfile.getSecurityContext(), entity, relClass);
-
-				// let rel. know of its instantiation so it can cache its start- and end node ID.
-				newRel.onRelationshipInstantiation();
-
-			} catch (Throwable t) {
-
-				newRel = null;
-
-			}
-
-		}
-
-		return newRel;
-
 	}
 }

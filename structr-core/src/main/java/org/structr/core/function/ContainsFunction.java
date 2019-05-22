@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,30 +20,27 @@ package org.structr.core.function;
 
 import java.util.Collection;
 import org.apache.commons.lang3.ArrayUtils;
+import org.python.google.common.collect.Iterables;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class ContainsFunction extends Function<Object, Object> {
+public class ContainsFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_CONTAINS = "Usage: ${contains(string, word)} or ${contains(collection, element)}. Example: ${contains(this.name, \"the\")} or ${contains(find('Page'), page)}";
 
 	@Override
 	public String getName() {
-		return "contains()";
+		return "contains";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
 		try {
-			if (!arrayHasLengthAndAllElementsNotNull(sources, 2)) {
 
-				return false;
-			}
+			assertArrayHasLengthAndAllElementsNotNull(sources, 2);
 
 			if (sources[0] instanceof String && sources[1] instanceof String) {
 
@@ -51,6 +48,11 @@ public class ContainsFunction extends Function<Object, Object> {
 				final String part = sources[1].toString();
 
 				return source.contains(part);
+
+			} else if (sources[0] instanceof Iterable) {
+
+				final Iterable collection = (Iterable)sources[0];
+				return Iterables.contains(collection, sources[1]);
 
 			} else if (sources[0] instanceof Collection) {
 
@@ -62,18 +64,18 @@ public class ContainsFunction extends Function<Object, Object> {
 				return ArrayUtils.contains((Object[])sources[0], sources[1]);
 			}
 
-		} catch (final IllegalArgumentException e) {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
-			
+			// silently ignore null arguments
+
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
-		
+
 		return false;
-
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {
@@ -84,5 +86,4 @@ public class ContainsFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Returns true if the given string or collection contains an element";
 	}
-
 }

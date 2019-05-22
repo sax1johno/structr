@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -33,8 +33,6 @@ import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.property.PropertyKey;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
  * Change the property key from the old to the new value on all nodes matching the type.
  *
@@ -48,8 +46,6 @@ import org.structr.core.property.PropertyKey;
 public class BulkChangeNodePropertyKeyCommand extends NodeServiceCommand implements MaintenanceCommand {
 
 	private static final Logger logger = LoggerFactory.getLogger(BulkChangeNodePropertyKeyCommand.class.getName());
-
-	//~--- methods --------------------------------------------------------
 
 	@Override
 	public void execute(final Map<String, Object> properties) throws FrameworkException {
@@ -82,7 +78,7 @@ public class BulkChangeNodePropertyKeyCommand extends NodeServiceCommand impleme
 			final long count = bulkGraphOperation(securityContext, nodeIterator, 1000, "ChangeNodePropertyKey", new BulkGraphOperation<AbstractNode>() {
 
 				@Override
-				public void handleGraphObject(SecurityContext securityContext, AbstractNode node) {
+				public boolean handleGraphObject(SecurityContext securityContext, AbstractNode node) {
 
 					for (Entry entry : properties.entrySet()) {
 
@@ -106,13 +102,10 @@ public class BulkChangeNodePropertyKeyCommand extends NodeServiceCommand impleme
 								dbNode.removeProperty(oldKey);
 
 							}
-
-							node.updateInIndex();
-
 						}
-
 					}
 
+					return true;
 				}
 
 				@Override

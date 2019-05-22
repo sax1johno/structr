@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -132,6 +132,13 @@ public interface PropertyKey<T> extends Comparable<PropertyKey> {
 	public String format();
 
 	/**
+	 * Returns the type hint for this property.
+	 *
+	 * @return typeHint
+	 */
+	public String typeHint();
+
+	/**
 	 * Returns the default value for this property.
 	 *
 	 * @return defaultValue
@@ -152,6 +159,13 @@ public interface PropertyKey<T> extends Comparable<PropertyKey> {
 	 */
 	public String writeFunction();
 
+	/**
+	 * Returns the cachingEnabled value for this property.
+	 *
+	 * @return cachingEnabled
+	 */
+	public boolean cachingEnabled();
+
 
 	public PropertyConverter<T, ?> databaseConverter(final SecurityContext securityContext);
 	public PropertyConverter<T, ?> databaseConverter(final SecurityContext securityContext, final GraphObject entity);
@@ -163,6 +177,7 @@ public interface PropertyKey<T> extends Comparable<PropertyKey> {
 
 	public void setDeclaringClass(final Class declaringClass);
 	public Class getDeclaringClass();
+	public String getSourceUuid();
 
 	public T getProperty(final SecurityContext securityContext, final GraphObject obj, final boolean applyConverter);
 	public T getProperty(final SecurityContext securityContext, final GraphObject obj, final boolean applyConverter, final Predicate<GraphObject> predicate);
@@ -277,6 +292,13 @@ public interface PropertyKey<T> extends Comparable<PropertyKey> {
 	public boolean isDynamic();
 
 	/**
+	 * Indicates whether this property is a part of the internal Structr schema.
+	 *
+	 * @return whether this property is a part of the internal Structr schema
+	 */
+	public boolean isPartOfBuiltInSchema();
+
+	/**
 	 * Returns the lucene sort type of this property.
 	 * @return sortType
 	 */
@@ -300,9 +322,9 @@ public interface PropertyKey<T> extends Comparable<PropertyKey> {
 		return null;
 	}
 
-	public void index(final GraphObject entity);
-	public void index(final GraphObject entity, final Object value);
-	public boolean indexable(final Object value);
+	public Object getIndexValue(final Object value);
+	public boolean isPropertyTypeIndexable();
+	public boolean isPropertyValueIndexable(final Object value);
 
 	public SearchAttribute getSearchAttribute(final SecurityContext securityContext, final Occurrence occur, final T searchValue, final boolean exactMatch, final Query query);
 	public void extractSearchableAttribute(final SecurityContext securityContext, final HttpServletRequest request, final boolean exactMatch, final Query query) throws FrameworkException;
@@ -319,9 +341,13 @@ public interface PropertyKey<T> extends Comparable<PropertyKey> {
 	public PropertyKey<T> notNull(final boolean notNull);
 	public PropertyKey<T> unique(final boolean unique);
 	public PropertyKey<T> format(final String format);
+	public PropertyKey<T> typeHint(final String typeHint);
+	public PropertyKey<T> partOfBuiltInSchema();
 	public PropertyKey<T> dynamic();
 	public PropertyKey<T> readFunction(final String readFunction);
 	public PropertyKey<T> writeFunction(final String writeFunction);
+	public PropertyKey<T> cachingEnabled(final boolean enabled);
+	public PropertyKey<T> transformators(final String... transformators);
 
 	// ----- CMIS support -----
 	public PropertyType getDataType();

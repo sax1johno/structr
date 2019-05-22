@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -34,12 +34,17 @@ public class TextSetting extends StringSetting {
 		super(group, groupName, key, value);
 	}
 
+	public TextSetting(final SettingsGroup group, final String groupName, final String key, final String value, final String comment) {
+		super(group, groupName, key, value, comment);
+	}
+
 	@Override
 	public void render(final Tag parent) {
 
 		final Tag group = parent.block("div").css("form-group");
 
-		group.block("label").text(getKey());
+		renderLabel(group);
+
 		group.block("textarea").attr(new Attr("name", getKey())).text(getValue(""));
 
 		renderResetButton(group);

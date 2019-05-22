@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,6 +18,7 @@
  */
 package org.structr.schema.parser;
 
+import java.util.Map;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.common.error.InvalidPropertySchemaToken;
@@ -64,12 +65,10 @@ public class CountPropertyParser extends PropertySourceGenerator {
 	}
 
 	@Override
-	public void parseFormatString(final Schema entity, final String expression) throws FrameworkException {
+	public void parseFormatString(final Map<String, SchemaNode> schemaNodes, final Schema entity, final String expression) throws FrameworkException {
 
 		if (expression == null || expression.isEmpty()) {
-			throw new FrameworkException(422, "Invalid count property expression.", new InvalidPropertySchemaToken(SchemaNode.class.getSimpleName(), expression, "invalid_property_reference", "Empty property reference."));
-//			reportError(new InvalidPropertySchemaToken(SchemaNode.class.getSimpleName(), expression, "invalid_property_reference", "Empty property reference."));
-//			return;
+			throw new FrameworkException(422, "Invalid count property expression for property " + source.getPropertyName() + ".", new InvalidPropertySchemaToken(SchemaNode.class.getSimpleName(), source.getPropertyName(), expression, "invalid_property_reference", "Empty property reference."));
 		}
 
 		auxType = ", " + expression + "Property";

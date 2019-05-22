@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,7 +18,6 @@
  */
 package org.structr.web.importer;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringWriter;
@@ -26,7 +25,6 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -58,7 +56,7 @@ import org.structr.common.PathHelper;
 import org.structr.common.PropertyView;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.common.error.UnlicensedException;
+import org.structr.common.error.UnlicensedScriptException;
 import org.structr.core.GraphObject;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
@@ -70,11 +68,8 @@ import org.structr.core.graph.Tx;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.core.property.StringProperty;
-import org.structr.dynamic.File;
 import org.structr.rest.common.HttpHelper;
-import org.structr.schema.ConfigurationProvider;
 import org.structr.schema.action.Actions;
-import org.structr.schema.importer.GraphGistImporter;
 import org.structr.schema.importer.SchemaJsonImporter;
 import org.structr.web.common.FileHelper;
 import org.structr.web.common.ImageHelper;
@@ -83,7 +78,8 @@ import org.structr.web.diff.DeleteOperation;
 import org.structr.web.diff.InvertibleModificationOperation;
 import org.structr.web.diff.MoveOperation;
 import org.structr.web.diff.UpdateOperation;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
+import org.structr.web.entity.Folder;
 import org.structr.web.entity.Image;
 import org.structr.web.entity.LinkSource;
 import org.structr.web.entity.Linkable;
@@ -96,14 +92,11 @@ import org.structr.web.entity.html.Body;
 import org.structr.web.entity.html.Head;
 import org.structr.web.entity.html.Input;
 import org.structr.web.maintenance.DeployCommand;
+import org.structr.web.property.CustomHtmlAttributeProperty;
 import org.structr.websocket.command.CreateComponentCommand;
 
-//~--- classes ----------------------------------------------------------------
 /**
  * The importer creates a new page by downloading and parsing markup from a URL.
- *
- *
- *
  */
 public class Importer {
 
@@ -116,7 +109,6 @@ public class Importer {
 	private static final Map<String, String> contentTypeForExtension = new HashMap<>();
 
 	private static App app;
-	private static ConfigurationProvider config;
 
 	private final static String DATA_STRUCTR_PREFIX = "data-structr-";
 	private final static String DATA_META_PREFIX    = "data-structr-meta-";
@@ -132,6 +124,7 @@ public class Importer {
 
 	private final StringBuilder commentSource = new StringBuilder();
 	private final SecurityContext securityContext;
+	private final boolean includeInExport;
 	private final boolean publicVisible;
 	private final boolean authVisible;
 	private CommentHandler commentHandler;
@@ -156,7 +149,7 @@ public class Importer {
 	 * @param publicVisible
 	 * @param authVisible
 	 */
-	public Importer(final SecurityContext securityContext, final String code, final String address, final String name, final boolean publicVisible, final boolean authVisible) {
+	public Importer(final SecurityContext securityContext, final String code, final String address, final String name, final boolean publicVisible, final boolean authVisible, final boolean includeInExport) {
 
 		this.code            = code;
 		this.address         = address;
@@ -164,7 +157,7 @@ public class Importer {
 		this.securityContext = securityContext;
 		this.publicVisible   = publicVisible;
 		this.authVisible     = authVisible;
-		this.config          = StructrApp.getConfiguration();
+		this.includeInExport = includeInExport;
 
 		if (address != null && !address.endsWith("/") && !address.endsWith(".html")) {
 			this.address = this.address.concat("/");
@@ -338,17 +331,6 @@ public class Importer {
 		createChildNodes(parsedDocument, parent, page, removeHashAttribute, 0);
 	}
 
-	public void importDataComments() throws FrameworkException {
-
-		// try to import graph gist from comments
-		final GraphGistImporter importer = app.command(GraphGistImporter.class);
-		final byte[] data                = commentSource.toString().getBytes();
-		final ByteArrayInputStream bis   = new ByteArrayInputStream(data);
-		final List<String> sources       = importer.extractSources(bis);
-
-		importer.importCypher(sources);
-	}
-
 	public void setIsDeployment(final boolean isDeployment) {
 		this.isDeployment = isDeployment;
 	}
@@ -361,7 +343,7 @@ public class Importer {
 
 	public static Page parsePageFromSource(final SecurityContext securityContext, final String source, final String name, final boolean removeHashAttribute) throws FrameworkException {
 
-		final Importer importer = new Importer(securityContext, source, null, "source", false, false);
+		final Importer importer = new Importer(securityContext, source, null, "source", false, false, false);
 		final App localAppCtx = StructrApp.getInstance(securityContext);
 		Page page = null;
 
@@ -376,9 +358,13 @@ public class Importer {
 
 			tx.success();
 
+			return page;
+
+		} catch (Throwable t) {
+			logger.warn("Unable to parse source:\n\n" + source);
+			return null;
 		}
 
-		return page;
 	}
 
 	public static List<InvertibleModificationOperation> diffNodes(final DOMNode sourceNode, final DOMNode modifiedNode) {
@@ -427,15 +413,16 @@ public class Importer {
 			final DOMNode newNode = newNodeEntry.getValue();
 
 			// if newNode is a content element, do not rely on local hash property
-			String newHash = newNode.getProperty(DOMNode.dataHashProperty);
+			String newHash = newNode.getDataHash();
 			if (newHash == null) {
+
 				newHash = newNode.getIdHash();
 			}
 
 			// check for deleted nodes ignoring Page nodes
 			if (!hashMappedExistingNodes.containsKey(newHash) && !(newNode instanceof Page)) {
 
-				final DOMNode newParent = newNode.getProperty(DOMNode.parent);
+				final DOMNode newParent = newNode.getParent();
 
 				changeSet.add(new CreateOperation(hashMappedExistingNodes, getHashOrNull(newParent), getSiblingHashes(newNode), newNode, depthMappedNewNodes.get(newNode)));
 			}
@@ -472,7 +459,7 @@ public class Importer {
 						break;
 
 					case 6: // same content (2), same node (4), NOT same tree index => node has moved
-						newParent = newNode.getProperty(DOMNode.parent);
+						newParent = newNode.getParent();
 						changeSet.add(new MoveOperation(hashMappedExistingNodes, getHashOrNull(newParent), getSiblingHashes(newNode), newNode, existingNode));
 						break;
 
@@ -487,7 +474,7 @@ public class Importer {
 						break;
 
 					case 2: // NOT same tree index, same node (2), NOT same content => node was moved and changed
-						newParent = newNode.getProperty(DOMNode.parent);
+						newParent = newNode.getParent();
 						changeSet.add(new UpdateOperation(hashMappedExistingNodes, existingNode, newNode));
 						changeSet.add(new MoveOperation(hashMappedExistingNodes, getHashOrNull(newParent), getSiblingHashes(newNode), newNode, existingNode));
 						break;
@@ -507,12 +494,12 @@ public class Importer {
 	private static List<String> getSiblingHashes(final DOMNode node) {
 
 		final List<String> siblingHashes = new LinkedList<>();
-		DOMNode nextSibling = node.getProperty(DOMNode.nextSibling);
+		DOMNode nextSibling = node.getNextSibling();
 
 		while (nextSibling != null) {
 
 			siblingHashes.add(nextSibling.getIdHashOrProperty());
-			nextSibling = nextSibling.getProperty(DOMNode.nextSibling);
+			nextSibling = nextSibling.getNextSibling();
 		}
 
 		return siblingHashes;
@@ -535,7 +522,7 @@ public class Importer {
 	private DOMNode createChildNodes(final Node startNode, final DOMNode parent, final Page page, final boolean removeHashAttribute, final int depth) throws FrameworkException {
 
 		DOMNode rootElement     = null;
-		Linkable res            = null;
+		Linkable linkable            = null;
 		String instructions     = null;
 
 		final List<Node> children = startNode.childNodes();
@@ -545,7 +532,7 @@ public class Importer {
 
 			// clean tag, remove non-word characters except : and #
 			if (tag != null) {
-				tag = tag.replaceAll("[^a-zA-Z0-9#:.-_]+", "");
+				tag = tag.replaceAll("[^a-zA-Z0-9#:.\\-_]+", "");
 			}
 
 			final StringBuilder classString  = new StringBuilder();
@@ -579,17 +566,19 @@ public class Importer {
 						? "src" : hrefElements.contains(tag)
 						? "href" : null;
 
-					if (downloadAddressAttr != null && StringUtils.isNotBlank(node.attr(downloadAddressAttr))) {
+					if (originalUrl != null && downloadAddressAttr != null && StringUtils.isNotBlank(node.attr(downloadAddressAttr))) {
 
 						String downloadAddress = node.attr(downloadAddressAttr);
-						res = downloadFile(downloadAddress, originalUrl);
+						linkable = downloadFile(downloadAddress, originalUrl);
+					} else {
+						linkable = null;
 					}
 				}
 
 				if (removeHashAttribute) {
 
 					// Remove data-structr-hash attribute
-					node.removeAttr(DOMNode.dataHashProperty.jsonName());
+					node.removeAttr("data-structr-hash");
 				}
 			}
 
@@ -667,8 +656,10 @@ public class Importer {
 					// create comment or content node
 					if (!StringUtils.isBlank(comment)) {
 
+						final PropertyKey<String> contentTypeKey = StructrApp.key(Content.class, "contentType");
+
 						newNode = (DOMNode) page.createComment(comment);
-						newNode.setProperty(org.structr.web.entity.dom.Comment.contentType, "text/html");
+						newNode.setProperty(contentTypeKey, "text/html");
 
 					} else {
 
@@ -693,14 +684,14 @@ public class Importer {
 
 						}
 
-					} else if ( DeployCommand.endsWithUuid(src) ) {
+					} else if (DeployCommand.endsWithUuid(src)) {
+
 						final String uuid = src.substring(src.length() - 32);
 						template = (DOMNode)StructrApp.getInstance().nodeQuery(NodeInterface.class).and(GraphObject.id, uuid).getFirst();
 
 						if (template == null) {
 
 							System.out.println("##################################### template with UUID " + uuid + " not found, this is a known bug");
-
 						}
 
 					} else {
@@ -710,12 +701,11 @@ public class Importer {
 
 							template = Importer.findTemplateByName(src);
 
-								if(template == null){
+							if (template == null) {
 
-									template = createNewTemplateNode(parent, node.childNodes());
-									isNewTemplateOrComponent = true;
-
-								}
+								template = createNewTemplateNode(parent, node.childNodes());
+								isNewTemplateOrComponent = true;
+							}
 						}
 					}
 
@@ -726,12 +716,13 @@ public class Importer {
 						if (template.isSharedComponent()) {
 
 							newNode = (DOMNode) template.cloneNode(false);
-							newNode.setProperty(DOMNode.sharedComponent, template);
-							newNode.setProperty(DOMNode.ownerDocument, page);
+
+							newNode.setSharedComponent(template);
+							newNode.setOwnerDocument(page);
 
 						} else if (page != null) {
 
-							newNode.setProperty(DOMNode.ownerDocument, page);
+							newNode.setOwnerDocument(page);
 						}
 
 					} else {
@@ -754,12 +745,17 @@ public class Importer {
 
 						component = app.nodeQuery(DOMNode.class).and(GraphObject.id, src).getFirst();
 
+					} else if (DeployCommand.endsWithUuid(src)) {
+
+						final String uuid = src.substring(src.length() - 32);
+						component = app.nodeQuery(DOMNode.class).and(GraphObject.id, uuid).getFirst();
+
 					} else {
 
 						component = Importer.findSharedComponentByName(src);
 					}
 
-					if(component == null){
+					if (component == null) {
 
 						component = createSharedComponent(node);
 					}
@@ -769,8 +765,16 @@ public class Importer {
 					if (component != null) {
 
 						newNode = (DOMNode) component.cloneNode(false);
-						newNode.setProperty(DOMNode.sharedComponent, component);
-						newNode.setProperty(DOMNode.ownerDocument, page);
+
+						final String _html_src = newNode.getProperty(new StringProperty("_html_src"));
+						if (!StringUtils.isEmpty(_html_src)) {
+							node.attr("src", _html_src);
+						} else {
+							node.removeAttr("src");
+						}
+
+						newNode.setSharedComponent(component);
+						newNode.setOwnerDocument(page);
 
 					} else {
 
@@ -789,24 +793,6 @@ public class Importer {
 					newNode = (org.structr.web.entity.dom.DOMElement) page.createElement(tag, true);
 				}
 
-				if (newNode == null) {
-
-					// experimental: create DOM element with literal tag
-					newNode = (DOMElement) app.create(DOMElement.class,
-						new NodeAttribute(DOMElement.tag, node.nodeName()),
-						new NodeAttribute(DOMElement.hideOnDetail, false),
-						new NodeAttribute(DOMElement.hideOnIndex, false)
-					);
-
-					if (newNode != null && page != null) {
-						newNode.doAdopt(page);
-					}
-
-					/* disabled / replaced by implementation above
-					newNode = createNewHTMLTemplateNodeForUnsupportedTag(parent, node);
-					isNewTemplateOrComponent = true;
-					*/
-				}
 			}
 
 			if (newNode != null) {
@@ -817,26 +803,26 @@ public class Importer {
 				}
 
 				// set linkable
-				if (res != null) {
-					newNode.setProperty(LinkSource.linkable, res);
+				if (linkable != null && newNode instanceof LinkSource) {
+					((LinkSource)newNode).setLinkable(linkable);
 				}
 
 				// container for bulk setProperties()
 				final PropertyMap newNodeProperties = new PropertyMap();
 				final Class newNodeType             = newNode.getClass();
 
-				newNodeProperties.put(AbstractNode.visibleToPublicUsers, publicVisible);
+				newNodeProperties.put(AbstractNode.visibleToPublicUsers,        publicVisible);
 				newNodeProperties.put(AbstractNode.visibleToAuthenticatedUsers, authVisible);
 
 				// "id" attribute: Put it into the "_html_id" field
 				if (StringUtils.isNotBlank(id)) {
 
-					newNodeProperties.put(DOMElement._id, id);
+					newNodeProperties.put(StructrApp.key(DOMElement.class, "_html_id"), id);
 				}
 
 				if (StringUtils.isNotBlank(classString.toString())) {
 
-					newNodeProperties.put(DOMElement._class, StringUtils.trim(classString.toString()));
+					newNodeProperties.put(StructrApp.key(DOMElement.class, "_html_class"), StringUtils.trim(classString.toString()));
 				}
 
 				for (Attribute nodeAttr : node.attributes()) {
@@ -881,13 +867,14 @@ public class Importer {
 
 							} else if (key.startsWith(DATA_STRUCTR_PREFIX)) { // don't convert data-structr-* attributes as they are internal
 
-								final PropertyKey propertyKey = config.getPropertyKeyForJSONName(newNodeType, key);
+								final PropertyKey propertyKey = StructrApp.getConfiguration().getPropertyKeyForJSONName(newNodeType, key);
 								if (propertyKey != null) {
 
 									final PropertyConverter inputConverter = propertyKey.inputConverter(securityContext);
 									if (value != null && inputConverter != null) {
 
 										newNodeProperties.put(propertyKey, propertyKey.inputConverter(securityContext).convert(value));
+
 									} else {
 
 										newNodeProperties.put(propertyKey, value);
@@ -897,10 +884,9 @@ public class Importer {
 							} else {
 
 								// store data-* attributes in node
-								final PropertyKey propertyKey = new StringProperty(key);
 								if (value != null) {
 
-									newNodeProperties.put(propertyKey, value);
+									newNodeProperties.put(new StringProperty(CustomHtmlAttributeProperty.CUSTOM_HTML_ATTRIBUTE_PREFIX + key), value);
 								}
 							}
 
@@ -912,22 +898,28 @@ public class Importer {
 							boolean isActive = notBlank && value.contains("${");
 							boolean isStructrLib = notBlank && value.startsWith("/structr/js/");
 
-							if ("link".equals(tag) && "href".equals(key) && isLocal && !isActive && !isDeployment) {
+							if (linkable != null && "link".equals(tag) && "href".equals(key) && isLocal && !isActive && !isDeployment) {
 
-								newNodeProperties.put(new StringProperty(PropertyView.Html.concat(key)), "${link.path}?${link.version}");
+								newNodeProperties.put(new StringProperty(PropertyView.Html + key), "${link.path}?${link.version}");
 
-							} else if (("href".equals(key) || "src".equals(key)) && isLocal && !isActive && !isAnchor && !isStructrLib && !isDeployment) {
+							} else if (linkable != null && ("href".equals(key) || "src".equals(key)) && isLocal && !isActive && !isAnchor && !isStructrLib && !isDeployment) {
 
-								newNodeProperties.put(new StringProperty(PropertyView.Html.concat(key)), "${link.path}");
+								newNodeProperties.put(new StringProperty(PropertyView.Html + key), "${link.path}");
 
 							} else {
 
-								newNodeProperties.put(new StringProperty(PropertyView.Html.concat(key)), value);
-							}
+								if (key.startsWith("aria-")) {
 
+									// use custom key
+									newNodeProperties.put(new StringProperty(CustomHtmlAttributeProperty.CUSTOM_HTML_ATTRIBUTE_PREFIX + key), value);
+
+								} else {
+
+									newNodeProperties.put(new StringProperty(PropertyView.Html + key), value);
+								}
+							}
 						}
 					}
-
 				}
 
 				// bulk set properties on new node
@@ -935,12 +927,13 @@ public class Importer {
 
 				if ("script".equals(tag)) {
 
-					final String contentType = newNode.getProperty(Input._type);
+					final PropertyKey<String> typeKey = StructrApp.key(Input.class, "_html_type");
+					final String contentType          = newNode.getProperty(typeKey);
 
 					if (contentType == null) {
 
 						// Set default type of script tag to "text/javascript" to ensure inline JS gets imported properly
-						newNode.setProperty(Input._type, "text/javascript");
+						newNode.setProperty(typeKey, "text/javascript");
 
 					} else if (contentType.equals("application/schema+json")) {
 
@@ -952,22 +945,6 @@ public class Importer {
 							SchemaJsonImporter.importSchemaJson(source);
 						}
 
-					} else if (contentType.equals("application/x-cypher")) {
-
-						for (final Node scriptContentNode : node.childNodes()) {
-
-							final String source = scriptContentNode.toString();
-
-							// import Cypher queries from script source
-							final GraphGistImporter importer = app.command(GraphGistImporter.class);
-							final List<String> sources       = new ArrayList<>();
-							sources.add(source);
-
-							importer.importCypher(sources);
-						}
-
-						continue;
-
 					} else if (contentType.equals("application/x-structr-script")) {
 
 						for (final Node scriptContentNode : node.childNodes()) {
@@ -978,7 +955,7 @@ public class Importer {
 
 								Actions.execute(securityContext, null, source, null);
 
-							} catch (UnlicensedException ex) {
+							} catch (UnlicensedScriptException ex) {
 								ex.log(logger);
 							}
 						}
@@ -995,7 +972,7 @@ public class Importer {
 
 								Actions.execute(securityContext, null, source, null);
 
-							} catch (UnlicensedException ex) {
+							} catch (UnlicensedScriptException ex) {
 								ex.log(logger);
 							}
 						}
@@ -1003,6 +980,30 @@ public class Importer {
 						continue;
 
 					}
+
+				} else if ("style".equals(tag)) {
+
+					final PropertyKey<String> typeKey = StructrApp.key(Input.class, "_html_type");
+					final String contentType          = newNode.getProperty(typeKey);
+
+					if ("text/css".equals(contentType)) {
+
+						// parse content of style elements and add referenced files to list of resources to be downloaded
+						for (final Node styleContentNode : node.childNodes()) {
+
+							final String source = styleContentNode.toString();
+
+							try {
+								// Import referenced resources
+								processCss(source, originalUrl);
+
+							} catch (IOException ex) {
+								logger.warn("Couldn't process CSS source", ex);
+							}
+						}
+					}
+
+
 				}
 
 				if (instructions != null) {
@@ -1035,6 +1036,8 @@ public class Importer {
 
 					} else {
 
+						// don't do same page check or hierarchy check
+						parent.getTemporaryStorage().put("import", true);
 						parent.appendChild(newNode);
 					}
 				}
@@ -1042,7 +1045,7 @@ public class Importer {
 				// Link new node to its parent node
 				// linkNodes(parent, newNode, page, localIndex);
 				// Step down and process child nodes except for newly created templates
-				if(!isNewTemplateOrComponent){
+				if (!isNewTemplateOrComponent){
 
 					createChildNodes(node, newNode, page, removeHashAttribute, depth + 1);
 
@@ -1065,27 +1068,44 @@ public class Importer {
 	/**
 	 * Check whether a file with given path and checksum already exists
 	 */
-	private FileBase fileExists(final String path, final long checksum) throws FrameworkException {
-		return app.nodeQuery(FileBase.class).and(FileBase.path, path).and(File.checksum, checksum).getFirst();
+	private File fileExists(final String path, final long checksum) throws FrameworkException {
+
+		final PropertyKey<Long> checksumKey = StructrApp.key(File.class, "checksum");
+		final PropertyKey<String> pathKey   = StructrApp.key(File.class, "path");
+
+		return app.nodeQuery(File.class).and(pathKey, path).and(checksumKey, checksum).getFirst();
 	}
 
 	private Linkable downloadFile(final String downloadAddress, final URL base) {
 
+		URL downloadUrl = null;
+
+		try {
+
+			downloadUrl = new URL(base, downloadAddress);
+
+		} catch (MalformedURLException ex) {
+
+			logger.error("Could not resolve address {}", address != null ? address.concat("/") : "");
+			return null;
+		}
+
+		final String alreadyDownloadedKey = downloadUrl.getPath();
+
 		// Don't download the same file twice
-		if (alreadyDownloaded.containsKey(downloadAddress)) {
-			return alreadyDownloaded.get(downloadAddress);
+		if (alreadyDownloaded.containsKey(alreadyDownloadedKey)) {
+			return alreadyDownloaded.get(alreadyDownloadedKey);
 		}
 
 		long size;
 		long checksum;
-		URL downloadUrl;
 		String contentType;
 		java.io.File tmpFile;
 
 		try {
 			// create temporary file on disk
 			final Path tmpFilePath = Files.createTempFile("structr", "download");
-			tmpFile = tmpFilePath.toFile();
+			tmpFile                = tmpFilePath.toFile();
 
 		} catch (IOException ioex) {
 
@@ -1094,8 +1114,6 @@ public class Importer {
 		}
 
 		try {
-
-			downloadUrl = new URL(base, downloadAddress);
 
 			logger.info("Starting download from {}", downloadUrl);
 
@@ -1142,7 +1160,8 @@ public class Importer {
 		}
 
 		//downloadAddress = StringUtils.substringBefore(downloadAddress, "?");
-		final String fileName = PathHelper.getName(downloadAddress);
+		final String downloadName = cleanFileName(downloadUrl.getFile());
+		final String fileName     = PathHelper.getName(downloadName);
 
 		if (StringUtils.isBlank(fileName)) {
 
@@ -1171,6 +1190,7 @@ public class Importer {
 
 		String relativePath = StringUtils.substringAfter(downloadUrl.toString(), StringUtils.substringBeforeLast(address, "/"));
 		if (StringUtils.isBlank(relativePath)) {
+
 			relativePath = downloadAddress;
 		}
 
@@ -1181,19 +1201,19 @@ public class Importer {
 
 		if (downloadAddress.startsWith(httpsPrefix)) {
 
-			path = StringUtils.substringBefore((StringUtils.substringAfter(downloadAddress, httpsPrefix)), fileName);
+			path = StringUtils.substringBefore((StringUtils.substringAfter(downloadAddress, httpsPrefix)), "/");
 
 		} else if (downloadAddress.startsWith(httpPrefix)) {
 
-			path = StringUtils.substringBefore((StringUtils.substringAfter(downloadAddress, httpPrefix)), fileName);
+			path = StringUtils.substringBefore((StringUtils.substringAfter(downloadAddress, httpPrefix)), "/");
 
 		} else if (downloadAddress.startsWith(flexiblePrefix)) {
 
-			path = StringUtils.substringBefore((StringUtils.substringAfter(downloadAddress, flexiblePrefix)), fileName);
+			path = StringUtils.substringBefore((StringUtils.substringAfter(downloadAddress, flexiblePrefix)), "/");
 
 		} else {
 
-			path = StringUtils.substringBefore(relativePath, fileName);
+			path = StringUtils.substringBeforeLast(relativePath, "/");
 		}
 
 
@@ -1206,9 +1226,10 @@ public class Importer {
 
 		try {
 
-			final String fullPath = path + fileName;
+			final String fullPath = path + "/" + fileName;
 
-			FileBase fileNode = fileExists(fullPath, checksum);
+
+			File fileNode = fileExists(PathHelper.removeRelativeParts(fullPath), checksum);
 			if (fileNode == null) {
 
 				if (ImageHelper.isImageType(fileName)) {
@@ -1231,12 +1252,15 @@ public class Importer {
 					processCssFileNode(fileNode, downloadUrl);
 				}
 
+				// set export flag according to user preference
+				fileNode.setProperty(StructrApp.key(File.class, "includeInFrontendExport"), includeInExport);
+
 			} else {
 
 				tmpFile.delete();
 			}
 
-			alreadyDownloaded.put(downloadAddress, fileNode);
+			alreadyDownloaded.put(alreadyDownloadedKey, fileNode);
 			return fileNode;
 
 		} catch (final FrameworkException | IOException ex) {
@@ -1249,19 +1273,32 @@ public class Importer {
 
 	}
 
-	private FileBase createFileNode(final String path, final String contentType, final long size, final long checksum) throws FrameworkException {
+	private File createFileNode(final String path, final String contentType, final long size, final long checksum) throws FrameworkException {
 		return createFileNode(path, contentType, size, checksum, null);
 	}
 
-	private FileBase createFileNode(final String path, final String contentType, final long size, final long checksum, final Class fileClass) throws FrameworkException {
+	private File createFileNode(final String path, final String contentType, final long size, final long checksum, final Class fileClass) throws FrameworkException {
+
+		final PropertyKey<Integer> versionKey    = StructrApp.key(File.class, "version");
+		final PropertyKey<Folder> parentKey      = StructrApp.key(File.class, "parent");
+		final PropertyKey<String> contentTypeKey = StructrApp.key(File.class, "contentType");
+		final PropertyKey<Long> checksumKey      = StructrApp.key(File.class, "checksum");
+		final PropertyKey<Long> sizeKey          = StructrApp.key(File.class, "size");
+		final Folder parentFolder                = FileHelper.createFolderPath(securityContext, PathHelper.getFolderPath(path));
+
+		if (parentFolder != null) {
+
+			// set export flag according to user preference
+			parentFolder.setProperty(StructrApp.key(File.class, "includeInFrontendExport"), includeInExport);
+		}
 
 		return app.create(fileClass != null ? fileClass : File.class,
 			new NodeAttribute(AbstractNode.name, PathHelper.getName(path)),
-			new NodeAttribute(File.parent,  FileHelper.createFolderPath(securityContext, PathHelper.getFolderPath(path))),
-			new NodeAttribute(File.contentType, contentType),
-			new NodeAttribute(File.size, size),
-			new NodeAttribute(File.checksum, checksum),
-			new NodeAttribute(File.version, 1),
+			new NodeAttribute(parentKey,      parentFolder),
+			new NodeAttribute(contentTypeKey, contentType),
+			new NodeAttribute(sizeKey,        size),
+			new NodeAttribute(checksumKey,    checksum),
+			new NodeAttribute(versionKey,     1),
 			new NodeAttribute(AbstractNode.visibleToPublicUsers, publicVisible),
 			new NodeAttribute(AbstractNode.visibleToAuthenticatedUsers, authVisible));
 	}
@@ -1270,7 +1307,7 @@ public class Importer {
 		return (Image) createFileNode(path, contentType, size, checksum, Image.class);
 	}
 
-	private void processCssFileNode(final FileBase fileNode, final URL base) throws IOException {
+	private void processCssFileNode(final File fileNode, final URL base) throws IOException {
 
 		final StringWriter sw = new StringWriter();
 
@@ -1292,6 +1329,18 @@ public class Importer {
 			String url = matcher.group(2);
 
 			logger.info("Trying to download from URL found in CSS: {}", url);
+			downloadFile(url, base);
+
+		}
+
+		pattern = Pattern.compile("(@import\\s*([\"']|url\\('|url\\(\"))([^\"']*)");
+		matcher = pattern.matcher(css);
+
+		while (matcher.find()) {
+
+			String url = matcher.group(3);
+
+			logger.info("Trying to download file referenced by @import found in CSS: {}", url);
 			downloadFile(url, base);
 
 		}
@@ -1318,10 +1367,13 @@ public class Importer {
 			return null;
 		}
 
-		for (final DOMNode n : StructrApp.getInstance().nodeQuery(DOMNode.class).andName(name).and(DOMNode.ownerDocument, CreateComponentCommand.getOrCreateHiddenDocument()).getAsList()) {
+		final PropertyKey<Page> ownerDocumentKey = StructrApp.key(DOMNode.class, "ownerDocument");
+		final PropertyKey<DOMNode> parentKey     = StructrApp.key(DOMNode.class, "parent");
+
+		for (final DOMNode n : StructrApp.getInstance().nodeQuery(DOMNode.class).andName(name).and(ownerDocumentKey, CreateComponentCommand.getOrCreateHiddenDocument()).getAsList()) {
 
 			// only return toplevel nodes in shared components
-			if (n.getProperty(DOMNode.parent) == null) {
+			if (n.getProperty(parentKey) == null) {
 				return n;
 			}
 		}
@@ -1335,10 +1387,12 @@ public class Importer {
 			return null;
 		}
 
+		final PropertyKey<DOMNode> sharedComponentKey = StructrApp.key(DOMNode.class, "sharedComponent");
+
 		for (final DOMNode n : StructrApp.getInstance().nodeQuery(Template.class).andName(name).and().notBlank(AbstractNode.name).getAsList()) {
 
 			// IGNORE everything that REFERENCES a shared component!
-			if (n.getProperty(DOMNode.sharedComponent) == null) {
+			if (n.getProperty(sharedComponentKey) == null) {
 
 				return n;
 			}
@@ -1369,7 +1423,7 @@ public class Importer {
 
 		contentNode.setVisibility(publicVisible, authVisible);
 
-		if(parent != null){
+		if (parent != null) {
 
 			parent.appendChild(contentNode);
 		}
@@ -1395,12 +1449,14 @@ public class Importer {
 
 	private Template createNewTemplateNode(final DOMNode parent, final String content, final String contentType) throws FrameworkException {
 
-		final PropertyMap map = new PropertyMap();
+		final PropertyKey<String> contentTypeKey = StructrApp.key(Content.class, "contentType");
+		final PropertyKey<String> contentKey     = StructrApp.key(Content.class, "content");
+		final PropertyMap map                    = new PropertyMap();
 
 		map.put(AbstractNode.visibleToPublicUsers, publicVisible);
 		map.put(AbstractNode.visibleToAuthenticatedUsers, authVisible);
-		map.put(Content.contentType, contentType);
-		map.put(Content.content, content);
+		map.put(contentTypeKey, contentType);
+		map.put(contentKey,     content);
 
 		final Template newTemplate = StructrApp.getInstance(securityContext).create(Template.class, map);
 
@@ -1442,5 +1498,22 @@ public class Importer {
 
 		}
 
+	}
+
+	private String cleanFileName(final String src) {
+
+		String result = src;
+
+		result = result.replace("?", ".");
+		result = result.replace("#", ".");
+		result = result.replace(",", ".");
+		result = result.replace("=", ".");
+		result = result.replace(":", ".");
+		result = result.replace("+", ".");
+
+		// replace multiple dots by a single dot
+		result = result.replaceAll("\\.+", ".");
+
+		return result;
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -23,7 +23,7 @@ var StructrModel = {
 		return StructrModel.objects[id];
 	},
 
-	ensureObject: function (entity) {
+	ensureObject: function(entity) {
 		if (!entity || entity.id === undefined) {
 			return false;
 		}
@@ -151,7 +151,9 @@ var StructrModel = {
 	 */
 	append: function(obj, refId) {
 
-		if (!obj) return;
+		if (!obj) {
+			return;
+		}
 
 		if (obj.content) {
 			// only show the first 40 characters for content elements
@@ -196,7 +198,9 @@ var StructrModel = {
 	 */
 	del: function(id) {
 
-		if (!id) return;
+		if (!id) {
+			return;
+		}
 
 		var node = Structr.node(id);
 		if (node && !node.hasClass("schema")) {
@@ -213,7 +217,7 @@ var StructrModel = {
 		if (graphBrowser) {
 			try {
 				graphBrowser.graph.dropElement(id);
-			} catch (e) { }
+			} catch (e) {}
 		}
 
 	},
@@ -233,12 +237,35 @@ var StructrModel = {
 
 		if (obj && data.modifiedProperties && data.modifiedProperties.length) {
 
-			$.each(data.modifiedProperties, function(i, key) {
-				_Logger.log(_LogType.MODEL, 'update model', key, data.data[key]);
-				obj[key] = data.data[key];
+			let refreshObj = function(obj, newProperties) {
+				Object.keys(newProperties).forEach(k => {
+					obj[k] = newProperties[k];
+				});
+				StructrModel.refresh(obj.id);
+			};
+
+			let callback = function(newProperties) {
+				refreshObj(obj, newProperties);
+				StructrModel.callCallback(data.callback, obj);
+			};
+
+			let refreshKeys = Object.keys(obj);
+			data.modifiedProperties.forEach((p) => {
+				if (!refreshKeys.includes(p)) {
+					refreshKeys.push(p);
+				}
 			});
 
-			StructrModel.refresh(obj.id);
+			if (data.relData && data.relData.sourceId) {
+				Command.getRelationship(data.id, data.relData.sourceId, refreshKeys.join(','), callback);
+			} else {
+				Command.get(data.id, refreshKeys.join(','), callback);
+			}
+
+		} else {
+
+			// call callback anyway even if there is no obj
+			StructrModel.callCallback(data.callback, obj);
 
 		}
 
@@ -310,6 +337,9 @@ var StructrModel = {
 
 					attrElement.text(newValue);
 
+					if (Structr.isModuleActive(_Pages)) {
+						_Pages.reloadIframe(obj.pageId);
+					}
 				}
 			}
 		}
@@ -330,7 +360,6 @@ var StructrModel = {
 
 					_Logger.log(_LogType.MODEL, 'Model: Reload iframe', id, newValue);
 					_Pages.reloadIframe(id);
-
 				}
 
 			} else if (Structr.getClass(element) === 'folder') {
@@ -338,11 +367,8 @@ var StructrModel = {
 				if (Structr.isModuleActive(_Files)) {
 					_Files.refreshTree();
 				}
-
 			}
 		}
-
-
 	},
 	/**
 	 * Refresh the object's UI representation
@@ -413,7 +439,7 @@ var StructrModel = {
 
 			var iconEl = element.children('.typeIcon');
 			if (icon && iconEl.length) {
-				_Icons.updateSpritasdeClassTo(iconEl[0], _Icons.getSpriteClassOnly(icon));
+				_Icons.updateSpriteClassTo(iconEl[0], _Icons.getSpriteClassOnly(icon));
 			}
 
 			// check if key icon needs to be displayed (in case of nodes not visible to public/auth users)
@@ -439,13 +465,13 @@ var StructrModel = {
 				if ((obj.type === 'Template' || obj.isContent)) {
 					if (obj.name) {
 						element.children('.content_').replaceWith('<b title="' + displayName + '" class="tag_ name_">' + displayName + '</b>');
-						element.children('.content_').off('click').on('click', function (e) {
+						element.children('.content_').off('click').on('click', function(e) {
 							e.stopPropagation();
 							_Entities.makeNameEditable(element, 200);
 						});
 
 						element.children('.name_').replaceWith('<b title="' + displayName + '" class="tag_ name_">' + displayName + '</b>');
-						element.children('b.name_').off('click').on('click', function (e) {
+						element.children('b.name_').off('click').on('click', function(e) {
 							e.stopPropagation();
 							_Entities.makeNameEditable(element, 200);
 						});
@@ -455,11 +481,8 @@ var StructrModel = {
 				} else {
 					element.children('.name_').attr('title', displayName).html(fitStringToWidth(displayName, 200));
 				}
-
 			}
-
 		}
-
 	},
 	/**
 	 * Fetch data from server. This will trigger a refresh of the model.
@@ -497,7 +520,7 @@ var StructrModel = {
 				try {
 					StructrModel.callbacks[callback](entity, resultSize, errorOccurred);
 				} catch (e) {
-					//console.log('Exception catched: ', e, ', callback:', StructrModel.callbacks[callback], entity);
+					console.log('Exception caught: ', e, ', callback:', StructrModel.callbacks[callback], entity);
 				}
 			}
 			StructrModel.clearCallback(callback);
@@ -512,7 +535,7 @@ var StructrModel = {
 		}
 	},
 
-	copyDataToObject: function (data, target) {
+	copyDataToObject: function(data, target) {
 		$.each(Object.keys(data), function(i, key) {
 			target[key] = data[key];
 		});
@@ -669,7 +692,7 @@ StructrUser.prototype.append = function(groupId) {
 	if (Structr.isModuleActive(_Security)) {
 		if (groupId) {
 			var grpContainer = $('.groupid_' + groupId, _Security.groups);
-			$('.userid_' + this.id, grpContainer).remove();
+			//$('.userid_' + this.id, grpContainer).remove();
 			_UsersAndGroups.appendMemberToGroup(this, StructrModel.obj(groupId), grpContainer);
 		} else {
 			_UsersAndGroups.appendUserToUserList(this);
@@ -693,17 +716,18 @@ StructrGroup.prototype.setProperty = function(key, value, recursive, callback) {
 	Command.setProperty(this.id, key, value, recursive, callback);
 };
 
-StructrGroup.prototype.append = function(refId) {
+StructrGroup.prototype.append = function(groupId) {
 	if (Structr.isModuleActive(_Security)) {
 		var container = _Security.groups;
-		if (refId) {
-			var grpContainer = $('.groupid_' + refId, container);
+		if (groupId) {
+			var grpContainer = $('.groupid_' + groupId, container);
 			if (grpContainer.length) {
-				container = grpContainer;
-				$('.groupid_' + this.id, container).remove();
+//				$('.groupid_' + this.id, container).remove();
 			}
+			StructrModel.expand(_UsersAndGroups.appendMemberToGroup(this, StructrModel.obj(groupId), grpContainer), this);
+		} else {
+			StructrModel.expand(_UsersAndGroups.appendGroupElement(container, this), this);
 		}
-		StructrModel.expand(_UsersAndGroups.appendGroupElement(container, this), this);
 	}
 };
 
@@ -717,7 +741,7 @@ StructrGroup.prototype.remove = function() {
 };
 
 StructrGroup.prototype.removeUser = function(userId) {
-	this.members = this.members.filter(function (user) {
+	this.members = this.members.filter(function(user) {
 		return user.id !== userId;
 	});
 
@@ -835,11 +859,12 @@ StructrElement.prototype.remove = function() {
 		// remove this element from its parent object in the model
 		var modelEntity = StructrModel.obj(this.parent.id);
 		if (modelEntity) {
-			modelEntity.children = modelEntity.children.filter(function (child) {
+
+			modelEntity.children = modelEntity.children.filter(function(child) {
 				return child.id === this.id;
 			});
 			if (modelEntity.childrenIds) {
-				modelEntity.childrenIds = modelEntity.childrenIds.filter(function (childId) {
+				modelEntity.childrenIds = modelEntity.childrenIds.filter(function(childId) {
 					return childId === this.id;
 				});
 			}
@@ -882,7 +907,7 @@ StructrElement.prototype.exists = function() {
 	var obj = this;
 
 	var hasChildren = obj.childrenIds && obj.childrenIds.length;
-	var isComponent = obj.syncedNodes && obj.syncedNodes.length;
+	var isComponent = obj.syncedNodesIds && obj.syncedNodesIds.length;
 
 	var isMasterComponent = (isComponent && hasChildren);
 
@@ -905,9 +930,9 @@ StructrElement.prototype.isActiveNode = function() {
 		|| this["data-structr-return"]
 		|| this["data-structr-type"]
 		//Boolean attributes
-		|| this["data-structr-append-id"]===true
-		|| this["data-structr-confirm"]===true
-		|| this["data-structr-reload"]===true;
+		|| this["data-structr-append-id"] === true
+		|| this["data-structr-confirm"] === true
+		|| this["data-structr-reload"] === true;
 };
 
 /**************************************

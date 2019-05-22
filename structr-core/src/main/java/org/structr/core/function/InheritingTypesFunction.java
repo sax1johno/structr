@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -24,46 +24,41 @@ import org.structr.common.error.FrameworkException;
 import org.structr.core.graph.search.SearchCommand;
 import org.structr.schema.SchemaHelper;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-public class InheritingTypesFunction extends Function<Object, Object> {
+public class InheritingTypesFunction extends AdvancedScriptingFunction {
 
 	public static final String ERROR_MESSAGE_INHERITING_TYPES    = "Usage: ${inheriting_types(type[, blacklist])}. Example ${inheriting_types('User')}";
 	public static final String ERROR_MESSAGE_INHERITING_TYPES_JS = "Usage: ${Structr.inheriting_types(type[, blacklist])}. Example ${Structr.inheriting_types('User')}";
+
+	@Override
+	public String getName() {
+		return "inheriting_types";
+	}
 
 	@Override
 	public Object apply(ActionContext ctx, Object caller, Object[] sources) throws FrameworkException {
 
 		try {
 
-			if (arrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 1, 2)) {
+			assertArrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 1, 2);
 
-				final String typeName = sources[0].toString();
-				final Class type = SchemaHelper.getEntityClassForRawType(typeName);
-				final ArrayList inheritants = new ArrayList();
+			final String typeName = sources[0].toString();
+			final Class type = SchemaHelper.getEntityClassForRawType(typeName);
+			final ArrayList inheritants = new ArrayList();
 
-				inheritants.addAll(SearchCommand.getAllSubtypesAsStringSet(type.getSimpleName()));
+			inheritants.addAll(SearchCommand.getAllSubtypesAsStringSet(type.getSimpleName()));
 
-				if (sources.length == 2) {
-					inheritants.removeAll((List)sources[1]);
-				}
-
-				return inheritants;
-
-			} else {
-
-				logParameterError(caller, sources, ctx.isJavaScriptContext());
-				return usage(ctx.isJavaScriptContext());
-
+			if (sources.length == 2) {
+				inheritants.removeAll((List)sources[1]);
 			}
 
-		} catch (final IllegalArgumentException e) {
+			return inheritants;
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+		} catch (IllegalArgumentException e) {
+
+			logParameterError(caller, sources, e.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
-
 	}
 
 	@Override
@@ -75,10 +70,4 @@ public class InheritingTypesFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Returns the names of the child classes of the given type";
 	}
-
-	@Override
-	public String getName() {
-		return "inheriting_types()";
-	}
-
 }

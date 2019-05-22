@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -37,6 +37,11 @@ public interface PropertyView {
 	 */
 	public static final String Public =	"public";
 	
+	/**
+	 * The "custom" view, this is the default view for custom attributes.
+	 */
+	public static final String Custom =	"custom";
+
 	/**
 	 * The "protected" view, free to use.
 	 */

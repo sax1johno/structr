@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -28,12 +28,8 @@ import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
- * Websocket command to create a simple HTML page
- *
- *
+ * Websocket command to create a simple HTML page.
  */
 public class CreateSimplePage extends AbstractCommand {
 
@@ -45,12 +41,12 @@ public class CreateSimplePage extends AbstractCommand {
 
 	}
 
-	//~--- methods --------------------------------------------------------
-
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
-		final String pageName                 = (String) webSocketData.getNodeData().get(Page.name.dbName());
+		setDoTransactionNotifications(true);
+
+		final String pageName                 = webSocketData.getNodeDataStringValue(Page.name.jsonName());
 		final SecurityContext securityContext = getWebSocket().getSecurityContext();
 
 		try {
@@ -66,13 +62,9 @@ public class CreateSimplePage extends AbstractCommand {
 		}
 	}
 
-	//~--- get methods ----------------------------------------------------
-
 	@Override
 	public String getCommand() {
 
 		return "CREATE_SIMPLE_PAGE";
-
 	}
-
 }

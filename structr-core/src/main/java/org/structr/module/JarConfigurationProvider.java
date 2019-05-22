@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -21,7 +21,6 @@ package org.structr.module;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -71,11 +70,8 @@ import org.structr.core.property.PropertyKey;
 import org.structr.schema.ConfigurationProvider;
 import org.structr.schema.SchemaService;
 
-//~--- classes ----------------------------------------------------------------
 /**
  * The module service main class.
- *
- *
  */
 public class JarConfigurationProvider implements ConfigurationProvider {
 
@@ -106,10 +102,11 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 	private final Map<String, Map<String, Set<PropertyKey>>> globalPropertyViewMap                 = new ConcurrentHashMap<>(2000);
 	private final Map<String, Map<PropertyKey, Set<PropertyValidator>>> globalValidatorMap         = new ConcurrentHashMap<>(100);
 	private final Map<String, Map<String, PropertyKey>> globalClassDBNamePropertyMap               = new ConcurrentHashMap<>(2000);
+	private final Map<String, Map<String, PropertyKey>> globalBuiltinClassDBNamePropertyMap        = new ConcurrentHashMap<>(2000);
 	private final Map<String, Map<String, PropertyKey>> globalClassJSNamePropertyMap               = new ConcurrentHashMap<>(2000);
+	private final Map<String, Map<String, PropertyKey>> globalBuiltinClassJSNamePropertyMap        = new ConcurrentHashMap<>(2000);
 	private final Map<String, Map<String, PropertyGroup>> globalAggregatedPropertyGroupMap         = new ConcurrentHashMap<>(100);
 	private final Map<String, Map<String, PropertyGroup>> globalPropertyGroupMap                   = new ConcurrentHashMap<>(100);
-	private final Map<String, Map<String, ViewTransformation>> viewTransformations                 = new ConcurrentHashMap<>(100);
 	private final Map<String, Set<Transformation<GraphObject>>> globalTransformationMap            = new ConcurrentHashMap<>(100);
 	private final Map<String, Map<String, Method>> exportedMethodMap                               = new ConcurrentHashMap<>(100);
 	private final Map<Class, Set<Class>> interfaceMap                                              = new ConcurrentHashMap<>(2000);
@@ -194,10 +191,7 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 
 								}
 
-							} catch (ClassNotFoundException ex) {
-
-								// ignore
-							}
+							} catch (ClassNotFoundException ex) {}
 						}
 					}
 				}
@@ -536,6 +530,11 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 		final String simpleName = type.getSimpleName();
 		final String fqcn       = type.getName();
 
+		// do not register types that match org.structr.*Mixin (helpers)
+		if (fqcn.startsWith("org.structr.") && simpleName.endsWith("Mixin")) {
+			return;
+		}
+
 		if (AbstractNode.class.isAssignableFrom(type)) {
 
 			nodeEntityClassCache.put(simpleName, type);
@@ -548,6 +547,12 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 			relationshipEntityClassCache.put(simpleName, type);
 			relationshipPackages.add(fqcn.substring(0, fqcn.lastIndexOf(".")));
 			globalPropertyViewMap.remove(fqcn);
+		}
+
+		// interface that extends NodeInterface, must be stored
+		if (type.isInterface() && GraphObject.class.isAssignableFrom(type)) {
+
+			reverseInterfaceMap.put(type.getSimpleName(), type);
 		}
 
 		for (final Class interfaceClass : type.getInterfaces()) {
@@ -573,8 +578,8 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 			for (final Map.Entry<Field, PropertyKey> entry : allProperties.entrySet()) {
 
 				final PropertyKey propertyKey = entry.getValue();
-				final Field field = entry.getKey();
-				final Class declaringClass = field.getDeclaringClass();
+				final Field field             = entry.getKey();
+				final Class declaringClass    = field.getDeclaringClass();
 
 				if (declaringClass != null) {
 
@@ -585,16 +590,29 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 				registerProperty(type, propertyKey);
 			}
 
-			for (Map.Entry<Field, View> entry : views.entrySet()) {
+			for (final Map.Entry<Field, View> entry : views.entrySet()) {
 
-				final Field field = entry.getKey();
-				final View view = entry.getValue();
+				final Field field        = entry.getKey();
+				final View view          = entry.getValue();
+				final PropertyKey[] keys = view.properties();
 
-				for (PropertyKey propertyKey : view.properties()) {
+				// register field in view for entity class and declaring superclass
+				registerPropertySet(field.getDeclaringClass(), view.name(), keys);
+				registerPropertySet(type, view.name(), keys);
 
-					// register field in view for entity class and declaring superclass
-					registerPropertySet(field.getDeclaringClass(), view.name(), propertyKey);
-					registerPropertySet(type, view.name(), propertyKey);
+				for (final PropertyKey propertyKey : keys) {
+
+					// replace field in any other view of this type (not superclass!)
+					for (final Map.Entry<Field, View> other : views.entrySet()) {
+
+						final View otherView = other.getValue();
+
+						final Set<PropertyKey> otherKeys = getPropertyViewMapForType(type).get(otherView.name());
+						if (otherKeys != null && otherKeys.contains(propertyKey)) {
+
+							replaceKeyInSet(otherKeys, propertyKey);
+						}
+					}
 				}
 			}
 
@@ -649,7 +667,13 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 
 			for (Class iface : type.getInterfaces()) {
 
-				reverseInterfaceMap.put(iface.getSimpleName(), iface);
+				/*
+				if (GraphObject.class.isAssignableFrom(iface)) {
+
+					reverseInterfaceMap.put(iface.getSimpleName(), iface);
+				}
+				*/
+
 				interfaces.add(iface);
 			}
 		}
@@ -755,16 +779,6 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 	}
 
 	@Override
-	public void registerViewTransformation(Class type, String view, ViewTransformation transformation) {
-		getViewTransformationMapForType(type).put(view, transformation);
-	}
-
-	@Override
-	public ViewTransformation getViewTransformation(Class type, String view) {
-		return getViewTransformationMapForType(type).get(view);
-	}
-
-	@Override
 	public Set<String> getPropertyViews() {
 
 		Set<String> views = new LinkedHashSet<>();
@@ -855,7 +869,6 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 	public void registerPropertySet(final Class type, final String propertyView, final String propertyName) {
 
 		this.registerPropertySet(type, propertyView, this.getPropertyKeyForJSONName(type, propertyName));
-
 	}
 
 	@Override
@@ -917,6 +930,14 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 	}
 
 	@Override
+	public void setPropertyKeyForJSONName(final Class type, final String jsonName, final PropertyKey key) {
+
+		final Map<String, PropertyKey> classJSNamePropertyMap = getClassJSNamePropertyMapForType(type);
+
+		classJSNamePropertyMap.put(jsonName, key);
+	}
+
+	@Override
 	public Set<PropertyValidator> getPropertyValidators(final SecurityContext securityContext, Class type, PropertyKey propertyKey) {
 
 		Set<PropertyValidator> validators = new LinkedHashSet<>();
@@ -952,13 +973,53 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 	@Override
 	public void registerProperty(Class type, PropertyKey propertyKey) {
 
-		getClassDBNamePropertyMapForType(type).put(propertyKey.dbName(), propertyKey);
-		getClassJSNamePropertyMapForType(type).put(propertyKey.jsonName(), propertyKey);
+		final Map<String, PropertyKey> dbNamePropertyMap = getClassDBNamePropertyMapForType(type);
+
+		// backup key (if present and either not dynamic or part of builtin schema)
+		final PropertyKey existingDBNamePropertyKey = dbNamePropertyMap.get(propertyKey.dbName());
+
+		if (existingDBNamePropertyKey != null && (!existingDBNamePropertyKey.isDynamic() || existingDBNamePropertyKey.isPartOfBuiltInSchema())) {
+			getBuiltinClassDBNamePropertyMapForType(type).put(propertyKey.dbName(), existingDBNamePropertyKey);
+		}
+
+		dbNamePropertyMap.put(propertyKey.dbName(), propertyKey);
+
+
+		final Map<String, PropertyKey> jsonNamePropertyMap = getClassJSNamePropertyMapForType(type);
+
+		// backup key (if present and either not dynamic or part of builtin schema)
+		final PropertyKey existingJSONNamePropertyKey = jsonNamePropertyMap.get(propertyKey.jsonName());
+
+		if (existingJSONNamePropertyKey != null && (!existingJSONNamePropertyKey.isDynamic() || existingJSONNamePropertyKey.isPartOfBuiltInSchema())) {
+			getBuiltinClassJSNamePropertyMapForType(type).put(propertyKey.jsonName(), existingJSONNamePropertyKey);
+		}
+
+		jsonNamePropertyMap.put(propertyKey.jsonName(), propertyKey);
 
 		registerPropertySet(type, PropertyView.All, propertyKey);
 
 		// inform property key of its registration
 		propertyKey.registrationCallback(type);
+	}
+
+	@Override
+	public void unregisterProperty(Class type, PropertyKey propertyKey) {
+
+		getClassDBNamePropertyMapForType(type).remove(propertyKey.dbName());
+
+		Map<String, PropertyKey> backupdbNamePropertyMap = getBuiltinClassDBNamePropertyMapForType(type);
+		if (backupdbNamePropertyMap.containsKey(propertyKey.dbName())) {
+			// restore builtin property
+			getClassDBNamePropertyMapForType(type).put(propertyKey.dbName(), backupdbNamePropertyMap.get(propertyKey.dbName()));
+		}
+
+		getClassJSNamePropertyMapForType(type).remove(propertyKey.jsonName());
+
+		Map<String, PropertyKey> backupjsonNamePropertyMap = getBuiltinClassDBNamePropertyMapForType(type);
+		if (backupjsonNamePropertyMap.containsKey(propertyKey.jsonName())) {
+			// restore builtin property
+			getClassJSNamePropertyMapForType(type).put(propertyKey.jsonName(), backupjsonNamePropertyMap.get(propertyKey.jsonName()));
+		}
 	}
 
 	@Override
@@ -1080,6 +1141,8 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 
 						if (!modules.containsKey(moduleName)) {
 
+							structrModule.registerModuleFunctions(licenseManager);
+
 							if (coreModules.contains(moduleName) || licenseManager == null || licenseManager.isModuleLicensed(moduleName)) {
 
 								modules.put(moduleName, structrModule);
@@ -1090,12 +1153,17 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 						}
 
 					} catch (Throwable t) {
-						logger.warn("Unable to instantiate module " + clazz.getName(), t);
+
+						// log only errors from internal classes
+						if (className.startsWith("org.structr.")) {
+
+							logger.warn("Unable to instantiate module " + clazz.getName(), t);
+						}
 					}
 				}
 
 			} catch (Throwable t) {
-				logger.debug("Error trying to load class " + className, t);
+				logger.warn("Error trying to load class {}: {}",  className, t.getMessage());
 			}
 		}
 	}
@@ -1119,25 +1187,76 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 						final String name = attrs.getValue("Structr-Module-Name");
 
 						// only scan and load modules that are licensed
-						if (name != null && (licenseManager == null || licenseManager.isModuleLicensed(name))) {
+						if (name != null) {
 
-							for (final Enumeration<? extends JarEntry> entries = jarFile.entries(); entries.hasMoreElements();) {
+							if (licenseManager == null || licenseManager.isModuleLicensed(name)) {
 
-								final JarEntry entry = entries.nextElement();
-								final String entryName = entry.getName();
+								for (final Enumeration<? extends JarEntry> entries = jarFile.entries(); entries.hasMoreElements();) {
 
-								if (entryName.endsWith(".class")) {
+									final JarEntry entry = entries.nextElement();
+									final String entryName = entry.getName();
 
-									// cat entry > /dev/null (necessary to get signers below)
-									IOUtils.copy(jarFile.getInputStream(entry), new ByteArrayOutputStream(65535));
+									if (entryName.endsWith(".class")) {
 
-									// verify module
-									if (licenseManager == null || licenseManager.isValid(entry.getCodeSigners())) {
+										// cat entry > /dev/null (necessary to get signers below)
+										IOUtils.copy(jarFile.getInputStream(entry), new ByteArrayOutputStream(65535));
 
-										final String fileEntry = entry.getName().replaceAll("[/]+", ".");
+										// verify module
+										if (licenseManager == null || licenseManager.isValid(entry.getCodeSigners())) {
 
-										// add class entry to Module
-										classes.add(fileEntry.substring(0, fileEntry.length() - 6));
+											final String fileEntry = entry.getName().replaceAll("[/]+", ".");
+											final String fqcn      = fileEntry.substring(0, fileEntry.length() - 6);
+
+											// add class entry to Module
+											classes.add(fqcn);
+
+											if (licenseManager != null) {
+												// store licensing information
+												licenseManager.addLicensedClass(fqcn);
+											}
+										}
+									}
+								}
+
+							} else {
+
+								// module is not licensed, only load functions as unlicensed
+
+								for (final Enumeration<? extends JarEntry> entries = jarFile.entries(); entries.hasMoreElements();) {
+
+									final JarEntry entry = entries.nextElement();
+									final String entryName = entry.getName();
+
+									if (entryName.endsWith(".class")) {
+
+										// cat entry > /dev/null (necessary to get signers below)
+										IOUtils.copy(jarFile.getInputStream(entry), new ByteArrayOutputStream(65535));
+
+										// verify module
+										if (licenseManager == null || licenseManager.isValid(entry.getCodeSigners())) {
+
+											final String fileEntry = entry.getName().replaceAll("[/]+", ".");
+											final String fqcn      = fileEntry.substring(0, fileEntry.length() - 6);
+
+											try {
+
+												final Class clazz   = Class.forName(fqcn);
+												final int modifiers = clazz.getModifiers();
+
+												// register entity classes
+												if (StructrModule.class.isAssignableFrom(clazz) && !(Modifier.isAbstract(modifiers))) {
+
+													// we need to make sure that a module is initialized exactly once
+													final StructrModule structrModule = (StructrModule) clazz.newInstance();
+
+													structrModule.registerModuleFunctions(licenseManager);
+
+												}
+
+											} catch (Throwable t) {
+												logger.warn("Error trying to load class {}: {}",  fqcn, t.getMessage());
+											}
+										}
 									}
 								}
 							}
@@ -1160,7 +1279,7 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 		return ret;
 	}
 
-	private void addClassesRecursively(File dir, String prefix, Set<String> classes) {
+	private void addClassesRecursively(final File dir, final String prefix, final Set<String> classes) {
 
 		if (dir == null) {
 			return;
@@ -1185,15 +1304,18 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 
 					String fileEntry = file.getAbsolutePath();
 
-					fileEntry = fileEntry.substring(0, fileEntry.length() - 6);
-					fileEntry = fileEntry.substring(fileEntry.indexOf(prefix) + prefixLen);
-					fileEntry = fileEntry.replaceAll("[".concat(fileSepEscaped).concat("]+"), ".");
+					if (fileEntry.endsWith(".class")) {
 
-					if (fileEntry.startsWith(".")) {
-						fileEntry = fileEntry.substring(1);
+						fileEntry = fileEntry.substring(0, fileEntry.length() - 6);
+						fileEntry = fileEntry.substring(fileEntry.indexOf(prefix) + prefixLen);
+						fileEntry = fileEntry.replaceAll("[".concat(fileSepEscaped).concat("]+"), ".");
+
+						if (fileEntry.startsWith(".")) {
+							fileEntry = fileEntry.substring(1);
+						}
+
+						classes.add(fileEntry);
 					}
-
-					classes.add(fileEntry);
 
 				} catch (Throwable t) {
 					// ignore
@@ -1280,7 +1402,7 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 
 	private <T> Map<Field, T> getFieldValuesOfType(final Class<T> fieldType, final Class entityType) {
 
-		final Map<Field, T> fields = new LinkedHashMap<>();
+		final Map<Field, T> fields   = new LinkedHashMap<>();
 		final Set<Class<?>> allTypes = getAllTypes(entityType);
 
 		for (final Class<?> type : allTypes) {
@@ -1372,6 +1494,20 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 		return classDBNamePropertyMap;
 	}
 
+	private Map<String, PropertyKey> getBuiltinClassDBNamePropertyMapForType(final Class type) {
+
+		Map<String, PropertyKey> classDBNamePropertyMap = globalBuiltinClassDBNamePropertyMap.get(type.getName());
+		if (classDBNamePropertyMap == null) {
+
+			classDBNamePropertyMap = new LinkedHashMap<>();
+
+			globalBuiltinClassDBNamePropertyMap.put(type.getName(), classDBNamePropertyMap);
+
+		}
+
+		return classDBNamePropertyMap;
+	}
+
 	private Map<String, PropertyKey> getClassJSNamePropertyMapForType(final Class type) {
 
 		Map<String, PropertyKey> classJSNamePropertyMap = globalClassJSNamePropertyMap.get(type.getName());
@@ -1380,6 +1516,20 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 			classJSNamePropertyMap = new LinkedHashMap<>();
 
 			globalClassJSNamePropertyMap.put(type.getName(), classJSNamePropertyMap);
+
+		}
+
+		return classJSNamePropertyMap;
+	}
+
+	private Map<String, PropertyKey> getBuiltinClassJSNamePropertyMapForType(final Class type) {
+
+		Map<String, PropertyKey> classJSNamePropertyMap = globalBuiltinClassJSNamePropertyMap.get(type.getName());
+		if (classJSNamePropertyMap == null) {
+
+			classJSNamePropertyMap = new LinkedHashMap<>();
+
+			globalBuiltinClassJSNamePropertyMap.put(type.getName(), classJSNamePropertyMap);
 
 		}
 
@@ -1443,29 +1593,22 @@ public class JarConfigurationProvider implements ConfigurationProvider {
 		return transformations;
 	}
 
-	private Map<String, ViewTransformation> getViewTransformationMapForType(final Class type) {
+	private void replaceKeyInSet(final Set<PropertyKey> set, final PropertyKey key) {
 
-		Map<String, ViewTransformation> viewTransformationMap = viewTransformations.get(type.getName());
-		if (viewTransformationMap == null) {
+		final List<PropertyKey> list = new LinkedList<>(set);
 
-			viewTransformationMap = new LinkedHashMap<>();
-			viewTransformations.put(type.getName(), viewTransformationMap);
-		}
+		set.clear();
 
-		return viewTransformationMap;
-	}
+		for (final PropertyKey existingKey : list) {
 
-	private void consume(final InputStream is) {
+			if (existingKey.equals(key)) {
 
-		final byte[] buffer = new byte[32768];
+				set.add(key);
 
-		try (final InputStream stream = is) {
+			} else {
 
-			// read stream into buffer
-			while (stream.read(buffer, 0, 32768) != -1) {}
-
-		} catch (IOException ioex) {
-			ioex.printStackTrace();
+				set.add(existingKey);
+			}
 		}
 	}
 
@@ -1484,7 +1627,6 @@ public class JarConfigurationProvider implements ConfigurationProvider {
  		System.out.println("" + globalClassJSNamePropertyMap.size());
 		System.out.println("" + globalAggregatedPropertyGroupMap.size());
 		System.out.println("" + globalPropertyGroupMap.size());
-		System.out.println("" + viewTransformations.size());
 		System.out.println("" + globalTransformationMap.size());
 		System.out.println("" + exportedMethodMap.size());
 		System.out.println("" + interfaceMap.size());

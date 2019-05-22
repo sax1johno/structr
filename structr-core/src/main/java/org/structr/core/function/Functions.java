@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -29,8 +29,11 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.structr.api.service.LicenseManager;
 import org.structr.common.error.FrameworkException;
-import org.structr.common.error.UnlicensedException;
+import org.structr.common.error.UnlicensedScriptException;
 import org.structr.core.GraphObject;
 import org.structr.core.parser.AllExpression;
 import org.structr.core.parser.AnyExpression;
@@ -60,10 +63,25 @@ import org.structr.schema.action.Function;
  */
 public class Functions {
 
+	protected static final Logger logger = LoggerFactory.getLogger(Functions.class.getName());
 	private static final Map<String, Function<Object, Object>> functions = new LinkedHashMap<>();
-	public static final String NULL_STRING                               = "___NULL___";
 
-	public static void put(final boolean licensed, final int edition, final String name, final Function<Object, Object> function) {
+	public static void put(final LicenseManager licenseManager, final Function<Object, Object> function) {
+
+		final boolean licensed = (licenseManager == null || licenseManager.isModuleLicensed(function.getRequiredModule()));
+
+		registerFunction(licensed, function.getName(), function);
+
+		function.aliases().forEach(alias -> {
+			registerFunction(licensed, alias, function);
+		});
+	}
+
+	private static void registerFunction(final boolean licensed, final String name, final Function<Object, Object> function) {
+
+		if (functions.containsKey(name)) {
+			logger.warn("A function named '{}' is already registered! The previous function will be overwritten with this one.", name);
+		}
 
 		if (licensed) {
 
@@ -71,7 +89,7 @@ public class Functions {
 
 		} else {
 
-			functions.put(name, new UnlicensedFunction(name, edition));
+			functions.put(name, new UnlicensedFunction(name, function.getRequiredModule()));
 		}
 	}
 
@@ -87,7 +105,7 @@ public class Functions {
 		return new LinkedList<>(functions.values());
 	}
 
-	public static Object evaluate(final ActionContext actionContext, final GraphObject entity, final String expression) throws FrameworkException, UnlicensedException {
+	public static Object evaluate(final ActionContext actionContext, final GraphObject entity, final String expression) throws FrameworkException, UnlicensedScriptException {
 
 		final String expressionWithoutNewlines = expression.replace('\n', ' ').replace('\r', ' ');
 		final StreamTokenizer tokenizer = new StreamTokenizer(new StringReader(expressionWithoutNewlines));
@@ -305,11 +323,8 @@ public class Functions {
 				return new NoneExpression();
 
 			case "null":
-				return new ConstantExpression(NULL_STRING);
+				return new ConstantExpression(null);
 
-			case NULL_STRING:
-				return new ConstantExpression(NULL_STRING);
-				
 		}
 
 		// no match, try functions

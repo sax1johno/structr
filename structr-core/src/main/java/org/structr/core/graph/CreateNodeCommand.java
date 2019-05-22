@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -24,11 +24,14 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import org.structr.api.DatabaseService;
-import org.structr.api.NativeResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.structr.api.ConstraintViolationException;
 import org.structr.api.DataFormatException;
+import org.structr.api.DatabaseService;
 import org.structr.api.graph.Node;
+import org.structr.api.graph.Relationship;
+import org.structr.api.util.NodeWithOwnerResult;
 import org.structr.common.Permission;
 import org.structr.common.PropertyView;
 import org.structr.common.error.FrameworkException;
@@ -46,14 +49,12 @@ import org.structr.core.property.PropertyMap;
 import org.structr.core.property.TypeProperty;
 import org.structr.schema.SchemaHelper;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
  * Creates a new node in the database with the given properties.
- *
- *
  */
 public class CreateNodeCommand<T extends NodeInterface> extends NodeServiceCommand {
+
+	private static final Logger logger = LoggerFactory.getLogger(CreateNodeCommand.class);
 
 	public T execute(final Collection<NodeAttribute<?>> attributes) throws FrameworkException {
 
@@ -91,8 +92,9 @@ public class CreateNodeCommand<T extends NodeInterface> extends NodeServiceComma
 			final PropertyMap toNotify       = new PropertyMap();
 			final Object typeObject          = properties.get(AbstractNode.type);
 			final Class nodeType             = getTypeOrGeneric(typeObject);
+			final String typeName            = nodeType.getSimpleName();
 			final Set<String> labels         = TypeProperty.getLabelsForType(nodeType);
-			final CreationContainer tmp      = new CreationContainer();
+			final CreationContainer tmp      = new CreationContainer(true);
 			final Date now                   = new Date();
 			final boolean isCreation         = true;
 
@@ -114,7 +116,7 @@ public class CreateNodeCommand<T extends NodeInterface> extends NodeServiceComma
 			// use property keys to set property values on creation dummy
 			// set default values for common properties in creation query
 			GraphObject.id.setProperty(securityContext, tmp, uuid);
-			GraphObject.type.setProperty(securityContext, tmp, nodeType.getSimpleName());
+			GraphObject.type.setProperty(securityContext, tmp, typeName);
 			AbstractNode.createdDate.setProperty(securityContext, tmp, now);
 			AbstractNode.lastModifiedDate.setProperty(securityContext, tmp, now);
 
@@ -122,7 +124,6 @@ public class CreateNodeCommand<T extends NodeInterface> extends NodeServiceComma
 			AbstractNode.visibleToPublicUsers.setProperty(securityContext, tmp,        getOrDefault(properties, AbstractNode.visibleToPublicUsers, false));
 			AbstractNode.visibleToAuthenticatedUsers.setProperty(securityContext, tmp, getOrDefault(properties, AbstractNode.visibleToAuthenticatedUsers, false));
 			AbstractNode.hidden.setProperty(securityContext, tmp,                      getOrDefault(properties, AbstractNode.hidden, false));
-			AbstractNode.deleted.setProperty(securityContext, tmp,                     getOrDefault(properties, AbstractNode.deleted, false));
 
 			if (user != null) {
 
@@ -138,7 +139,6 @@ public class CreateNodeCommand<T extends NodeInterface> extends NodeServiceComma
 			properties.remove(AbstractNode.visibleToPublicUsers);
 			properties.remove(AbstractNode.visibleToAuthenticatedUsers);
 			properties.remove(AbstractNode.hidden);
-			properties.remove(AbstractNode.deleted);
 			properties.remove(AbstractNode.lastModifiedDate);
 			properties.remove(AbstractNode.lastModifiedBy);
 			properties.remove(AbstractNode.createdDate);
@@ -160,13 +160,13 @@ public class CreateNodeCommand<T extends NodeInterface> extends NodeServiceComma
 				}
 			}
 
-			node = (T) nodeFactory.instantiateWithType(createNode(graphDb, user, nodeType, labels, tmp.getData()), nodeType, null, isCreation);
+			node = (T) nodeFactory.instantiateWithType(createNode(graphDb, user, typeName, labels, tmp.getData()), nodeType, null, isCreation);
 			if (node != null) {
 
 				TransactionCommand.nodeCreated(user, node);
 
 				securityContext.disableModificationOfAccessTime();
-				node.setProperties(securityContext, properties);
+				node.setProperties(securityContext, properties, true);
 				securityContext.enableModificationOfAccessTime();
 
 				// ensure modification callbacks are called (necessary for validation)
@@ -207,81 +207,70 @@ public class CreateNodeCommand<T extends NodeInterface> extends NodeServiceComma
 	}
 
 	// ----- private methods -----
-	private Node createNode(final DatabaseService graphDb, final Principal user, final Class nodeType, final Set<String> labels, final Map<String, Object> properties) throws FrameworkException {
+	private Node createNode(final DatabaseService graphDb, final Principal user, final String type, final Set<String> labels, final Map<String, Object> properties) throws FrameworkException {
 
-		final Map<String, Object> parameters         = new HashMap<>();
 		final Map<String, Object> ownsProperties     = new HashMap<>();
 		final Map<String, Object> securityProperties = new HashMap<>();
-		final StringBuilder buf                      = new StringBuilder();
 		final String newUuid                         = (String)properties.get("id");
 
 		if (user != null && user.shouldSkipSecurityRelationships() == false) {
 
-			buf.append("MATCH (u:Principal) WHERE id(u) = {userId}");
-			buf.append(" CREATE (u)-[o:OWNS {ownsProperties}]->(n");
+			final String userId = user.getUuid();
 
-			for (final String label : labels) {
+			// configure OWNS relationship creation statement for maximum performance
+			ownsProperties.put(GraphObject.id.dbName(),                          getNextUuid());
+			ownsProperties.put(GraphObject.type.dbName(),                        PrincipalOwnsNode.class.getSimpleName());
+			ownsProperties.put(GraphObject.visibleToPublicUsers.dbName(),        false);
+			ownsProperties.put(GraphObject.visibleToAuthenticatedUsers.dbName(), false);
+			ownsProperties.put(AbstractRelationship.relType.dbName(),            "OWNS");
+			ownsProperties.put(AbstractRelationship.sourceId.dbName(),           userId);
+			ownsProperties.put(AbstractRelationship.targetId.dbName(),           newUuid);
+			ownsProperties.put(AbstractRelationship.internalTimestamp.dbName(),  graphDb.getInternalTimestamp());
 
-				buf.append(":");
-				buf.append(label);
+			// configure SECURITY relationship creation statement for maximum performance
+			securityProperties.put(GraphObject.id.dbName(),                          getNextUuid());
+			securityProperties.put(GraphObject.type.dbName(),                        Security.class.getSimpleName());
+			securityProperties.put(GraphObject.visibleToPublicUsers.dbName(),        false);
+			securityProperties.put(GraphObject.visibleToAuthenticatedUsers.dbName(), false);
+			securityProperties.put(AbstractRelationship.relType.dbName(),            "SECURITY");
+			securityProperties.put(AbstractRelationship.sourceId.dbName(),           userId);
+			securityProperties.put(AbstractRelationship.targetId.dbName(),           newUuid);
+			securityProperties.put(AbstractRelationship.internalTimestamp.dbName(),  graphDb.getInternalTimestamp());
+			securityProperties.put(Security.allowed.dbName(),                        new String[] { Permission.read.name(), Permission.write.name(), Permission.delete.name(), Permission.accessControl.name() } );
+			securityProperties.put(Security.principalId.dbName(),                    userId);
+			securityProperties.put(Security.accessControllableId.dbName(),           newUuid);
+
+			try {
+
+				final NodeWithOwnerResult result = graphDb.createNodeWithOwner(user.getNode().getId(), type, labels, properties, ownsProperties, securityProperties);
+				final Relationship securityRel   = result.getSecurityRelationship();
+				final Relationship ownsRel       = result.getOwnsRelationship();
+				final Node newNode               = result.getNewNode();
+
+				notifySecurityRelCreation(user, securityRel);
+				notifyOwnsRelCreation(user, ownsRel);
+
+				return newNode;
+
+			} catch (DataFormatException dex) {
+				throw new FrameworkException(422, dex.getMessage());
+			} catch (ConstraintViolationException qex) {
+				throw new FrameworkException(422, qex.getMessage());
 			}
 
-			buf.append(" {nodeProperties})<-[s:SECURITY {securityProperties}]-(u)");
-			buf.append(" RETURN n");
-
-			// configure OWNS relationship
-			ownsProperties.put(GraphObject.id.dbName(),                getNextUuid());
-			ownsProperties.put(GraphObject.type.dbName(),              PrincipalOwnsNode.class.getSimpleName());
-			ownsProperties.put(AbstractRelationship.sourceId.dbName(), user.getUuid());
-			ownsProperties.put(AbstractRelationship.targetId.dbName(), newUuid);
-
-			// configure SECURITY relationship
-			securityProperties.put(Security.allowed.dbName(),              new String[] { Permission.read.name(), Permission.write.name(), Permission.delete.name(), Permission.accessControl.name() } );
-			securityProperties.put(GraphObject.id.dbName(),                getNextUuid());
-			securityProperties.put(GraphObject.type.dbName(),              Security.class.getSimpleName());
-			securityProperties.put(AbstractRelationship.sourceId.dbName(), user.getUuid());
-			securityProperties.put(AbstractRelationship.targetId.dbName(), newUuid);
-
-			// store properties in statement
-			parameters.put("userId",             user.getId());
-			parameters.put("ownsProperties",     ownsProperties);
-			parameters.put("securityProperties", securityProperties);
 
 		} else {
 
-			buf.append("CREATE (n");
+			try {
 
-			for (final String label : labels) {
+				return graphDb.createNode(type, labels, properties);
 
-				buf.append(":");
-				buf.append(label);
+			} catch (DataFormatException dex) {
+				throw new FrameworkException(422, dex.getMessage());
+			} catch (ConstraintViolationException qex) {
+				throw new FrameworkException(422, qex.getMessage());
 			}
-
-			buf.append(" {nodeProperties})");
-			buf.append(" RETURN n");
 		}
-
-		// make properties available to Cypher statement
-		parameters.put("nodeProperties", properties);
-
-		final NativeResult result = graphDb.execute(buf.toString(), parameters);
-		try {
-
-			if (result.hasNext()) {
-
-				final Map<String, Object> data = result.next();
-				final Node newNode             = (Node)data.get("n");
-
-				return newNode;
-			}
-
-		} catch (DataFormatException dex) {
-			throw new FrameworkException(422, dex.getMessage());
-		} catch (ConstraintViolationException qex) {
-			throw new FrameworkException(422, qex.getMessage());
-		}
-
-		throw new RuntimeException("Unable to create new node.");
 	}
 
 	private Class getTypeOrGeneric(final Object typeObject) {
@@ -302,5 +291,78 @@ public class CreateNodeCommand<T extends NodeInterface> extends NodeServiceComma
 		}
 
 		return defaultValue;
+	}
+
+	private void notifySecurityRelCreation(final Principal user, final Relationship rel) {
+
+		final RelationshipFactory<Security> factory = new RelationshipFactory<>(securityContext);
+
+		try {
+
+			final Security securityRelationship = factory.instantiate(rel);
+			if (securityRelationship != null) {
+
+				TransactionCommand.relationshipCreated(user, securityRelationship);
+			}
+
+		} catch (ClassCastException cce) {
+
+			logger.warn("Encountered ClassCastException which is likely caused by faulty cache invalidation. Relationship ID {} of type {}, start and end node IDs: {}, {}",
+				rel.getId(),
+				rel.getType(),
+				rel.getStartNode() != null ? rel.getStartNode().getId() : "null",
+				rel.getEndNode()   != null ? rel.getEndNode().getId()   : "null"
+			);
+
+			try {
+
+				// try again
+				final Security securityRelationship = factory.instantiate(rel);
+				if (securityRelationship != null) {
+
+					TransactionCommand.relationshipCreated(user, securityRelationship);
+				}
+
+			} catch (ClassCastException cce2) {
+				logger.warn("ClassCastException still exists, giving up.");
+			}
+
+		}
+	}
+
+	private void notifyOwnsRelCreation(final Principal user, final Relationship rel) {
+
+		final RelationshipFactory<PrincipalOwnsNode> factory = new RelationshipFactory<>(securityContext);
+
+		try {
+
+			final PrincipalOwnsNode ownsRelationship = factory.instantiate(rel);
+			if (ownsRelationship != null) {
+
+				TransactionCommand.relationshipCreated(user, ownsRelationship);
+			}
+
+		} catch (ClassCastException cce) {
+
+			logger.warn("Encountered ClassCastException which is likely caused by faulty cache invalidation. Relationship ID {} of type {}, start and end node IDs: {}, {}",
+				rel.getId(),
+				rel.getType(),
+				rel.getStartNode() != null ? rel.getStartNode().getId() : "null",
+				rel.getEndNode()   != null ? rel.getEndNode().getId()   : "null"
+			);
+
+			try {
+				// try again
+				final PrincipalOwnsNode ownsRelationship = factory.instantiate(rel);
+				if (ownsRelationship != null) {
+
+					TransactionCommand.relationshipCreated(user, ownsRelationship);
+				}
+
+			} catch (ClassCastException cce2) {
+				logger.warn("ClassCastException still exists, giving up.");
+			}
+
+		}
 	}
 }

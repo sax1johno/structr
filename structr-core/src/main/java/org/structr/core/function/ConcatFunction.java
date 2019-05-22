@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,30 +20,29 @@ package org.structr.core.function;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
+import org.structr.api.util.Iterables;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
 /**
  *
  */
-public class ConcatFunction extends Function<Object, Object> {
+public class ConcatFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_CONCAT = "Usage: ${concat(values...)}. Example: ${concat(this.firstName, this.lastName)}";
 
 	@Override
 	public String getName() {
-		return "concat()";
+		return "concat";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
 		final List list = new ArrayList();
-		
+
 		try {
 			if (sources == null) {
 				throw new IllegalArgumentException();
@@ -54,9 +53,9 @@ public class ConcatFunction extends Function<Object, Object> {
 				// collection can contain nulls..
 				if (source != null) {
 
-					if (source instanceof Collection) {
+					if (source instanceof Iterable) {
 
-						list.addAll((Collection)source);
+						Iterables.addAll(list, (Iterable)source);
 
 					} else if (source.getClass().isArray()) {
 
@@ -70,14 +69,14 @@ public class ConcatFunction extends Function<Object, Object> {
 			}
 
 			return StringUtils.join(list, "");
-			
+
 		} catch (final IllegalArgumentException e) {
 
 			logParameterError(caller, sources, ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
 
 		}
-		
+
 	}
 
 

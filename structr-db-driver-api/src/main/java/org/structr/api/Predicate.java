@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,10 +18,65 @@
  */
 package org.structr.api;
 
+import java.util.Comparator;
+
 /**
  *
  */
 public interface Predicate<T> {
 
 	boolean accept(final T value);
+
+	/**
+	 * Returns an optional Comparator to allow ordering
+	 * of elements according to this predicate.
+	 *
+	 * @return a comparator or null
+	 */
+	default Comparator<T> comparator() {
+		return null;
+	}
+
+	public static <T> Predicate<T> all() {
+
+		return new Predicate<T>() {
+
+			@Override
+			public boolean accept(final T value) {
+				return true;
+			}
+		};
+	}
+
+	public static <T> Predicate<T> allExcept(final T given) {
+
+		return new Predicate<T>() {
+
+			@Override
+			public boolean accept(final T value) {
+
+				if (value != null && given != null) {
+					return !value.equals(given);
+				}
+
+				return true;
+			}
+		};
+	}
+
+	public static <T> Predicate<T> only(final T given) {
+
+		return new Predicate<T>() {
+
+			@Override
+			public boolean accept(final T value) {
+
+				if (value != null && given != null) {
+					return value.equals(given);
+				}
+
+				return false;
+			}
+		};
+	}
 }

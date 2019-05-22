@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,10 +18,10 @@
  */
 package org.structr.bolt.index;
 
-import org.structr.api.QueryResult;
 import org.structr.api.graph.Relationship;
-import org.structr.api.util.QueryUtils;
+import org.structr.api.util.Iterables;
 import org.structr.bolt.BoltDatabaseService;
+import org.structr.bolt.SessionTransaction;
 import org.structr.bolt.mapper.RelationshipRelationshipMapper;
 
 /**
@@ -29,40 +29,77 @@ import org.structr.bolt.mapper.RelationshipRelationshipMapper;
  */
 public class CypherRelationshipIndex extends AbstractCypherIndex<Relationship> {
 
-	public CypherRelationshipIndex(final BoltDatabaseService db, final int queryCacheSize) {
-		super(db, queryCacheSize);
+	public CypherRelationshipIndex(final BoltDatabaseService db) {
+		super(db);
 	}
 
 	@Override
 	public String getQueryPrefix(final String typeLabel, final String sourceTypeLabel, final String targetTypeLabel) {
 
-		if (typeLabel != null) {
+		final StringBuilder buf       = new StringBuilder();
+		final String tenantIdentifier = db.getTenantIdentifier();
 
-			if (sourceTypeLabel != null && targetTypeLabel != null) {
+		buf.append("MATCH (");
 
-				return "MATCH (:" + sourceTypeLabel + ")-[n: " + typeLabel + "]->(: " + targetTypeLabel + ")";
-			}
-
-			return "MATCH ()-[n: " + typeLabel + "]-()";
-
-		} else {
-
-			if (sourceTypeLabel != null && targetTypeLabel != null) {
-
-				return "MATCH (:" + sourceTypeLabel + ")-[n]->(: " + targetTypeLabel + ")";
-			}
-
-			return "MATCH ()-[n]-()";
+		if (tenantIdentifier != null) {
+			buf.append(":");
+			buf.append(tenantIdentifier);
 		}
+
+		if (sourceTypeLabel != null) {
+			buf.append(":");
+			buf.append(sourceTypeLabel);
+		}
+
+		buf.append(")-[n");
+
+		if (typeLabel != null) {
+			buf.append(":");
+			buf.append(typeLabel);
+		}
+
+		buf.append("]->(");
+
+		if (tenantIdentifier != null) {
+			buf.append(":");
+			buf.append(tenantIdentifier);
+		}
+
+		if (targetTypeLabel != null) {
+			buf.append(":");
+			buf.append(targetTypeLabel);
+		}
+
+		buf.append(")");
+
+		return buf.toString();
 	}
 
 	@Override
-	public String getQuerySuffix() {
-		return " RETURN DISTINCT n";
+	public String getQuerySuffix(final AdvancedCypherQuery query) {
+
+		final StringBuilder buf = new StringBuilder();
+		final String sortKey    = query.getSortKey();
+
+		buf.append(" RETURN DISTINCT n");
+
+		if (sortKey != null) {
+
+			buf.append(", n.`");
+			buf.append(sortKey);
+			buf.append("` AS sortKey");
+		}
+
+		return buf.toString();
 	}
 
 	@Override
-	public QueryResult<Relationship> getResult(final PageableQuery query) {
-		return QueryUtils.map(new RelationshipRelationshipMapper(db), new RelationshipResultStream(db, query));
+	public Iterable<Relationship> getResult(final AdvancedCypherQuery query) {
+
+		final SessionTransaction tx = db.getCurrentTransaction();
+
+		tx.setIsPing(query.getQueryContext().isPing());
+
+		return Iterables.map(new RelationshipRelationshipMapper(db), tx.getRelationships(query.getStatement(), query.getParameters()));
 	}
 }

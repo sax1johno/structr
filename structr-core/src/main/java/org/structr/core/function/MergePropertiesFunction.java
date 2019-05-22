@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,64 +20,73 @@ package org.structr.core.function;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.app.StructrApp;
 import org.structr.core.property.PropertyKey;
 import org.structr.schema.ConfigurationProvider;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class MergePropertiesFunction extends Function<Object, Object> {
+public class MergePropertiesFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_MERGE_PROPERTIES = "Usage: ${merge_properties(source, target , mergeKeys...)}. Example: ${merge_properties(this, parent, \"eMail\")}";
 
 	@Override
 	public String getName() {
-		return "merge_properties()";
+		return "merge_properties";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
-		if (arrayHasMinLengthAndAllElementsNotNull(sources, 2) && sources[0] instanceof GraphObject && sources[1] instanceof GraphObject) {
+		try {
 
-			final ConfigurationProvider config = StructrApp.getConfiguration();
-			final Set<PropertyKey> mergeKeys = new LinkedHashSet<>();
-			final GraphObject source = (GraphObject)sources[0];
-			final GraphObject target = (GraphObject)sources[1];
-			final int paramCount = sources.length;
+			assertArrayHasMinLengthAndAllElementsNotNull(sources, 2);
 
-			for (int i = 2; i < paramCount; i++) {
+			if (sources[0] instanceof GraphObject && sources[1] instanceof GraphObject) {
 
-				final String keyName = sources[i].toString();
-				final PropertyKey key = config.getPropertyKeyForJSONName(target.getClass(), keyName);
+				final ConfigurationProvider config = StructrApp.getConfiguration();
+				final Set<PropertyKey> mergeKeys = new LinkedHashSet<>();
+				final GraphObject source = (GraphObject)sources[0];
+				final GraphObject target = (GraphObject)sources[1];
+				final int paramCount = sources.length;
 
-				mergeKeys.add(key);
-			}
+				for (int i = 2; i < paramCount; i++) {
 
-			for (final PropertyKey key : mergeKeys) {
+					final String keyName = sources[i].toString();
+					final PropertyKey key = StructrApp.key(target.getClass(), keyName);
 
-				final Object sourceValue = source.getProperty(key);
-				if (sourceValue != null) {
-
-					target.setProperty(key, sourceValue);
+					mergeKeys.add(key);
 				}
 
+				for (final PropertyKey key : mergeKeys) {
+
+					final Object sourceValue = source.getProperty(key);
+					if (sourceValue != null) {
+
+						target.setProperty(key, sourceValue);
+					}
+				}
+
+			} else {
+
+				logParameterError(caller, sources, ctx.isJavaScriptContext());
 			}
 
-		} else {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
+			return usage(ctx.isJavaScriptContext());
 		}
 
 		return "";
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {
@@ -88,5 +97,4 @@ public class MergePropertiesFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "";
 	}
-
 }

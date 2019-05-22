@@ -5,13 +5,13 @@
 	<parent>
 		<groupId>org.structr</groupId>
 		<artifactId>structr</artifactId>
-		<version>2.3-SNAPSHOT</version>
+		<version>3.3-SNAPSHOT</version>
 	</parent>
 
 	<groupId>org.structr</groupId>
 	<artifactId>structr-db-driver-api</artifactId>
 	<packaging>jar</packaging>
-	<version>2.3-SNAPSHOT</version>
+	<version>3.3-SNAPSHOT</version>
 	<name>Structr Database Driver API</name>
 	<url>http://structr.org</url>
 	<description>Structr is an open source framework based on the popular Neo4j graph database.</description>
@@ -43,8 +43,8 @@
 			<optional>true</optional>
 		</dependency>
 		<dependency>
-			<groupId>junit</groupId>
-			<artifactId>junit</artifactId>
+			<groupId>org.testng</groupId>
+			<artifactId>testng</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
@@ -81,6 +81,34 @@
 							<alias>structr</alias>
 							<storepass>${structrKeystorePassword}</storepass>
 						</configuration>
+					</plugin>
+					<plugin>
+						<groupId>com.mycila</groupId>
+						<artifactId>license-maven-plugin</artifactId>
+						<version>2.11</version>
+						<configuration>
+							<header>header.txt</header>
+							<includes>
+								<include>src/**</include>
+							</includes>
+							<excludes>
+								<exclude>**/README</exclude>
+								<exclude>src/**/.directory</exclude>
+								<exclude>src/**/*.sh</exclude>
+								<exclude>src/**/*.properties</exclude>
+							</excludes>
+							<properties>
+								<year>2019</year>
+								<owner>Structr GmbH</owner>
+							</properties>
+						</configuration>
+						<executions>
+							<execution>
+								<goals>
+									<goal>check</goal>
+								</goals>
+							</execution>
+						</executions>
 					</plugin>
 				</plugins>
 			</build>
@@ -119,7 +147,7 @@
 			<name>GNU General Public License, Version 3</name>
 			<url>http://www.gnu.org/licenses/gpl-3.0-standalone.html</url>
 			<comments>
-				Copyright (C) 2010-2017 Structr GmbH, structr &lt;structr@structr.org&gt;
+				Copyright (C) 2010-2019 Structr GmbH, structr &lt;structr@structr.org&gt;
 
 				This file is part of Structr &lt;http://structr.org&gt;.
 
@@ -144,19 +172,19 @@
 		<connection>scm:git:https://github.com:structr/structr.git</connection>
 		<developerConnection>scm:git:git@github.com:structr/structr.git</developerConnection>
 	</scm>
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>2.3.2</version>
-                <configuration>
-                    <debug>true</debug>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
-    <distributionManagement>
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>2.3.2</version>
+				<configuration>
+					<debug>true</debug>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+	<distributionManagement>
 		<repository>
 			<id>sonatype-nexus-staging</id>
 			<name>Maven Central Staging</name>

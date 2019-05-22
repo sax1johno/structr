@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -32,7 +32,7 @@ import org.structr.schema.NonIndexed;
  */
 public interface RelationshipInterface extends GraphObject, NonIndexed {
 
-	public void init(final SecurityContext securityContext, final Relationship dbRel, final Class entityType);
+	public void init(final SecurityContext securityContext, final Relationship dbRel, final Class entityType, final long transactionId);
 
 	public void onRelationshipCreation();
 	public void onRelationshipInstantiation();
@@ -55,7 +55,7 @@ public interface RelationshipInterface extends GraphObject, NonIndexed {
 	public String getTargetNodeId();
 	public void setTargetNodeId(final String targetIdNode) throws FrameworkException;
 
-	public int cascadeDelete();
+	public int getCascadingDeleteFlag();
 
 	public boolean isInternal();
 }

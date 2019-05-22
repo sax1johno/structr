@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -22,7 +22,6 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.api.Predicate;
@@ -31,6 +30,7 @@ import org.structr.api.search.SortType;
 import org.structr.api.util.Iterables;
 import org.structr.common.NotNullPredicate;
 import org.structr.common.SecurityContext;
+import org.structr.common.TruePredicate;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.app.Query;
@@ -51,7 +51,7 @@ import org.structr.core.notion.ObjectNotion;
  *
  *
  */
-public class StartNodes<S extends NodeInterface, T extends NodeInterface> extends Property<List<S>> implements RelationProperty<S> {
+public class StartNodes<S extends NodeInterface, T extends NodeInterface> extends Property<Iterable<S>> implements RelationProperty<S> {
 
 	private static final Logger logger = LoggerFactory.getLogger(StartNodes.class.getName());
 
@@ -80,19 +80,13 @@ public class StartNodes<S extends NodeInterface, T extends NodeInterface> extend
 
 		super(name);
 
-		try {
-
-			this.relation = relationClass.newInstance();
-
-		} catch (Throwable t) {
-			logger.warn("", t);
-		}
-
+		this.relation = Relation.getInstance(relationClass);
 		this.notion   = notion;
 		this.destType = relation.getSourceType();
 
 		this.notion.setType(destType);
 		this.notion.setRelationProperty(this);
+		this.relation.setSourceProperty(this);
 
 		StructrApp.getConfiguration().registerConvertedProperty(this);
 	}
@@ -134,44 +128,44 @@ public class StartNodes<S extends NodeInterface, T extends NodeInterface> extend
 	}
 
 	@Override
-	public PropertyConverter<List<S>, ?> databaseConverter(SecurityContext securityContext) {
+	public PropertyConverter<Iterable<S>, ?> databaseConverter(SecurityContext securityContext) {
 		return null;
 	}
 
 	@Override
-	public PropertyConverter<List<S>, ?> databaseConverter(SecurityContext securityContext, GraphObject entity) {
+	public PropertyConverter<Iterable<S>, ?> databaseConverter(SecurityContext securityContext, GraphObject entity) {
 		return null;
 	}
 
 	@Override
-	public PropertyConverter<?, List<S>> inputConverter(SecurityContext securityContext) {
+	public PropertyConverter<?, Iterable<S>> inputConverter(SecurityContext securityContext) {
 		return getNotion().getCollectionConverter(securityContext);
 	}
 
 	@Override
-	public List<S> getProperty(SecurityContext securityContext, GraphObject obj, boolean applyConverter) {
+	public Iterable<S> getProperty(SecurityContext securityContext, GraphObject obj, boolean applyConverter) {
 		return getProperty(securityContext, obj, applyConverter, null);
 	}
 
 	@Override
-	public List<S> getProperty(SecurityContext securityContext, GraphObject obj, boolean applyConverter, final Predicate<GraphObject> predicate) {
+	public Iterable<S> getProperty(SecurityContext securityContext, GraphObject obj, boolean applyConverter, final Predicate<GraphObject> predicate) {
 
 		ManyStartpoint<S> startpoint = relation.getSource();
 
 		if (predicate != null) {
 
-			return Iterables.toList(Iterables.filter(predicate, Iterables.filter(new NotNullPredicate(), startpoint.get(securityContext, (NodeInterface)obj, null))));
+			return Iterables.filter(predicate, Iterables.filter(new NotNullPredicate(), startpoint.get(securityContext, (NodeInterface)obj, new TruePredicate(predicate.comparator()))));
 
 		} else {
 
-			return Iterables.toList(Iterables.filter(new NotNullPredicate(), startpoint.get(securityContext, (NodeInterface)obj, null)));
+			return Iterables.filter(new NotNullPredicate(), startpoint.get(securityContext, (NodeInterface)obj, null));
 		}
 	}
 
 	@Override
-	public Object setProperty(SecurityContext securityContext, GraphObject obj, List<S> collection) throws FrameworkException {
+	public Object setProperty(SecurityContext securityContext, GraphObject obj, Iterable<S> collection) throws FrameworkException {
 
-		ManyStartpoint<S> startpoint = relation.getSource();
+		final ManyStartpoint<S> startpoint = relation.getSource();
 
 		return startpoint.set(securityContext, (NodeInterface)obj, collection);
 	}
@@ -187,12 +181,12 @@ public class StartNodes<S extends NodeInterface, T extends NodeInterface> extend
 	}
 
 	@Override
-	public Property<List<S>> indexed() {
+	public Property<Iterable<S>> indexed() {
 		return this;
 	}
 
 	@Override
-	public Property<List<S>> passivelyIndexed() {
+	public Property<Iterable<S>> passivelyIndexed() {
 		return this;
 	}
 
@@ -202,8 +196,13 @@ public class StartNodes<S extends NodeInterface, T extends NodeInterface> extend
 	}
 
 	@Override
-	public void index(GraphObject entity, Object value) {
-		// no indexing
+	public boolean isIndexed() {
+		return false;
+	}
+
+	@Override
+	public boolean isPassivelyIndexed() {
+		return false;
 	}
 
 	// ----- interface RelationProperty -----
@@ -215,7 +214,7 @@ public class StartNodes<S extends NodeInterface, T extends NodeInterface> extend
 	@Override
 	public void addSingleElement(final SecurityContext securityContext, final GraphObject obj, final S s) throws FrameworkException {
 
-		List<S> list = getProperty(securityContext, obj, false);
+		List<S> list = Iterables.toList(getProperty(securityContext, obj, false));
 		list.add(s);
 
 		setProperty(securityContext, obj, list);
@@ -227,7 +226,7 @@ public class StartNodes<S extends NodeInterface, T extends NodeInterface> extend
 	}
 
 	@Override
-	public List<S> convertSearchValue(SecurityContext securityContext, String requestParameter) throws FrameworkException {
+	public Iterable<S> convertSearchValue(SecurityContext securityContext, String requestParameter) throws FrameworkException {
 
 		final PropertyConverter inputConverter = inputConverter(securityContext);
 		if (inputConverter != null) {
@@ -240,71 +239,36 @@ public class StartNodes<S extends NodeInterface, T extends NodeInterface> extend
 				}
 			}
 
-			return (List<S>)inputConverter.convert(sources);
+			return (Iterable<S>)inputConverter.convert(sources);
 		}
 
 		return null;
 	}
 
 	@Override
-	public SearchAttribute getSearchAttribute(SecurityContext securityContext, Occurrence occur, List<S> searchValue, boolean exactMatch, final Query query) {
+	public SearchAttribute getSearchAttribute(SecurityContext securityContext, Occurrence occur, Iterable<S> searchValue, boolean exactMatch, final Query query) {
 
 		final Predicate<GraphObject> predicate    = query != null ? query.toPredicate() : null;
 		final SourceSearchAttribute attr          = new SourceSearchAttribute(occur);
-		final Set<GraphObject> intersectionResult = new LinkedHashSet<>();
-		boolean alreadyAdded                      = false;
 
-		if (searchValue != null && !StringUtils.isBlank(searchValue.toString())) {
+		if (searchValue != null && searchValue.iterator().hasNext()) {
 
-			if (exactMatch) {
+			if (!Occurrence.FORBIDDEN.equals(occur)) {
 
-				for (NodeInterface node : searchValue) {
+				final Set<GraphObject> intersectionResult = new LinkedHashSet<>();
 
-					switch (occur) {
-
-						case REQUIRED:
-
-							if (!alreadyAdded) {
-
-								// the first result is the basis of all subsequent intersections
-								intersectionResult.addAll(getRelatedNodesReverse(securityContext, node, declaringClass, predicate));
-
-								// the next additions are intersected with this one
-								alreadyAdded = true;
-
-							} else {
-
-								intersectionResult.retainAll(getRelatedNodesReverse(securityContext, node, declaringClass, predicate));
-							}
-
-							break;
-
-						case OPTIONAL:
-							intersectionResult.addAll(getRelatedNodesReverse(securityContext, node, declaringClass, predicate));
-							break;
-
-						case FORBIDDEN:
-							break;
-					}
-				}
-
-			} else {
-
-				// loose search behaves differently, all results must be combined
 				for (NodeInterface node : searchValue) {
 
 					intersectionResult.addAll(getRelatedNodesReverse(securityContext, node, declaringClass, predicate));
 				}
-			}
 
-			attr.setResult(intersectionResult);
+				attr.setResult(intersectionResult);
+			}
 
 		} else {
 
-			// experimental filter attribute that
-			// removes entities with a non-empty
-			// value in the given field
-			return new EmptySearchAttribute(this, null);
+			// experimental filter attribute that removes entities with a non-empty value in the given field
+			return new EmptySearchAttribute(this, null, true);
 		}
 
 		return attr;

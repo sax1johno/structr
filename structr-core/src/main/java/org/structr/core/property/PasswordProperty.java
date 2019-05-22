@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,14 +18,18 @@
  */
 package org.structr.core.property;
 
+import java.util.Date;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.structr.api.config.Settings;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.common.error.TooShortToken;
 import org.structr.core.GraphObject;
+import org.structr.core.app.StructrApp;
 import org.structr.core.auth.HashHelper;
 import org.structr.core.converter.ValidationInfo;
 import org.structr.core.entity.Principal;
+import org.structr.core.graph.CreationContainer;
 
 /**
  * A {@link StringProperty} that converts its value to a hexadecimal SHA512 hash upon storage.
@@ -64,6 +68,9 @@ public class PasswordProperty extends StringProperty {
 	@Override
 	public Object setProperty(SecurityContext securityContext, GraphObject obj, String clearTextPassword) throws FrameworkException {
 
+		final Object returnValue;
+		GraphObject wrappedObject = null;
+
 		if (clearTextPassword != null) {
 
 			if (validationInfo != null) {
@@ -77,15 +84,46 @@ public class PasswordProperty extends StringProperty {
 					throw new FrameworkException(422, "Validation of entity with ID " + obj.getUuid() + " failed", new TooShortToken(errorType, errorKey, minLength));
 				}
 			}
+			
+					
+			if (obj instanceof CreationContainer) {
 
-			String salt = RandomStringUtils.randomAlphanumeric(16);
+				wrappedObject = ((CreationContainer)obj).getWrappedObject();
 
-			obj.setProperty(Principal.salt, salt);
-			return super.setProperty(securityContext, obj, HashHelper.getHash(clearTextPassword, salt));
+				if (wrappedObject != null && wrappedObject instanceof Principal) {
+
+					final Principal principal   = (Principal)wrappedObject;
+					final String oldSalt        = Principal.getSalt(principal);
+					final String oldEncPassword = Principal.getEncryptedPassword(principal);
+
+					boolean passwordChangedOrFirstPassword = (oldEncPassword == null || oldSalt == null || !oldEncPassword.equals(HashHelper.getHash(clearTextPassword, oldSalt)));
+					if (passwordChangedOrFirstPassword) {
+
+						obj.setProperty(StructrApp.key(Principal.class, "passwordChangeDate"), new Date().getTime());
+					}
+				}
+			}
+
+			final String salt = RandomStringUtils.randomAlphanumeric(16);
+
+			obj.setProperty(StructrApp.key(Principal.class, "salt"), salt);
+
+			returnValue = super.setProperty(securityContext, obj, HashHelper.getHash(clearTextPassword, salt));
+			
+			if (Settings.PasswordClearSessionsOnChange.getValue() && wrappedObject != null && wrappedObject instanceof Principal) {
+				wrappedObject.removeProperty(StructrApp.key(Principal.class, "sessionIds"));
+			}
 
 		} else {
 
-			return super.setProperty(securityContext, obj, null);
+			returnValue = super.setProperty(securityContext, obj, null);
 		}
+		
+		if (Settings.PasswordClearSessionsOnChange.getValue() && wrappedObject != null && wrappedObject instanceof Principal) {
+			wrappedObject.removeProperty(StructrApp.key(Principal.class, "sessionIds"));
+		}
+
+		return returnValue;
+		
 	}
 }

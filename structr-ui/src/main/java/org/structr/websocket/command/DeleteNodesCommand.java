@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -29,7 +29,6 @@ import org.structr.core.graph.Tx;
 import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.message.WebSocketMessage;
 
-//~--- classes ----------------------------------------------------------------
 /**
  * Websocket command to delete multiple nodes in one transaction.
  */
@@ -40,31 +39,31 @@ public class DeleteNodesCommand extends AbstractCommand {
 	static {
 
 		StructrWebSocket.addCommand(DeleteNodesCommand.class);
-
 	}
 
-	//~--- methods --------------------------------------------------------
 	@Override
-	public void processMessage(final WebSocketMessage webSocketData) {
+	public void processMessage(final WebSocketMessage webSocketData) throws FrameworkException {
+
+		setDoTransactionNotifications(true);
 
 		final SecurityContext securityContext = getWebSocket().getSecurityContext();
 
-		final Boolean      recursive = (Boolean)      webSocketData.getNodeData().get("recursive");
-		final List<String> nodeIds   = (List<String>) webSocketData.getNodeData().get("nodeIds");
+		final Boolean      recursive = webSocketData.getNodeDataBooleanValue("recursive");
+		final List<String> nodeIds   = webSocketData.getNodeDataStringList("nodeIds");
 
 		if (nodeIds != null) {
 
 			final App app = StructrApp.getInstance(securityContext);
 
 			try (final Tx tx = app.tx()) {
-				
+
 				for (final String id : nodeIds) {
 
 					DeleteNodeCommand.deleteNode(getWebSocket(), app.getNodeById(id), recursive);
 				}
-				
+
 				tx.success();
-			
+
 			} catch (FrameworkException ex) {
 				logger.warn("", ex);
 			}

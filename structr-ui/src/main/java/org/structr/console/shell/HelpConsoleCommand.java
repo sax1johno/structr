@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -39,7 +39,7 @@ public class HelpConsoleCommand extends AdminConsoleCommand {
 
 		if (parameters.size() > 1) {
 
-			final String key         = parameters.get(1);
+			final String key              = parameters.get(1);
 			final AdminConsoleCommand cmd = AdminConsoleCommand.getCommand(key);
 
 			if (cmd != null) {
@@ -53,11 +53,17 @@ public class HelpConsoleCommand extends AdminConsoleCommand {
 
 		} else {
 
+			int maxCommandNameLength = 0;
+
+			for (final String key : AdminConsoleCommand.commandNames()) {
+				maxCommandNameLength = Math.max(maxCommandNameLength, key.length());
+			}
+
 			for (final String key : AdminConsoleCommand.commandNames()) {
 
 				final AdminConsoleCommand cmd = AdminConsoleCommand.getCommand(key);
 
-				writable.print(StringUtils.rightPad(key, 10));
+				writable.print(StringUtils.rightPad(key, maxCommandNameLength));
 				writable.print(" - ");
 				cmd.commandHelp(writable);
 			}

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,8 +19,13 @@
 package org.structr.web.servlet;
 
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonSyntaxException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import javax.servlet.ServletException;
@@ -46,28 +51,32 @@ import org.structr.common.SecurityContext;
 import org.structr.common.ThreadLocalMatcher;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
+import org.structr.core.IJsonInput;
+import org.structr.core.JsonInput;
+import org.structr.core.JsonSingleInput;
+import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.auth.exception.AuthenticationException;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.Tx;
 import org.structr.core.property.PropertyMap;
+import org.structr.core.rest.JsonInputGSONAdapter;
 import org.structr.rest.service.HttpServiceServlet;
 import org.structr.rest.service.StructrHttpServiceConfig;
+import org.structr.rest.servlet.AbstractServletBase;
 import org.structr.schema.SchemaHelper;
 import org.structr.web.auth.UiAuthenticator;
 import org.structr.web.common.FileHelper;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.AbstractFile;
 import org.structr.web.entity.Folder;
+import org.structr.web.entity.File;
+import org.structr.web.entity.Image;
 
-
-//~--- classes ----------------------------------------------------------------
 /**
  * Simple upload servlet.
- *
- *
  */
-public class UploadServlet extends HttpServlet implements HttpServiceServlet {
+public class UploadServlet extends AbstractServletBase implements HttpServiceServlet {
 
 	private static final Logger logger                             = LoggerFactory.getLogger(UploadServlet.class.getName());
 	private static final ThreadLocalMatcher threadLocalUUIDMatcher = new ThreadLocalMatcher("[a-fA-F0-9]{32}");
@@ -77,13 +86,13 @@ public class UploadServlet extends HttpServlet implements HttpServiceServlet {
 	private static final long MEGABYTE                              = 1024 * 1024;
 
 	// non-static fields
-	private ServletFileUpload uploader = null;
 	private final StructrHttpServiceConfig config = new StructrHttpServiceConfig();
+	private ServletFileUpload uploader            = null;
+	private java.io.File filesDir                 = null;
 
 	public UploadServlet() {
 	}
 
-	//~--- methods --------------------------------------------------------
 	@Override
 	public StructrHttpServiceConfig getConfig() {
 		return config;
@@ -96,9 +105,7 @@ public class UploadServlet extends HttpServlet implements HttpServiceServlet {
 
 	@Override
 	public void init() {
-
 		uploader = new ServletFileUpload();
-
 	}
 
 	@Override
@@ -107,6 +114,8 @@ public class UploadServlet extends HttpServlet implements HttpServiceServlet {
 
 	@Override
 	protected void doPost(final HttpServletRequest request, final HttpServletResponse response) throws ServletException {
+
+		setCustomResponseHeaders(response);
 
 		try {
 
@@ -151,6 +160,8 @@ public class UploadServlet extends HttpServlet implements HttpServiceServlet {
 			logger.warn("No SecurityContext, aborting.");
 			return;
 		}
+
+		final App app              = StructrApp.getInstance(securityContext);
 
 		try {
 
@@ -216,7 +227,16 @@ public class UploadServlet extends HttpServlet implements HttpServiceServlet {
 
 					} else {
 
-						params.put(fieldName, fieldValue);
+						try {
+							
+							final IJsonInput jsonInput = cleanAndParseJsonString(app, "{" + fieldName + ":" + fieldValue + "}");
+							for (final JsonInput input : jsonInput.getJsonInputs()) {
+								params.put(fieldName, convertPropertySetToMap(input).get(fieldName));
+							}
+							
+						} catch (final FrameworkException fex) {
+							params.put(fieldName, fieldValue);
+						}
 					}
 
 				} else {
@@ -243,7 +263,7 @@ public class UploadServlet extends HttpServlet implements HttpServiceServlet {
 
 							if (isImage) {
 
-								cls = org.structr.dynamic.Image.class;
+								cls = Image.class;
 
 							} else if (isVideo) {
 
@@ -255,7 +275,7 @@ public class UploadServlet extends HttpServlet implements HttpServiceServlet {
 
 							} else {
 
-								cls = org.structr.dynamic.File.class;
+								cls = File.class;
 							}
 						}
 
@@ -264,7 +284,7 @@ public class UploadServlet extends HttpServlet implements HttpServiceServlet {
 						}
 
 						final String name = item.getName().replaceAll("\\\\", "/");
-						FileBase newFile  = null;
+						File newFile  = null;
 						String uuid       = null;
 						boolean retry     = true;
 
@@ -286,22 +306,25 @@ public class UploadServlet extends HttpServlet implements HttpServiceServlet {
 
 							}
 
-							try (final Tx tx = StructrApp.getInstance().tx()) {
+							try (final Tx tx = StructrApp.getInstance(securityContext).tx()) {
 
-								newFile = FileHelper.createFile(securityContext, item.openStream(), contentType, cls, name, uploadFolder);
-								newFile.validateAndRenameFileOnce(securityContext, null);
+								try (final InputStream is = item.openStream()) {
 
-								final PropertyMap changedProperties = new PropertyMap();
+									newFile = FileHelper.createFile(securityContext, is, contentType, cls, name, uploadFolder);
+									AbstractFile.validateAndRenameFileOnce(newFile, securityContext, null);
 
-								changedProperties.putAll(PropertyMap.inputTypeToJavaType(securityContext, cls, params));
+									final PropertyMap changedProperties = new PropertyMap();
 
-								// Update type as it could have changed
-								changedProperties.put(AbstractNode.type, type);
+									changedProperties.putAll(PropertyMap.inputTypeToJavaType(securityContext, cls, params));
 
-								newFile.unlockSystemPropertiesOnce();
-								newFile.setProperties(securityContext, changedProperties);
+									// Update type as it could have changed
+									changedProperties.put(AbstractNode.type, type);
 
-								uuid = newFile.getUuid();
+									newFile.unlockSystemPropertiesOnce();
+									newFile.setProperties(securityContext, changedProperties);
+
+									uuid = newFile.getUuid();
+								}
 
 								tx.success();
 
@@ -371,6 +394,8 @@ public class UploadServlet extends HttpServlet implements HttpServiceServlet {
 	@Override
 	protected void doPut(final HttpServletRequest request, final HttpServletResponse response) throws ServletException {
 
+		setCustomResponseHeaders(response);
+
 		try (final Tx tx = StructrApp.getInstance().tx(true, false, false)) {
 
 			final String uuid = PathHelper.getName(request.getPathInfo());
@@ -425,16 +450,19 @@ public class UploadServlet extends HttpServlet implements HttpServiceServlet {
 
 					}
 
-					if (node instanceof org.structr.web.entity.AbstractFile) {
+					if (node instanceof org.structr.web.entity.File) {
 
-						final FileBase file = (FileBase) node;
+						final File file = (File) node;
 						if (file.isGranted(Permission.write, securityContext)) {
 
-							FileHelper.writeToFile(file, fileItem.openStream());
-							file.increaseVersion();
+							try (final InputStream is = fileItem.openStream()) {
 
-							// upload trigger
-							file.notifyUploadCompletion();
+								FileHelper.writeToFile(file, is);
+								file.increaseVersion();
+
+								// upload trigger
+								file.notifyUploadCompletion();
+							}
 
 						} else {
 
@@ -457,6 +485,71 @@ public class UploadServlet extends HttpServlet implements HttpServiceServlet {
 			logger.error("Exception while processing request", t);
 			UiAuthenticator.writeInternalServerError(response);
 		}
+	}
+
+	protected Gson getGson() {
+
+		final JsonInputGSONAdapter jsonInputAdapter = new JsonInputGSONAdapter();
+
+		// create GSON serializer
+		final GsonBuilder gsonBuilder = new GsonBuilder()
+			.setPrettyPrinting()
+			.serializeNulls()
+			.registerTypeAdapter(IJsonInput.class, jsonInputAdapter);
+
+		final boolean lenient = Settings.JsonLenient.getValue();
+		if (lenient) {
+
+			// Serializes NaN, -Infinity, Infinity, see http://code.google.com/p/google-gson/issues/detail?id=378
+			gsonBuilder.serializeSpecialFloatingPointValues();
+		}
+
+		return gsonBuilder.create();
+	}
+
+	private IJsonInput cleanAndParseJsonString(final App app, final String input) throws FrameworkException {
+
+		final Gson gson      = getGson();
+		IJsonInput jsonInput = null;
+
+		// isolate input parsing (will include read and write operations)
+		try (final Tx tx = app.tx()) {
+
+			jsonInput   = gson.fromJson(input, IJsonInput.class);
+			tx.success();
+
+		} catch (JsonSyntaxException jsx) {
+			//logger.warn("", jsx);
+			throw new FrameworkException(400, jsx.getMessage());
+		}
+
+		if (jsonInput == null) {
+
+			if (org.tuckey.web.filters.urlrewrite.utils.StringUtils.isBlank(input)) {
+
+				try (final Tx tx = app.tx()) {
+
+					jsonInput   = gson.fromJson("{}", IJsonInput.class);
+					tx.success();
+				}
+
+			} else {
+
+				jsonInput = new JsonSingleInput();
+			}
+		}
+
+		return jsonInput;
+
+	}
+	
+	private Map<String, Object> convertPropertySetToMap(JsonInput propertySet) {
+
+		if (propertySet != null) {
+			return propertySet.getAttributes();
+		}
+
+		return new LinkedHashMap<>();
 	}
 
 	private synchronized Folder getOrCreateFolderPath(SecurityContext securityContext, String path) {

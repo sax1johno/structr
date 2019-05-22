@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -118,5 +118,15 @@ public class SourceNodeProperty extends Property<NodeInterface> {
 	@Override
 	public PropertyConverter<?, NodeInterface> inputConverter(SecurityContext securityContext) {
 		return null;
+	}
+
+	@Override
+	public boolean isIndexed() {
+		return false;
+	}
+
+	@Override
+	public boolean isPassivelyIndexed() {
+		return false;
 	}
 }

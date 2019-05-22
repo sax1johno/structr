@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -23,13 +23,15 @@ import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import org.structr.api.service.LicenseManager;
+import org.structr.api.util.PagingIterable;
+import org.structr.api.util.ResultStream;
 import org.structr.common.SecurityContext;
 import org.structr.common.VersionHelper;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObjectMap;
-import org.structr.core.Result;
 import org.structr.core.Services;
 import org.structr.core.property.ArrayProperty;
+import org.structr.core.property.DateProperty;
 import org.structr.core.property.GenericProperty;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.StringProperty;
@@ -56,7 +58,7 @@ public class EnvResource extends Resource {
 	}
 
 	@Override
-	public Result doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
+	public ResultStream doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
 
 		final List<GraphObjectMap> resultList             = new LinkedList<>();
 		final GraphObjectMap info                         = new GraphObjectMap();
@@ -74,8 +76,8 @@ public class EnvResource extends Resource {
 			info.setProperty(new StringProperty("edition"),   licenseManager.getEdition());
 			info.setProperty(new StringProperty("licensee"),  licenseManager.getLicensee());
 			info.setProperty(new StringProperty("hostId"),    licenseManager.getHardwareFingerprint());
-			info.setProperty(new StringProperty("startDate"), licenseManager.getStartDate());
-			info.setProperty(new StringProperty("endDate"),   licenseManager.getEndDate());
+			info.setProperty(new DateProperty("startDate"), licenseManager.getStartDate());
+			info.setProperty(new DateProperty("endDate"),   licenseManager.getEndDate());
 
 		} else {
 
@@ -85,7 +87,7 @@ public class EnvResource extends Resource {
 
 		resultList.add(info);
 
-		return new Result(resultList, resultList.size(), false, false);
+		return new PagingIterable(resultList);
 	}
 
 	@Override

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -23,25 +23,23 @@ import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.QuoteMode;
 import org.structr.schema.action.ActionContext;
-import org.structr.web.function.UiFunction;
 
-/**
- *
- */
-public class GetCsvHeadersFunction extends UiFunction {
+public class GetCsvHeadersFunction extends CsvFunction {
 
 	public static final String ERROR_MESSAGE_FROM_CSV    = "Usage: ${get_csv_headers(source[, delimiter[, quoteChar[, recordSeparator]]])}. Example: ${get_csv_headers('COL1;COL2;COL3\none;two;three')}";
 	public static final String ERROR_MESSAGE_FROM_CSV_JS = "Usage: ${{Structr.getCsvHeaders(source[, delimiter[, quoteChar[, recordSeparator]]])}}. Example: ${{Structr.getCsvHeaders('COL1;COL2;COL3\none;two;three')}}";
 
 	@Override
 	public String getName() {
-		return "get_csv_headers()";
+		return "get_csv_headers";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) {
 
-		if (arrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 1, 4)) {
+		try {
+
+			assertArrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 1, 4);
 
 			try {
 
@@ -77,19 +75,16 @@ public class GetCsvHeadersFunction extends UiFunction {
 
 			} catch (Throwable t) {
 
-				logException(t, "{}: Exception for parameter: {}", new Object[] { getName(), getParametersAsString(sources) });
-
+				logException(t, "{}: Exception for parameter: {}", new Object[] { getReplacement(), getParametersAsString(sources) });
 			}
 
 			return "";
 
-		} else {
+		} catch (IllegalArgumentException e) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
-
+			logParameterError(caller, sources, e.getMessage(), ctx.isJavaScriptContext());
+			return usage(ctx.isJavaScriptContext());
 		}
-
-		return usage(ctx.isJavaScriptContext());
 	}
 
 	@Override

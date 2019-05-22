@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,13 +19,22 @@
 package org.structr.web.common;
 
 import java.util.Set;
-
 import org.structr.api.service.LicenseManager;
+import org.structr.core.datasources.DataSources;
 import org.structr.core.entity.AbstractSchemaNode;
 import org.structr.core.function.Functions;
 import org.structr.module.StructrModule;
+import org.structr.schema.SourceFile;
 import org.structr.schema.action.Actions;
+import org.structr.web.datasource.CypherGraphDataSource;
+import org.structr.web.datasource.FunctionDataSource;
+import org.structr.web.datasource.IdRequestParameterGraphDataSource;
+import org.structr.web.datasource.RestDataSource;
+import org.structr.web.datasource.XPathGraphDataSource;
 import org.structr.web.function.AddHeaderFunction;
+import org.structr.web.function.AppendContentFunction;
+import org.structr.web.function.BarcodeFunction;
+import org.structr.web.function.ConfirmationKeyFunction;
 import org.structr.web.function.CopyFileContentsFunction;
 import org.structr.web.function.CreateArchiveFunction;
 import org.structr.web.function.EscapeHtmlFunction;
@@ -39,16 +48,20 @@ import org.structr.web.function.HttpGetFunction;
 import org.structr.web.function.HttpHeadFunction;
 import org.structr.web.function.HttpPostFunction;
 import org.structr.web.function.HttpPutFunction;
+import org.structr.web.function.IncludeChildFunction;
 import org.structr.web.function.IncludeFunction;
 import org.structr.web.function.IsLocaleFunction;
 import org.structr.web.function.LogEventFunction;
+import org.structr.web.function.MaintenanceFunction;
 import org.structr.web.function.ParseFunction;
 import org.structr.web.function.RemoveSessionAttributeFunction;
 import org.structr.web.function.RenderFunction;
 import org.structr.web.function.ScheduleFunction;
 import org.structr.web.function.SendHtmlMailFunction;
 import org.structr.web.function.SendPlaintextMailFunction;
+import org.structr.web.function.SetContentFunction;
 import org.structr.web.function.SetDetailsObjectFunction;
+import org.structr.web.function.SetResponseCodeFunction;
 import org.structr.web.function.SetResponseHeaderFunction;
 import org.structr.web.function.SetSessionAttributeFunction;
 import org.structr.web.function.StripHtmlFunction;
@@ -63,47 +76,56 @@ public class UiModule implements StructrModule {
 	@Override
 	public void onLoad(final LicenseManager licenseManager) {
 
-		final boolean basicEdition         = licenseManager == null || licenseManager.isEdition(LicenseManager.Basic);
-		final boolean smallBusinessEdition = licenseManager == null || licenseManager.isEdition(LicenseManager.SmallBusiness);
-		final boolean enterpriseEdition    = licenseManager == null || licenseManager.isEdition(LicenseManager.Enterprise);
+		DataSources.put(true, "ui", "idRequestParameterDataSource", new IdRequestParameterGraphDataSource("nodeId"));
+		DataSources.put(true, "ui", "restDataSource",               new RestDataSource());
+		DataSources.put(true, "ui", "cypherDataSource",             new CypherGraphDataSource());
+		DataSources.put(true, "ui", "functionDataSource",           new FunctionDataSource());
+		DataSources.put(true, "ui", "xpathDataSource",              new XPathGraphDataSource());
+	}
 
-		// Community Edition
-		Functions.put(true, LicenseManager.Community, "escape_html",              new EscapeHtmlFunction());
-		Functions.put(true, LicenseManager.Community, "unescape_html",            new UnescapeHtmlFunction());
-		Functions.put(true, LicenseManager.Community, "strip_html",               new StripHtmlFunction());
-		Functions.put(true, LicenseManager.Community, "from_json",                new FromJsonFunction());
-		Functions.put(true, LicenseManager.Community, "to_json",                  new ToJsonFunction());
-		Functions.put(true, LicenseManager.Community, "to_graph_object",          new ToGraphObjectFunction());
-		Functions.put(true, LicenseManager.Community, "include",                  new IncludeFunction());
-		Functions.put(true, LicenseManager.Community, "render",                   new RenderFunction());
-		Functions.put(true, LicenseManager.Community, "set_details_object",       new SetDetailsObjectFunction());
+	@Override
+	public void registerModuleFunctions(final LicenseManager licenseManager) {
 
-		// Basic Edition and up
-		Functions.put(basicEdition, LicenseManager.Basic, "send_html_mail",           new SendHtmlMailFunction());
-		Functions.put(basicEdition, LicenseManager.Basic, "send_plaintext_mail",      new SendPlaintextMailFunction());
-		Functions.put(basicEdition, LicenseManager.Basic, "get_content",              new GetContentFunction());
-		Functions.put(basicEdition, LicenseManager.Basic, "copy_file_contents",       new CopyFileContentsFunction());
-		Functions.put(basicEdition, LicenseManager.Basic, "set_session_attribute",    new SetSessionAttributeFunction());
-		Functions.put(basicEdition, LicenseManager.Basic, "get_session_attribute",    new GetSessionAttributeFunction());
-		Functions.put(basicEdition, LicenseManager.Basic, "remove_session_attribute", new RemoveSessionAttributeFunction());
-		Functions.put(basicEdition, LicenseManager.Basic, "is_locale",                new IsLocaleFunction());
+		Functions.put(licenseManager, new EscapeHtmlFunction());
+		Functions.put(licenseManager, new UnescapeHtmlFunction());
+		Functions.put(licenseManager, new StripHtmlFunction());
+		Functions.put(licenseManager, new FromJsonFunction());
+		Functions.put(licenseManager, new ToJsonFunction());
+		Functions.put(licenseManager, new ToGraphObjectFunction());
+		Functions.put(licenseManager, new IncludeFunction());
+		Functions.put(licenseManager, new IncludeChildFunction());
+		Functions.put(licenseManager, new RenderFunction());
+		Functions.put(licenseManager, new SetDetailsObjectFunction());
+		Functions.put(licenseManager, new ConfirmationKeyFunction());
 
-		// Small Business and up
-		Functions.put(smallBusinessEdition, LicenseManager.SmallBusiness, "log_event",                new LogEventFunction());
+		Functions.put(licenseManager, new SendHtmlMailFunction());
+		Functions.put(licenseManager, new SendPlaintextMailFunction());
+		Functions.put(licenseManager, new GetContentFunction());
+		Functions.put(licenseManager, new SetContentFunction());
+		Functions.put(licenseManager, new AppendContentFunction());
+		Functions.put(licenseManager, new CopyFileContentsFunction());
+		Functions.put(licenseManager, new SetSessionAttributeFunction());
+		Functions.put(licenseManager, new GetSessionAttributeFunction());
+		Functions.put(licenseManager, new RemoveSessionAttributeFunction());
+		Functions.put(licenseManager, new IsLocaleFunction());
 
-		// Enterprise only
-		Functions.put(enterpriseEdition, LicenseManager.Enterprise, "GET",                      new HttpGetFunction());
-		Functions.put(enterpriseEdition, LicenseManager.Enterprise, "HEAD",                     new HttpHeadFunction());
-		Functions.put(enterpriseEdition, LicenseManager.Enterprise, "POST",                     new HttpPostFunction());
-		Functions.put(enterpriseEdition, LicenseManager.Enterprise, "PUT",                      new HttpPutFunction());
-		Functions.put(enterpriseEdition, LicenseManager.Enterprise, "DELETE",                   new HttpDeleteFunction());
-		Functions.put(enterpriseEdition, LicenseManager.Enterprise, "add_header",               new AddHeaderFunction());
-		Functions.put(enterpriseEdition, LicenseManager.Enterprise, "set_response_header",      new SetResponseHeaderFunction());
-		Functions.put(enterpriseEdition, LicenseManager.Enterprise, "get_request_header",       new GetRequestHeaderFunction());
-		Functions.put(enterpriseEdition, LicenseManager.Enterprise, "from_xml",                 new FromXmlFunction());
-		Functions.put(enterpriseEdition, LicenseManager.Enterprise, "parse",                    new ParseFunction());
-		Functions.put(enterpriseEdition, LicenseManager.Enterprise, "createArchive", 		new CreateArchiveFunction());
-		Functions.put(enterpriseEdition, LicenseManager.Enterprise, "schedule",                 new ScheduleFunction());
+		Functions.put(licenseManager, new LogEventFunction());
+
+		Functions.put(licenseManager, new HttpGetFunction());
+		Functions.put(licenseManager, new HttpHeadFunction());
+		Functions.put(licenseManager, new HttpPostFunction());
+		Functions.put(licenseManager, new HttpPutFunction());
+		Functions.put(licenseManager, new HttpDeleteFunction());
+		Functions.put(licenseManager, new AddHeaderFunction());
+		Functions.put(licenseManager, new SetResponseHeaderFunction());
+		Functions.put(licenseManager, new SetResponseCodeFunction());
+		Functions.put(licenseManager, new GetRequestHeaderFunction());
+		Functions.put(licenseManager, new FromXmlFunction());
+		Functions.put(licenseManager, new ParseFunction());
+		Functions.put(licenseManager, new CreateArchiveFunction());
+		Functions.put(licenseManager, new ScheduleFunction());
+		Functions.put(licenseManager, new MaintenanceFunction());
+		Functions.put(licenseManager, new BarcodeFunction());
 	}
 
 	@Override
@@ -122,15 +144,15 @@ public class UiModule implements StructrModule {
 	}
 
 	@Override
-	public void insertImportStatements(final AbstractSchemaNode schemaNode, final StringBuilder buf) {
+	public void insertImportStatements(final AbstractSchemaNode schemaNode, final SourceFile buf) {
 	}
 
 	@Override
-	public void insertSourceCode(final AbstractSchemaNode schemaNode, final StringBuilder buf) {
+	public void insertSourceCode(final AbstractSchemaNode schemaNode, final SourceFile buf) {
 	}
 
 	@Override
-	public void insertSaveAction(final AbstractSchemaNode schemaNode, final StringBuilder buf, final Actions.Type type) {
+	public void insertSaveAction(final AbstractSchemaNode schemaNode, final SourceFile buf, final Actions.Type type) {
 	}
 
 	@Override

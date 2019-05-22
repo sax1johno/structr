@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -27,20 +27,29 @@ import org.structr.schema.SchemaHelper.Type;
  */
 public class StringBasedPropertyDefinition implements PropertyDefinition {
 
-	private String propertyName    = null;
-	private Type propertyType      = null;
-	private String rawSource       = null;
-	private String source          = null;
-	private String dbName          = null;
-	private String format          = null;
-	private String defaultValue    = null;
-	private String contentType     = null;
-	private boolean notNull        = false;
-	private boolean compound       = false;
-	private boolean unique         = false;
-	private boolean indexed        = true;
-	private String readFunction    = null;
-	private String writeFunction   = null;
+	private String propertyName           = null;
+	private Type propertyType             = null;
+	private String rawSource              = null;
+	private String source                 = null;
+	private String dbName                 = null;
+	private String format                 = null;
+	private String typeHint               = null;
+	private String hint                   = null;
+	private String category               = null;
+	private String defaultValue           = null;
+	private String contentType            = null;
+	private String fqcn                   = null;
+	private boolean notNull               = false;
+	private boolean compound              = false;
+	private boolean unique                = false;
+	private boolean indexed               = true;
+	private boolean readOnly              = false;
+	private boolean isPartOfBuiltInSchema = false;
+	private boolean isCachingEnabled      = false;
+	private String readFunction           = null;
+	private String writeFunction          = null;
+	private String[] transformators       = null;
+	private String[] validators           = null;
 
 	public StringBasedPropertyDefinition(final String propertyName, final String rawSource) {
 
@@ -133,8 +142,23 @@ public class StringBasedPropertyDefinition implements PropertyDefinition {
 	}
 
 	@Override
+	public String getHint() {
+		return hint;
+	}
+
+	@Override
+	public String getCategory() {
+		return category;
+	}
+
+	@Override
 	public String getFormat() {
 		return format;
+	}
+
+	@Override
+	public String getTypeHint() {
+		return typeHint;
 	}
 
 	@Override
@@ -158,6 +182,11 @@ public class StringBasedPropertyDefinition implements PropertyDefinition {
 	}
 
 	@Override
+	public boolean isReadOnly() {
+		return readOnly;
+	}
+
+	@Override
 	public String getDefaultValue() {
 		return defaultValue;
 	}
@@ -177,6 +206,36 @@ public class StringBasedPropertyDefinition implements PropertyDefinition {
 		return writeFunction;
 	}
 
+	@Override
+	public String[] getTransformators() {
+		return transformators;
+	}
+
+	@Override
+	public String[] getValidators() {
+		return validators;
+	}
+
+	@Override
+	public String getFqcn() {
+		return fqcn;
+	}
+
+	@Override
+	public boolean isPartOfBuiltInSchema() {
+		return isPartOfBuiltInSchema;
+	}
+
+	@Override
+	public boolean isCachingEnabled() {
+		return isCachingEnabled;
+	}
+
+	@Override
+	public String getUuid() {
+		return null;
+	}
+
 	public static String substringBetween(final String source, final String prefix, final String suffix) {
 
 		final int pos1 = source.indexOf(prefix);
@@ -189,5 +248,4 @@ public class StringBasedPropertyDefinition implements PropertyDefinition {
 
 		return null;
 	}
-
 }

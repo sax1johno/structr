@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -35,7 +35,12 @@ public class PropertySetSerializationStrategy implements SerializationStrategy {
 	private PropertyKey[] propertyKeys = null;
 
 	public PropertySetSerializationStrategy(PropertyKey... propertyKeys) {
+
 		this.propertyKeys = propertyKeys;
+
+		if (propertyKeys == null || propertyKeys.length == 0) {
+			throw new IllegalStateException("PropertySetDeserializationStrategy must contain at least one property.");
+		}
 	}
 
 	@Override

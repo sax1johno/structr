@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -21,7 +21,7 @@ package org.structr.core.parser;
 import java.util.Random;
 import org.apache.commons.lang3.StringUtils;
 import org.structr.common.error.FrameworkException;
-import org.structr.common.error.UnlicensedException;
+import org.structr.common.error.UnlicensedScriptException;
 import org.structr.core.GraphObject;
 import org.structr.core.Services;
 import org.structr.schema.action.ActionContext;
@@ -69,7 +69,7 @@ public class CacheExpression extends Expression {
 	}
 
 	@Override
-	public Object evaluate(final ActionContext ctx, final GraphObject entity) throws FrameworkException, UnlicensedException {
+	public Object evaluate(final ActionContext ctx, final GraphObject entity) throws FrameworkException, UnlicensedScriptException {
 
 		if (keyExpression == null) {
 			return "Error: cache(): key expression may not be empty.";
@@ -122,6 +122,37 @@ public class CacheExpression extends Expression {
 		}
 
 		return cachedValue.getValue();
+	}
+
+	public static boolean hasCachedValue(final String key) {
+
+		final CachedValue cachedValue = (CachedValue)Services.getInstance().getAttribute(key);
+
+		if (cachedValue == null) {
+
+			return false;
+
+		} else {
+
+			return !cachedValue.isExpired();
+		}
+	}
+
+	public static Object getCachedValue(final String key) {
+
+		final CachedValue cachedValue = (CachedValue)Services.getInstance().getAttribute(key);
+
+		if (cachedValue == null) {
+
+			return null;
+		}
+
+		return cachedValue.getValue();
+	}
+
+	public static void deleteCachedValue(final String key) {
+
+		Services.getInstance().removeAttribute(key);
 	}
 
 	private static final class CachedValue {

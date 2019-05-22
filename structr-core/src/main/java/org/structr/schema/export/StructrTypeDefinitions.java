@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,14 +18,18 @@
  */
 package org.structr.schema.export;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
+import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractSchemaNode;
 import org.structr.core.entity.SchemaNode;
 import org.structr.core.entity.SchemaRelationshipNode;
@@ -39,6 +43,8 @@ import org.structr.schema.json.JsonType;
  */
 public class StructrTypeDefinitions implements StructrDefinition {
 
+	private static final Logger logger = LoggerFactory.getLogger(StructrTypeDefinitions.class);
+
 	private final Set<StructrRelationshipTypeDefinition> relationships = new TreeSet<>();
 	private final Set<StructrTypeDefinition> typeDefinitions           = new TreeSet<>();
 	private StructrSchemaDefinition root                               = null;
@@ -51,7 +57,7 @@ public class StructrTypeDefinitions implements StructrDefinition {
 		return typeDefinitions;
 	}
 
-	public JsonType getType(final String name) {
+	public JsonType getType(final String name, final boolean create) {
 
 		for (final JsonType type : typeDefinitions) {
 
@@ -60,10 +66,22 @@ public class StructrTypeDefinitions implements StructrDefinition {
 			}
 		}
 
+		if (create) {
+
+			// create
+			return addType(name);
+		}
+
 		return null;
 	}
 
 	public JsonObjectType addType(final String name) {
+
+		final JsonType type = getType(name, false);
+		if (type != null) {
+
+			return (JsonObjectType)type;
+		}
 
 		final StructrNodeTypeDefinition def = new StructrNodeTypeDefinition(root, name);
 
@@ -83,9 +101,15 @@ public class StructrTypeDefinitions implements StructrDefinition {
 
 	public void createDatabaseSchema(final App app, final JsonSchema.ImportMode importMode) throws FrameworkException {
 
+		final Map<String, SchemaNode> schemaNodes = new LinkedHashMap<>();
+
+		// collect list of schema nodes
+		app.nodeQuery(SchemaNode.class).getAsList().stream().forEach(n -> { schemaNodes.put(n.getName(), n); });
+
+		// iterate type definitions
 		for (final StructrTypeDefinition type : typeDefinitions) {
 
-			final AbstractSchemaNode schemaNode = type.createDatabaseSchema(app);
+			final AbstractSchemaNode schemaNode = type.createDatabaseSchema(schemaNodes, app);
 			if (schemaNode != null) {
 
 				type.setSchemaNode(schemaNode);
@@ -93,7 +117,7 @@ public class StructrTypeDefinitions implements StructrDefinition {
 		}
 
 		for (final StructrRelationshipTypeDefinition rel : relationships) {
-			rel.resolveEndpointTypesForDatabaseSchemaCreation(app);
+			rel.resolveEndpointTypesForDatabaseSchemaCreation(schemaNodes, app);
 		}
 	}
 
@@ -163,9 +187,15 @@ public class StructrTypeDefinitions implements StructrDefinition {
 
 	void deserialize(final App app) throws FrameworkException {
 
-		for (final SchemaNode schemaNode : app.nodeQuery(SchemaNode.class).getAsList()) {
+		final Map<String, SchemaNode> schemaNodes = new LinkedHashMap<>();
 
-			final StructrTypeDefinition type = StructrTypeDefinition.deserialize(root, schemaNode);
+		// collect list of schema nodes
+		app.nodeQuery(SchemaNode.class).getAsList().stream().forEach(n -> { schemaNodes.put(n.getName(), n); });
+
+		// iterate
+		for (final SchemaNode schemaNode : schemaNodes.values()) {
+
+			final StructrTypeDefinition type = StructrTypeDefinition.deserialize(schemaNodes, root, schemaNode);
 			if (type != null) {
 
 				typeDefinitions.add(type);
@@ -174,7 +204,7 @@ public class StructrTypeDefinitions implements StructrDefinition {
 
 		for (final SchemaRelationshipNode schemaRelationship : app.nodeQuery(SchemaRelationshipNode.class).getAsList()) {
 
-			final StructrTypeDefinition type = StructrTypeDefinition.deserialize(root, schemaRelationship);
+			final StructrTypeDefinition type = StructrTypeDefinition.deserialize(schemaNodes, root, schemaRelationship);
 			if (type != null) {
 
 				typeDefinitions.add(type);
@@ -198,4 +228,68 @@ public class StructrTypeDefinitions implements StructrDefinition {
 	Set<StructrRelationshipTypeDefinition> getRelationships() {
 		return relationships;
 	}
+
+	void diff(final StructrTypeDefinitions other) throws FrameworkException {
+
+		final Map<String, StructrTypeDefinition> databaseTypes = getMappedTypes();
+		final Map<String, StructrTypeDefinition> structrTypes  = other.getMappedTypes();
+		final Set<String> typesOnlyInDatabase                  = new TreeSet<>(databaseTypes.keySet());
+		final Set<String> typesOnlyInStructrSchema             = new TreeSet<>(structrTypes.keySet());
+		final Set<String> bothTypes                            = new TreeSet<>(databaseTypes.keySet());
+
+		typesOnlyInDatabase.removeAll(structrTypes.keySet());
+		typesOnlyInStructrSchema.removeAll(databaseTypes.keySet());
+		bothTypes.retainAll(structrTypes.keySet());
+
+		// types that exist in the only database
+		for (final String key : typesOnlyInDatabase) {
+
+			final StructrTypeDefinition type = databaseTypes.get(key);
+			if (type.isBuiltinType()) {
+
+				handleRemovedBuiltInType(type);
+
+			} else {
+
+				// type should be ok, probably created by user
+			}
+		}
+
+		// nothing to do for this set, these types can simply be created without problems
+		//System.out.println(typesOnlyInStructrSchema);
+
+
+		// find detailed differences in the intersection of both schemas
+		for (final String name : bothTypes) {
+
+			final StructrTypeDefinition localType = databaseTypes.get(name);
+			final StructrTypeDefinition otherType = structrTypes.get(name);
+
+			// compare types
+			localType.diff(otherType);
+		}
+
+		// the same must be done for global methods and relationships!
+	}
+
+	private Map<String, StructrTypeDefinition> getMappedTypes() {
+
+		final LinkedHashMap<String, StructrTypeDefinition> mapped = new LinkedHashMap<>();
+
+		for (final StructrTypeDefinition def : getTypes()) {
+
+			mapped.put(def.getName(), def);
+		}
+
+		return mapped;
+	}
+
+	private void handleRemovedBuiltInType(final StructrTypeDefinition type) throws FrameworkException {
+
+		logger.warn("Built-in type {} was removed or renamed in the current version of the Structr schema, deleting.", type.getName());
+
+		// We can not determine yet if the type was deleted or renamed, so we need to delete it..
+		StructrApp.getInstance().delete(type.getSchemaNode());
+	}
+
 }

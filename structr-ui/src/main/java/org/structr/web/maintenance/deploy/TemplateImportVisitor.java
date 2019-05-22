@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -131,7 +131,7 @@ public class TemplateImportVisitor implements FileVisitor<Path> {
 
 	private void deleteRecursively(final App app, final DOMNode node) throws FrameworkException {
 
-		for (DOMNode child : node.treeGetChildren()) {
+		for (DOMNode child : node.getChildren()) {
 			deleteRecursively(app, child);
 		}
 
@@ -145,7 +145,7 @@ public class TemplateImportVisitor implements FileVisitor<Path> {
 
 			try {
 
-				return PropertyMap.inputTypeToJavaType(SecurityContext.getSuperUserInstance(), DOMNode.class, (Map<String, Object>)data);
+				return PropertyMap.inputTypeToJavaType(SecurityContext.getSuperUserInstance(), Template.class, (Map<String, Object>)data);
 
 			} catch (FrameworkException ex) {
 				logger.warn("Unable to resolve properties for template: {}", ex.getMessage());
@@ -165,6 +165,8 @@ public class TemplateImportVisitor implements FileVisitor<Path> {
 
 		try (final Tx tx = app.tx(true, false, false)) {
 
+			tx.disableChangelog();
+
 			final PropertyMap properties  = getPropertiesForTemplate(templateName);
 
 			if (properties == null) {
@@ -172,7 +174,7 @@ public class TemplateImportVisitor implements FileVisitor<Path> {
 				logger.info("Ignoring {} (not in templates.json)", fileName);
 			} else {
 
-				final String src = new String (Files.readAllBytes(file),Charset.forName("UTF-8"));
+				final String src = new String(Files.readAllBytes(file), Charset.forName("UTF-8"));
 
 				final Template template;
 
@@ -207,21 +209,20 @@ public class TemplateImportVisitor implements FileVisitor<Path> {
 
 				} else {
 
-					final String name = byId ? null : templateName;
+					// old export format: only name of template in filename
+					logger.info("Importing template {} from {}..", new Object[] { templateName, fileName } );
 
-					logger.info("Importing template {} from {}..", new Object[] { name, fileName } );
-
-					final DOMNode existingTemplate = getExistingTemplate(name);
+					final DOMNode existingTemplate = getExistingTemplate(templateName);
 					if (existingTemplate != null) {
 
 						deleteTemplate(app, existingTemplate);
 					}
 
 					template = app.create(Template.class);
-					properties.put(Template.name, name);
+					properties.put(Template.name, templateName);
 				}
 
-				properties.put(Template.content, src);
+				properties.put(StructrApp.key(Template.class, "content"), src);
 
 				// insert "shared" templates into ShadowDocument
 				final Object value = properties.get(internalSharedTemplateKey);
@@ -229,7 +230,7 @@ public class TemplateImportVisitor implements FileVisitor<Path> {
 
 					if ("true".equals(value)) {
 
-						template.setProperty(DOMNode.ownerDocument, CreateComponentCommand.getOrCreateHiddenDocument());
+						template.setOwnerDocument(CreateComponentCommand.getOrCreateHiddenDocument());
 					}
 
 					properties.remove(internalSharedTemplateKey);
@@ -244,7 +245,8 @@ public class TemplateImportVisitor implements FileVisitor<Path> {
 
 		} catch (Throwable t) {
 
-			logger.debug("Error trying to create template {}", fileName);
+			logger.error("Error trying to create template {}", fileName);
+			t.printStackTrace();
 		}
 	}
 }

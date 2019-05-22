@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,18 +20,14 @@ package org.structr.core.function;
 
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class AddFunction extends Function<Object, Object> {
+public class AddFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_ADD = "Usage: ${add(values...)}. Example: ${add(1, 2, 3, this.children.size)}";
 
 	@Override
 	public String getName() {
-		return "add()";
+		return "add";
 	}
 
 	@Override
@@ -54,19 +50,13 @@ public class AddFunction extends Function<Object, Object> {
 						logException(caller, t, sources);
 
 						return t.getMessage();
-
 					}
-
 				}
-
 			}
-
 		}
 
 		return result;
-
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {

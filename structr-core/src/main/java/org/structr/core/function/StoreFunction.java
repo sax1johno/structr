@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,46 +18,51 @@
  */
 package org.structr.core.function;
 
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class StoreFunction extends Function<Object, Object> {
+public class StoreFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_STORE    = "Usage: ${store(key, value)}. Example: ${store('tmpUser', this.owner)}";
 	public static final String ERROR_MESSAGE_STORE_JS = "Usage: ${{Structr.store(key, value)}}. Example: ${{Structr.store('tmpUser', Structr.get('this').owner)}}";
 
 	@Override
 	public String getName() {
-		return "store()";
+		return "store";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
 		try {
-			
-			if (!arrayHasLengthAndAllElementsNotNull(sources, 2)) {
-				
-				return null;
-			}
 
-			ctx.store(sources[0].toString(), sources[1]);
+			if (sources != null && sources.length == 2 && sources[0] != null) {
+
+				if (sources[1] == null) {
+
+					ctx.getContextStore().remove(sources[0].toString());
+
+				} else {
+
+					ctx.store(sources[0].toString(), sources[1]);
+				}
+			}
 
 			return "";
 
-		} catch (final IllegalArgumentException e) {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			// silently ignore null arguments
+			return null;
 
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
 		}
-
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {
@@ -68,5 +73,4 @@ public class StoreFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Stores the given value with the given key in the temporary store";
 	}
-
 }

@@ -1,11 +1,11 @@
-.directory
-.settings
+.settings/
 .project
 .classpath
 target
 structr-ui/data
 structr-ui/db*
 structr-ui/files*
+structr-ui/changelog*
 structr-ui/exchange
 structr-ui/snapshots
 structr-ui/sessions
@@ -24,10 +24,16 @@ structr-ui/structr-ui*.pid
 structr-ui/*.key
 *.diff
 **nb-configuration.xml
+**nbproject
 **nohup.out
+**.directory
 docs/html
 docs/screenshots
 *.DS_Store
 **nbactions.xml
 import-*.log
 license.key
+
+# IntelliJ specific ignores
+.idea
+*.iml

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -37,7 +37,7 @@ import org.structr.core.app.StructrApp;
 import org.structr.core.converter.PropertyConverter;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.graph.CreationContainer;
-import org.structr.schema.ConfigurationProvider;
+import org.structr.core.graph.Tx;
 import org.structr.schema.SchemaHelper;
 
 /**
@@ -329,12 +329,41 @@ public class PropertyMap {
 		return fallbackPropertyMap(source);
 	}
 
-	public static PropertyMap inputTypeToJavaType(SecurityContext securityContext, Class<? extends GraphObject> entity, Map<String, Object> source) throws FrameworkException {
+	public static PropertyMap inputTypeToJavaType(final SecurityContext securityContext, Class<? extends GraphObject> entity, final Map<String, Object> source) throws FrameworkException {
 
-		PropertyMap resultMap = new PropertyMap();
+		final PropertyMap resultMap = new PropertyMap();
+
+		// caution, source can be null when an empty nested property group is encountered!
 		if (source != null) {
 
-			// caution, source can be null when an empty nested property group is encountered!
+			final String batchType = securityContext.getAttribute("batchType", "__");
+			if (batchType.equals(source.get("type"))) {
+
+				// only to batching if a type is set for which batch is enable
+				final Integer count   = securityContext.getAttribute("objectCount", 0);
+				final Integer overall = securityContext.getAttribute("overallCount", 0);
+
+				securityContext.setAttribute("objectCount",  count   + 1);
+				securityContext.setAttribute("overallCount", overall + 1);
+
+				if (count == 100) {
+
+					final Tx tx = (Tx)securityContext.getAttribute("currentTransaction");
+					if (tx != null) {
+
+						logger.info("Committing batch transaction after {} objects of type {}.", overall, batchType);
+
+						// try to commit this batch
+						tx.success();
+						tx.close();
+
+						// open new transaction and store it in context
+						securityContext.setAttribute("currentTransaction", StructrApp.getInstance(securityContext).tx());
+						securityContext.setAttribute("objectCount",        0);
+					}
+				}
+			}
+
 			for (final Entry<String, Object> entry : source.entrySet()) {
 
 				String key   = entry.getKey();
@@ -342,29 +371,41 @@ public class PropertyMap {
 
 				if (key != null) {
 
-					PropertyKey propertyKey     = StructrApp.getConfiguration().getPropertyKeyForJSONName(entity, key);
-					PropertyConverter converter = propertyKey.inputConverter(securityContext);
+					PropertyKey propertyKey = StructrApp.key(entity, key, false);
+					if (propertyKey == null) {
+						propertyKey = StructrApp.getConfiguration().getPropertyKeyForJSONName(entity, key);
+					}
 
-					if (converter != null && value != null && !propertyKey.valueType().isAssignableFrom(value.getClass())) {
+					if (propertyKey != null) {
 
-						try {
+						final PropertyConverter converter = propertyKey.inputConverter(securityContext);
 
-							// test
-							converter.setContext(source);
+						if (converter != null && value != null && !propertyKey.valueType().isAssignableFrom(value.getClass())) {
 
-							Object propertyValue = converter.convert(value);
-							resultMap.put(propertyKey, propertyValue);
+							try {
 
-						} catch (ClassCastException cce) {
+								// test
+								converter.setContext(source);
 
-							logger.warn("", cce);
+								Object propertyValue = converter.convert(value);
+								resultMap.put(propertyKey, propertyValue);
 
-							throw new FrameworkException(422, "Invalid JSON input for key " + propertyKey.jsonName() + ", expected a JSON " + propertyKey.typeName() + ".");
+							} catch (ClassCastException cce) {
+
+								logger.warn("", cce);
+
+								throw new FrameworkException(422, "Invalid JSON input for key " + propertyKey.jsonName() + ", expected a JSON " + propertyKey.typeName() + ".");
+							}
+
+						} else {
+
+							resultMap.put(propertyKey, value);
 						}
 
 					} else {
 
-						resultMap.put(propertyKey, value);
+						// check settings on how to handle invalid JSON input
+						
 					}
 				}
 			}
@@ -377,7 +418,7 @@ public class PropertyMap {
 
 		Map<String, Object> databaseTypedProperties = new LinkedHashMap<>();
 
-		for(Entry<PropertyKey, Object> entry : properties.entrySet()) {
+		for (Entry<PropertyKey, Object> entry : properties.entrySet()) {
 
 			PropertyKey propertyKey     = entry.getKey();
 			PropertyConverter converter = propertyKey.databaseConverter(securityContext);
@@ -406,7 +447,7 @@ public class PropertyMap {
 
 		Map<String, Object> inputTypedProperties = new LinkedHashMap<>();
 
-		for(Entry<PropertyKey, Object> entry : properties.entrySet()) {
+		for (Entry<PropertyKey, Object> entry : properties.entrySet()) {
 
 			PropertyKey propertyKey     = entry.getKey();
 			PropertyConverter converter = propertyKey.inputConverter(securityContext);
@@ -434,7 +475,6 @@ public class PropertyMap {
 	public static PropertyMap cmisTypeToJavaType(final SecurityContext securityContext, final Class type, final Properties properties) throws FrameworkException {
 
 		final Map<String, PropertyData<?>> map = properties.getProperties();
-		final ConfigurationProvider config     = StructrApp.getConfiguration();
 		final PropertyMap propertyMap          = new PropertyMap();
 
 		for (final Entry<String, PropertyData<?>> entry : map.entrySet()) {
@@ -448,7 +488,7 @@ public class PropertyMap {
 				key = CMIS_PROPERTY_MAPPING.get(key);
 			}
 
-			final PropertyKey propertyKey = config.getPropertyKeyForJSONName(type, key, false);
+			final PropertyKey propertyKey = StructrApp.getConfiguration().getPropertyKeyForJSONName(type, key);
 			if (propertyKey != null) {
 
 				final PropertyConverter converter = propertyKey.inputConverter(securityContext);

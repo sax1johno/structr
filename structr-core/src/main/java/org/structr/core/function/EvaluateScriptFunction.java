@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -23,14 +23,18 @@ import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.script.Scripting;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-public class EvaluateScriptFunction extends Function<Object, Object> {
+public class EvaluateScriptFunction extends AdvancedScriptingFunction {
 
 	private static final org.slf4j.Logger logger = LoggerFactory.getLogger(EvaluateScriptFunction.class.getName());
 
 	public static final String ERROR_MESSAGE_EVALUATE_SCRIPT	 = "Usage: ${evaluate_script(entity, script)}";
 	public static final String ERROR_MESSAGE_EVALUATE_SCRIPT_JS	 = "Usage: ${Structr.evaluate_script(entity, script)}";
+
+	@Override
+	public String getName() {
+		return "evaluate_script";
+	}
 
 	@Override
 	public Object apply(ActionContext ctx, Object caller, Object[] sources) throws FrameworkException {
@@ -58,10 +62,4 @@ public class EvaluateScriptFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Evaluates script given as string in the context of given parameters.";
 	}
-
-	@Override
-	public String getName() {
-		return "evaluate_script()";
-	}
-
 }

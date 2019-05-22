@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -63,8 +63,6 @@ public class StructrHttpServiceConfig {
 
 		final String resourceProviderKeyName = "resourceprovider";
 		final String authenticatorKeyName    = "authenticator";
-		final String userAutoCreateKeyName   = "user.autocreate";
-		final String userAutoLoginKeyName    = "user.autologin";
 		final String defaultPropertyKeyName  = "defaultview";
 		final String nestingDepthKeyName     = "outputdepth";
 
@@ -107,8 +105,8 @@ public class StructrHttpServiceConfig {
 
 		}
 
-		this.defaultPropertyView = Settings.getOrCreateStringSetting(servletName, defaultPropertyKeyName).getValue();
-		this.outputNestingDepth  = Settings.getOrCreateIntegerSetting(servletName, nestingDepthKeyName).getValue();
+		this.defaultPropertyView = Settings.getOrCreateStringSetting(servletName, defaultPropertyKeyName).getValue("public");
+		this.outputNestingDepth  = Settings.getOrCreateIntegerSetting(servletName, nestingDepthKeyName).getValue(0);
 	}
 
 	public Authenticator getAuthenticator() {

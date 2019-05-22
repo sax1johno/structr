@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,92 +18,92 @@
  */
 package org.structr.core.entity;
 
-import java.util.LinkedList;
+import java.net.URI;
 import java.util.List;
+import org.structr.api.util.Iterables;
+import org.structr.common.ConstantBooleanTrue;
 import org.structr.common.PropertyView;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.entity.relationship.Groups;
-import org.structr.core.property.ConstantBooleanProperty;
-import org.structr.core.property.EndNodes;
-import org.structr.core.property.Property;
+import org.structr.core.app.StructrApp;
+import org.structr.core.property.PropertyKey;
 import org.structr.schema.SchemaService;
+import org.structr.schema.json.JsonObjectType;
+import org.structr.schema.json.JsonSchema;
 
-public class Group extends AbstractUser implements Principal {
+/**
+ */
+public interface Group extends Principal {
 
-	public static final Property<List<Principal>> members = new EndNodes<>("members", Groups.class);
-	public static final Property<Boolean>        isGroup  = new ConstantBooleanProperty("isGroup", true);
+	static class Impl { static {
 
-	public static final org.structr.common.View uiView = new org.structr.common.View(Group.class, PropertyView.Ui,
-		type, name, members, blocked, isGroup
-	);
+		final JsonSchema schema        = SchemaService.getDynamicSchema();
+		final JsonObjectType group     = schema.addType("Group");
+		final JsonObjectType principal = schema.addType("Principal");
 
-	public static final org.structr.common.View publicView = new org.structr.common.View(Group.class, PropertyView.Public,
-		type, name, members, blocked, isGroup
-	);
+		group.setImplements(URI.create("https://structr.org/v1.1/definitions/Group"));
+		group.setExtends(URI.create("#/definitions/Principal"));
+		group.setCategory("core");
 
-	static {
-		SchemaService.registerBuiltinTypeOverride("Group", Group.class.getName());
-	}
+		group.addBooleanProperty("isGroup", PropertyView.Public, PropertyView.Ui).setReadOnly(true).addTransformer(ConstantBooleanTrue.class.getName());
+		group.addPropertyGetter("members", Iterable.class);
 
-	public void addMember(final Principal user) throws FrameworkException {
+		group.addMethod("addMember")
+				.setSource(Group.class.getName() + ".addMember(this, member);")
+				.addParameter("member", Principal.class.getName())
+				.addException(FrameworkException.class.getName())
+				.setDoExport(true);
 
-		List<Principal> _users = getProperty(members);
-		_users.add(user);
+		group.addMethod("removeMember")
+				.setSource(Group.class.getName() + ".removeMember(this, member);")
+				.addParameter("member", Principal.class.getName())
+				.addException(FrameworkException.class.getName())
+				.setDoExport(true);
 
-		setProperty(members, _users);
-	}
+		// create relationship
+		group.relate(principal, "CONTAINS", Relation.Cardinality.ManyToMany, "groups", "members");
 
-	public void removeMember(final Principal user) throws FrameworkException {
+		// view configuration
+		group.addViewProperty(PropertyView.Ui, "members");
+		group.addViewProperty(PropertyView.Ui, "customPermissionQueryRead");
+		group.addViewProperty(PropertyView.Ui, "customPermissionQueryWrite");
+		group.addViewProperty(PropertyView.Ui, "customPermissionQueryDelete");
+		group.addViewProperty(PropertyView.Ui, "customPermissionQueryAccessControl");
 
-		List<Principal> _users = getProperty(members);
-		_users.remove(user);
+		group.addViewProperty(PropertyView.Public, "members");
+		group.addViewProperty(PropertyView.Public, "blocked");
+		group.addViewProperty(PropertyView.Public, "name");
+	}}
 
-		setProperty(members, _users);
-	}
+	void addMember(final Principal member) throws FrameworkException;
+	void removeMember(final Principal member) throws FrameworkException;
+	Iterable<Principal> getMembers();
 
-	@Override
-	public List<Principal> getParents() {
 
-		final List<Principal> principals = new LinkedList<>();
-		for (final Groups groups : getIncomingRelationships(Groups.class)) {
+	public static void addMember(final Group group, final Principal user) throws FrameworkException {
 
-			principals.add(groups.getSourceNode());
-
+		if (user == null) {
+			throw new FrameworkException(422, "Unable to add user " + user + " to group " + group);
 		}
 
-		return principals;
+		final PropertyKey<Iterable<Principal>> key = StructrApp.key(group.getClass(), "members");
+		final List<Principal> _users               = Iterables.toList(group.getProperty(key));
+
+		_users.add(user);
+
+		group.setProperty(key, _users);
 	}
 
-	@Override
-	public boolean shouldSkipSecurityRelationships() {
-		return false;
-	}
+	public static void removeMember(final Group group, final Principal member) throws FrameworkException {
 
-	/*
-	public void addAllowedPermission(final Permission permission) {
-		SecurityDelegate.addPermission(this, Principal.allowed, permission);
-	}
+		if (member == null) {
+			throw new FrameworkException(422, "Unable to remove member " + member + " from group " + group);
+		}
 
-	public void removeAllowedPermission(final Permission permission) {
-		SecurityDelegate.removePermission(this, Principal.allowed, permission);
-	}
+		final PropertyKey<Iterable<Principal>> key = StructrApp.key(group.getClass(), "members");
+		final List<Principal> _users               = Iterables.toList(group.getProperty(key));
 
-	public void addDeniedPermission(final Permission permission) {
-		SecurityDelegate.addPermission(this, Principal.denied, permission);
-	}
+		_users.remove(member);
 
-	public void removeDeniedPermission(final Permission permission) {
-		SecurityDelegate.removePermission(this, Principal.denied, permission);
+		group.setProperty(key, _users);
 	}
-
-	@Override
-	public Set<String> getAllowedPermissions() {
-		return SecurityDelegate.getPermissionSet(dbNode, Principal.allowed);
-	}
-
-	@Override
-	public Set<String> getDeniedPermissions() {
-		return SecurityDelegate.getPermissionSet(dbNode, Principal.denied);
-	}
-	*/
 }

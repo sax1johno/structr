@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -46,15 +46,12 @@ import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.graph.NodeAttribute;
 import org.structr.core.graph.Tx;
-import org.structr.dynamic.File;
 import org.structr.files.ssh.filesystem.StructrFileAttributes;
-import org.structr.files.ssh.filesystem.StructrFileChannel;
 import org.structr.files.ssh.filesystem.StructrFilesystem;
 import org.structr.files.ssh.filesystem.StructrPath;
 import org.structr.web.common.FileHelper;
 import org.structr.web.entity.AbstractFile;
-import static org.structr.web.entity.AbstractFile.path;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Folder;
 
 /**
@@ -63,8 +60,6 @@ import org.structr.web.entity.Folder;
 public class StructrFilePath extends StructrPath {
 
 	private static final Logger logger = LoggerFactory.getLogger(StructrFilePath.class.getName());
-
-	private AbstractFile cachedActualFile = null;
 
 	public StructrFilePath(final StructrFilesystem fs, final StructrPath parent, final String name) {
 		super(fs, parent, name);
@@ -91,12 +86,12 @@ public class StructrFilePath extends StructrPath {
 						try (final Tx tx = app.tx()) {
 
 
-							for (final Folder folder : folder.getProperty(Folder.folders)) {
+							for (final Folder folder : folder.getFolders()) {
 
 								files.add(new StructrFilePath(fs, StructrFilePath.this, folder.getName()));
 							}
 
-							for (final FileBase file : folder.getProperty(Folder.files)) {
+							for (final File file : folder.getFiles()) {
 
 								files.add(new StructrFilePath(fs, StructrFilePath.this, file.getName()));
 							}
@@ -163,39 +158,40 @@ public class StructrFilePath extends StructrPath {
 					}
 				}
 
-				if (actualFile != null && actualFile instanceof FileBase) {
+				if (actualFile != null && actualFile instanceof File) {
 
-					final FileBase file = (FileBase)actualFile;
+					final File file = (File)actualFile;
 
-					channel = new StructrFileChannel(file.getOutputStream(true, !truncate || append));
+					//channel = new StructrFileChannel(file.getOutputStream(true, !truncate || append));
+					channel = file.getOutputStream(true, !truncate || append).getChannel();
 				}
 
 				tx.success();
 
 			} catch (FrameworkException fex) {
 
-				logger.warn("Unable to open file channel for writing of {}: {}", new Object[] { path, fex.getMessage() });
+				logger.warn("Unable to open file channel for writing of {}: {}", new Object[] { actualFile.getPath(), fex.getMessage() });
 			}
 
 		} else {
 
-			if (actualFile != null && actualFile instanceof FileBase) {
+			if (actualFile != null && actualFile instanceof File) {
 
 				try (final Tx tx = StructrApp.getInstance(fs.getSecurityContext()).tx()) {
 
-					channel = FileChannel.open(((FileBase)actualFile).getFileOnDisk().toPath(), options);
+					channel = FileChannel.open(((File)actualFile).getFileOnDisk().toPath(), options);
 
 					tx.success();
 
 				} catch (FrameworkException fex) {
 
-					logger.warn("Unable to open file channel for reading of {}: {}", new Object[] { path, fex.getMessage() });
+					logger.warn("Unable to open file channel for reading of {}: {}", new Object[] { actualFile.getPath(), fex.getMessage() });
 
 				}
 
 			} else {
 
-				throw new FileNotFoundException("File " + path.toString() + " does not exist.");
+				throw new FileNotFoundException("File " + actualFile.getPath() + " does not exist.");
 			}
 		}
 
@@ -218,35 +214,33 @@ public class StructrFilePath extends StructrPath {
 
 		} catch (FrameworkException fex) {
 
-			logger.warn("Unable to delete file {}: {}", new Object[] { path, fex.getMessage() } );
+			logger.warn("Unable to delete file {}: {}", new Object[] { getActualFile().getPath(), fex.getMessage() } );
 		}
 	}
 
 	@Override
 	public void delete() throws IOException {
 
-		final App app                 = StructrApp.getInstance(fs.getSecurityContext());
-		final AbstractFile actualFile = getActualFile();
+		final App app = StructrApp.getInstance(fs.getSecurityContext());
 
 		try (final Tx tx = app.tx()) {
 
-			// if a folder is to be deleted, check contents
-			if (!actualFile.getProperty(AbstractFile.children).isEmpty()) {
+			final AbstractFile actualFile = getActualFile();
 
-				throw new DirectoryNotEmptyException(path.toString());
+			// if a folder is to be deleted, check contents
+			if (actualFile instanceof Folder && ((Folder)actualFile).getChildren().iterator().hasNext()) {
+
+				throw new DirectoryNotEmptyException(getActualFile().getPath());
 
 			} else {
 
 				app.delete(actualFile);
-
-				// remove cached version
-				this.cachedActualFile = null;
 			}
 
 			tx.success();
 
 		} catch (FrameworkException fex) {
-			logger.warn("Unable to delete file {}: {}", new Object[] { path, fex.getMessage() } );
+			logger.warn("Unable to delete file {}: {}", new Object[] { getActualFile().getPath(), fex.getMessage() } );
 		}
 	}
 
@@ -307,7 +301,7 @@ public class StructrFilePath extends StructrPath {
 				if (otherParent instanceof StructrFilesPath) {
 
 					// rename & move (parent is null: root path)
-					thisFile.setProperty(AbstractFile.parent, null);
+					thisFile.setParent(null);
 					thisFile.setProperty(AbstractNode.name, targetName);
 
 					// this is a move operation, delete existing file
@@ -321,7 +315,7 @@ public class StructrFilePath extends StructrPath {
 					final Folder newParentFolder  = (Folder)parent.getActualFile();
 
 					// rename & move
-					thisFile.setProperty(AbstractFile.parent, newParentFolder);
+					thisFile.setParent(newParentFolder);
 					thisFile.setProperty(AbstractNode.name, targetName);
 
 					// this is a move operation, delete existing file
@@ -352,38 +346,33 @@ public class StructrFilePath extends StructrPath {
 
 	public AbstractFile getActualFile() {
 
-		if (cachedActualFile == null) {
+		final String filePath = toString().substring(StructrPath.FILES_DIRECTORY.length() + 1);
+		final App app         = StructrApp.getInstance(fs.getSecurityContext());
 
-			final String filePath = toString().substring(StructrPath.FILES_DIRECTORY.length() + 1);
-			final App app         = StructrApp.getInstance(fs.getSecurityContext());
+		try (final Tx tx = app.tx()) {
 
-			try (final Tx tx = app.tx()) {
+			// remove /files from path since it is a virtual directory
+			final AbstractFile actualFile = app.nodeQuery(AbstractFile.class).and(StructrApp.key(AbstractFile.class, "path"), filePath).sort(AbstractNode.name).getFirst();
 
-				// remove /files from path since it is a virtual directory
-				cachedActualFile = app.nodeQuery(AbstractFile.class).and(AbstractFile.path, filePath).getFirst();
+			tx.success();
 
-				tx.success();
+			return actualFile;
 
-			} catch (FrameworkException fex) {
+		} catch (FrameworkException fex) {
 
-				logger.warn("Unable to load actual file for path {}: {}", new Object[] { toString(), fex.getMessage() } );
-			}
+			logger.warn("Unable to load actual file for path {}: {}", new Object[] { toString(), fex.getMessage() } );
 		}
 
-		return cachedActualFile;
+		return null;
 	}
 
-	public FileBase createNewFile() throws FrameworkException, IOException {
+	public File createNewFile() throws FrameworkException, IOException {
 
 		final String name        = getFileName().toString();
 		final byte[] data        = new byte[0];
 		final String contentType = null;
-		final FileBase file      = FileHelper.createFile(fs.getSecurityContext(), data, contentType, File.class, name);
 
-		// cache newly created file
-		this.cachedActualFile = file;
-
-		return file;
+		return FileHelper.createFile(fs.getSecurityContext(), data, contentType, File.class, name, false);
 	}
 
 	@Override
@@ -401,7 +390,7 @@ public class StructrFilePath extends StructrPath {
 			final Folder parentFolder = (Folder)parentFilePath.getActualFile();
 			if (parentFolder != null) {
 
-				file.setProperty(AbstractFile.parent, parentFolder);
+				file.setParent(parentFolder);
 			}
 		}
 	}

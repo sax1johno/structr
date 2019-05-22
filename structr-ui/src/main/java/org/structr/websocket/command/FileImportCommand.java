@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,7 +20,6 @@ package org.structr.websocket.command;
 
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.error.FrameworkException;
@@ -55,10 +54,10 @@ public class FileImportCommand extends AbstractCommand {
 	@Override
 	public void processMessage(WebSocketMessage webSocketData) throws FrameworkException {
 
-//		final SecurityContext securityContext = getWebSocket().getSecurityContext();
-		final Map<String, Object> properties  = webSocketData.getNodeData();
-		final String mode                     = (String) properties.get("mode");		// default: list    start | pause | resume | cancel | abort
-		final Long jobId                      = (Long) properties.get("jobId");
+		setDoTransactionNotifications(true);
+
+		final String mode                     = webSocketData.getNodeDataStringValue("mode");		// default: list    start | pause | resume | cancel | abort
+		final Long jobId                      = webSocketData.getNodeDataLongValue("jobId");
 
 		final JobQueueManager mgr = JobQueueManager.getInstance();
 

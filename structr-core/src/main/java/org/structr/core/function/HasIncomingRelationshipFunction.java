@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,30 +18,30 @@
  */
 package org.structr.core.function;
 
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.AbstractRelationship;
 import org.structr.core.graph.NodeInterface;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class HasIncomingRelationshipFunction extends Function<Object, Object> {
+public class HasIncomingRelationshipFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_HAS_INCOMING_RELATIONSHIP    = "Usage: ${has_incoming_relationship(from, to [, relType])}. Example: ${has_incoming_relationship(me, user, 'FOLLOWS')}";
 	public static final String ERROR_MESSAGE_HAS_INCOMING_RELATIONSHIP_JS = "Usage: ${{Structr.has_incoming_relationship(from, to [, relType])}}. Example: ${{Structr.has_incoming_relationship(Structr.get('me'), user, 'FOLLOWS')}}";
 
 	@Override
 	public String getName() {
-		return "has_incoming_relationship()";
+		return "has_incoming_relationship";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
-		if (arrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 2, 3)) {
+		try {
+
+			assertArrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 2, 3);
 
 			final Object source = sources[0];
 			final Object target = sources[1];
@@ -58,7 +58,6 @@ public class HasIncomingRelationshipFunction extends Function<Object, Object> {
 
 				logger.warn("Error: entities are not nodes. Parameters: {}", getParametersAsString(sources));
 				return "Error: entities are not nodes.";
-
 			}
 
 			if (sources.length == 2) {
@@ -92,18 +91,20 @@ public class HasIncomingRelationshipFunction extends Function<Object, Object> {
 						return true;
 					}
 				}
-
 			}
 
-		} else {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
+			return usage(ctx.isJavaScriptContext());
 		}
 
 		return false;
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {
@@ -114,5 +115,4 @@ public class HasIncomingRelationshipFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Returns true if the given entity has incoming relationships of the given type";
 	}
-
 }

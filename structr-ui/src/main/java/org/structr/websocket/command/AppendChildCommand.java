@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,8 +18,8 @@
  */
 package org.structr.websocket.command;
 
-import java.util.Map;
 import org.structr.core.entity.AbstractNode;
+import org.structr.core.graph.TransactionCommand;
 import org.structr.web.entity.dom.DOMNode;
 import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.message.MessageBuilder;
@@ -39,9 +39,10 @@ public class AppendChildCommand extends AbstractCommand {
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
+		setDoTransactionNotifications(true);
+
 		String id                    = webSocketData.getId();
-		Map<String, Object> nodeData = webSocketData.getNodeData();
-		String parentId              = (String) nodeData.get("parentId");
+		String parentId              = webSocketData.getNodeDataStringValue("parentId");
 
 		// check node to append
 		if (id == null) {
@@ -92,6 +93,8 @@ public class AppendChildCommand extends AbstractCommand {
 				parentDOMNode.appendChild(node);
 			}
 
+			TransactionCommand.registerNodeCallback(node, callback);
+			
 		} else {
 
 			// send exception

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,18 +18,17 @@
  */
 package org.structr.core.graph;
 
-
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.structr.bolt.wrapper.NodeWrapper;
-import org.structr.bolt.wrapper.RelationshipWrapper;
+import org.structr.api.DatabaseService;
 import org.structr.common.AccessPathCache;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.app.App;
+import org.structr.core.Services;
 import org.structr.core.app.StructrApp;
-
-//~--- classes ----------------------------------------------------------------
+import org.structr.core.entity.ResourceAccess;
+import org.structr.core.function.LocalizeFunction;
+import org.structr.schema.action.Actions;
 
 public class FlushCachesCommand extends NodeServiceCommand implements MaintenanceCommand {
 
@@ -46,14 +45,20 @@ public class FlushCachesCommand extends NodeServiceCommand implements Maintenanc
 	}
 
 	public static void flushAll() {
-		NodeWrapper.clearCache();
-		RelationshipWrapper.clearCache();
+
+		final NodeService nodeService = Services.getInstance().getService(NodeService.class);
+		if (nodeService != null) {
+
+			final DatabaseService db = nodeService.getDatabaseService();
+			db.clearCaches();
+		}
+
+		ResourceAccess.clearCache();
+		Actions.clearCache();
 		AccessPathCache.invalidate();
+		LocalizeFunction.invalidateCache();
 
-		App app = StructrApp.getInstance();
-
-		app.invalidateCache();
-		app.getDatabaseService().invalidateQueryCache();
+		StructrApp.getInstance().invalidateCache();
 	}
 
 	@Override

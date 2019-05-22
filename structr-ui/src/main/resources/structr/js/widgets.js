@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -17,160 +17,291 @@
  * along with Structr.  If not, see <http://www.gnu.org/licenses/>.
  */
 var _Widgets = {
-	url: 'https://widgets.structr.org/structr/rest/widgets',
+	defaultWidgetServerUrl: 'https://widgets.structr.org/structr/rest/widgets',
+	widgetServerKey: 'structrWidgetServerKey_' + port,
+	applicationConfigurationDataNodeKey: 'remote_widget_server',
+
 	remoteWidgetData: [],
+	remoteWidgetFilterEl: undefined,
 	remoteWidgetFilter: undefined,
 	remoteWidgetsEl: undefined,
 	localWidgetsEl: undefined,
+	widgetServerSelector: undefined,
+
+	localWidgetsCollapsedKey: 'structrWidgetLocalCollapsedKey_' + port,
+	remoteWidgetsCollapsedKey: 'structrWidgetRemoteCollapsedKey_' + port,
 
 	reloadWidgets: function() {
+
 		widgetsSlideout.find(':not(.compTab)').remove();
-		widgetsSlideout.append(
-			'<div class="ver-scrollable"><h2>Local Widgets</h2><button class="add_widgets_icon button"><i title="Add Widget" class="' + _Icons.getFullSpriteClass(_Icons.add_widget_icon) + '" /> Add Widget</button>' +
-			'<div id="widgets"></div><h2>Remote Widgets</h2><input placeholder="Filter..." id="remoteWidgetsFilter"><div id="remoteWidgets"></div></div>');
-		_Widgets.localWidgetsEl = $('#widgets', widgetsSlideout);
 
-		$('.add_widgets_icon', widgetsSlideout).on('click', function(e) {
-			e.stopPropagation();
-			Command.create({type: 'Widget'});
-		});
+		let templateConfig = {
+			localCollapsed: LSWrapper.getItem(_Widgets.localWidgetsCollapsedKey, false),
+			remoteCollapsed: LSWrapper.getItem(_Widgets.remoteWidgetsCollapsedKey, false)
+		};
 
-		_Widgets.localWidgetsEl.droppable({
-			drop: function(e, ui) {
-				e.preventDefault();
+		Structr.fetchHtmlTemplate('widgets/slideout', templateConfig, function(html) {
+
+			widgetsSlideout.append(html);
+
+			widgetsSlideout[0].querySelectorAll('a.tab-group-toggle').forEach(function(toggleLink) {
+
+				toggleLink.addEventListener('click', function(event) {
+					let tabGroup = event.target.closest('.tab-group');
+					tabGroup.classList.toggle('collapsed');
+					LSWrapper.setItem(tabGroup.dataset.key, tabGroup.classList.contains('collapsed'));
+				});
+			});
+
+			_Widgets.localWidgetsEl = $('#widgets', widgetsSlideout);
+
+			$('.add_widgets_icon', widgetsSlideout).on('click', function(e) {
 				e.stopPropagation();
-				dropBlocked = true;
-				var sourceId = Structr.getId($(ui.draggable));
-				var sourceWidget = StructrModel.obj(sourceId);
+				Command.create({type: 'Widget'});
+			});
 
-				if (sourceWidget && sourceWidget.isWidget) {
-					if (sourceWidget.treePath) {
-						_Logger.log(_LogType.WIDGETS, 'Copying remote widget', sourceWidget);
+			_Widgets.localWidgetsEl.droppable({
+				drop: function(e, ui) {
+					e.preventDefault();
+					e.stopPropagation();
+					dropBlocked = true;
+					var sourceId = Structr.getId($(ui.draggable));
+					var sourceWidget = StructrModel.obj(sourceId);
 
-						Command.create({ type: 'Widget', name: sourceWidget.name + ' (copied)', source: sourceWidget.source, description: sourceWidget.description, configuration: sourceWidget.configuration }, function(entity) {
-							_Logger.log(_LogType.WIDGETS, 'Copied remote widget successfully', entity);
-							dropBlocked = false;
+					if (sourceWidget && sourceWidget.isWidget) {
+						if (sourceWidget.treePath) {
+							_Logger.log(_LogType.WIDGETS, 'Copying remote widget', sourceWidget);
+
+							Command.create({ type: 'Widget', name: sourceWidget.name + ' (copied)', source: sourceWidget.source, description: sourceWidget.description, configuration: sourceWidget.configuration }, function(entity) {
+								_Logger.log(_LogType.WIDGETS, 'Copied remote widget successfully', entity);
+								dropBlocked = false;
+							});
+						}
+					} else {
+						$.ajax({
+							url: viewRootUrl + sourceId + '?edit=1',
+							contentType: 'text/html',
+							statusCode: {
+								200: function(data) {
+									Command.createLocalWidget(sourceId, 'New Widget (' + sourceId + ')', data, function(entity) {
+										_Logger.log(_LogType.WIDGETS, 'Created widget successfully', entity);
+										dropBlocked = false;
+									});
+								}
+							}
 						});
 					}
-				} else {
-					$.ajax({
-						url: viewRootUrl + sourceId + '?edit=1',
-						contentType: 'text/html',
-						statusCode: {
-							200: function(data) {
-								Command.createLocalWidget(sourceId, 'New Widget (' + sourceId + ')', data, function(entity) {
-									_Logger.log(_LogType.WIDGETS, 'Created widget successfully', entity);
-									dropBlocked = false;
-								});
-							}
-						}
-					});
 				}
-			}
-		});
+			});
 
-		_Pager.initPager('local-widgets', 'Widget', 1, 25);
-		var _wPager = _Pager.addPager('local-widgets', _Widgets.localWidgetsEl, true, 'Widget', 'public', function(entities) {
-			entities.forEach(function (entity) {
-				StructrModel.create(entity, null, false);
-				_Widgets.appendWidgetElement(entity, false, _Widgets.localWidgetsEl);
+			_Pager.initPager('local-widgets', 'Widget', 1, 25);
+			var _wPager = _Pager.addPager('local-widgets', _Widgets.localWidgetsEl, true, 'Widget', 'public', function(entities) {
+				entities.forEach(function (entity) {
+					StructrModel.create(entity, null, false);
+					_Widgets.appendWidgetElement(entity, false, _Widgets.localWidgetsEl);
+				});
+			});
+
+			_wPager.pager.append('Filter: <input type="text" class="filter" data-attribute="name" />');
+			_wPager.activateFilterElements();
+
+			_Widgets.remoteWidgetsEl = $('#remoteWidgets', widgetsSlideout);
+
+			_Widgets.remoteWidgetFilterEl = $('#remoteWidgetsFilter');
+			_Widgets.remoteWidgetFilterEl.val(_Widgets.remoteWidgetFilter);
+			_Widgets.remoteWidgetFilterEl.keyup(function (e) {
+				if (e.keyCode === 27) {
+					$(this).val('');
+				}
+
+				_Widgets.repaintRemoteWidgets($(this).val());
+			});
+
+			document.querySelector('button#edit-widget-servers').addEventListener('click', _Widgets.showWidgetServersDialog);
+
+			_Widgets.updateWidgetServerSelector(function() {
+				_Widgets.refreshRemoteWidgets();
 			});
 		});
+	},
+	getWidgetServerUrl: function() {
+		return _Widgets.widgetServerSelector.value;
+	},
+	getConfiguredWidgetServers: function (callback) {
 
-		_wPager.pager.append('Filter: <input type="text" class="filter" data-attribute="name" />');
-		_wPager.activateFilterElements();
+		Command.getApplicationConfigurationDataNodes(_Widgets.applicationConfigurationDataNodeKey, null, function(acdns) {
 
-		_Widgets.remoteWidgetsEl = $('#remoteWidgets', widgetsSlideout);
+			acdns.push({id: '', name: 'default', content: _Widgets.defaultWidgetServerUrl, editable: false});
 
-		$('#remoteWidgetsFilter').keyup(function (e) {
-			if (e.keyCode === 27) {
-				$(this).val('');
-			}
-
-			_Widgets.repaintRemoteWidgets($(this).val());
+			callback(acdns);
 		});
-
-		_Widgets.refreshRemoteWidgets();
 
 	},
+	showWidgetServersDialog: function() {
+
+		Structr.fetchHtmlTemplate('widgets/servers-dialog', {}, function(html) {
+
+			Structr.dialog('Widget Servers');
+			dialogText.html(html);
+
+			Structr.activateCommentsInElement(dialogText, {helpElementCss: { 'font-size': '13px'}});
+
+			_Widgets.updateWidgetServersTable();
+
+			dialogText[0].querySelector('button#save-widget-server').addEventListener('click', function () {
+				let name = document.querySelector("#new-widget-server-name").value;
+				let url = document.querySelector("#new-widget-server-url").value;
+
+				Command.createApplicationConfigurationDataNode(_Widgets.applicationConfigurationDataNodeKey, name, url, function(e) {
+					_Widgets.updateWidgetServersTable();
+					_Widgets.updateWidgetServerSelector();
+				});
+			});
+		});
+
+	},
+	updateWidgetServersTable: function() {
+
+		_Widgets.getConfiguredWidgetServers(function(serverConfigs) {
+
+			Structr.fetchHtmlTemplate('widgets/servers-table', {servers: serverConfigs}, function(html) {
+
+				let tableContainer = dialogText[0].querySelector('#widget-servers-table-container');
+
+				tableContainer.innerHTML = html;
+
+				tableContainer.querySelectorAll('button.delete').forEach(function(deleteButton) {
+					deleteButton.addEventListener('click', function(e) {
+						let el = e.target;
+						let tr = el.closest('tr');
+						let acdnID = tr.dataset.acdnId;
+
+						Structr.confirmation('Really delete Widget Server URL?', function() {
+							Command.deleteNode(acdnID, false, function() {
+								tr.remove();
+
+								let currentServer = LSWrapper.getItem(_Widgets.widgetServerKey);
+								let needsRefresh = (_Widgets.widgetServerSelector.value === currentServer);
+								if (needsRefresh) {
+									LSWrapper.removeItem(_Widgets.widgetServerKey);
+								}
+
+								_Widgets.updateWidgetServerSelector(function() {
+									if (needsRefresh) {
+										_Widgets.refreshRemoteWidgets();
+									}
+								});
+
+								$.unblockUI({
+									fadeOut: 25
+								});
+
+								_Widgets.showWidgetServersDialog();
+							});
+						});
+					});
+				});
+
+				tableContainer.querySelectorAll('table input').forEach(function(input) {
+					input.addEventListener('change', function(e) {
+						let el = e.target;
+						let acdnID = el.closest('tr').dataset.acdnId;
+						let key = el.dataset.key;
+						console.log(acdnID, key, el.value);
+
+						Command.setProperty(acdnID, key, el.value, false, function(e) {
+
+							blinkGreen($(el));
+
+							_Widgets.updateWidgetServerSelector();
+						});
+					});
+				});
+			});
+		});
+	},
+	updateWidgetServerSelector: function(callback) {
+
+		_Widgets.getConfiguredWidgetServers(function(serverConfigs) {
+
+			let templateConfig = {
+				servers: serverConfigs,
+				selectedServerURL: LSWrapper.getItem(_Widgets.widgetServerKey, _Widgets.defaultWidgetServerUrl)
+			};
+
+			Structr.fetchHtmlTemplate('widgets/servers-selector', templateConfig, function(html) {
+
+				let selectorContainer = document.querySelector('#widget-server-selector-container');
+
+				selectorContainer.innerHTML = html;
+
+				_Widgets.widgetServerSelector = document.querySelector('#widget-server-selector');
+				_Widgets.widgetServerSelector.addEventListener('change', _Widgets.refreshRemoteWidgets);
+
+				if (typeof callback === 'function') {
+					callback();
+				}
+			});
+		});
+	},
 	refreshRemoteWidgets: function() {
-		_Widgets.remoteWidgetFilter = undefined;
 
-		if (!_Widgets.url.startsWith(document.location.origin)) {
+		let url = _Widgets.getWidgetServerUrl();
 
-			_Widgets.getRemoteWidgets(_Widgets.url, function(entity) {
-				var obj = StructrModel.create(entity, null, false);
-				obj.srcUrl = _Widgets.url + '/' + entity.id;
-				_Widgets.remoteWidgetData.push(obj);
-			}, function () {
-				_Widgets.repaintRemoteWidgets('');
+		LSWrapper.setItem(_Widgets.widgetServerKey, url);
+
+		if (!url.startsWith(document.location.origin)) {
+
+			_Widgets.remoteWidgetsEl.empty();
+			_Widgets.remoteWidgetData = [];
+
+			fetch(url + '?sort=treePath').then(function(response) {
+
+				return response.json().then((json) => {
+					return json.result;
+				});
+
+			}).then(function(data) {
+
+				data.forEach(function(entity) {
+					var obj = StructrModel.create(entity, null, false);
+					obj.srcUrl = url + '/' + entity.id;
+					_Widgets.remoteWidgetData.push(obj);
+				});
+
+				_Widgets.repaintRemoteWidgets(_Widgets.remoteWidgetFilter);
+
+			}).catch(function(e) {
+				new MessageBuilder().error().text('Could not fetch data from server. Make sure that the resource loads correctly and check CORS settings.<br>Also check your adblocker settings for possible conflicts.').requiresConfirmation().show();
 			});
 
+		} else {
+			new MessageBuilder().warning().text('Can not display local widgets as remote widgets. Please select another widget server!').show();
 		}
 	},
 	repaintRemoteWidgets: function (search) {
-		if (search !== _Widgets.remoteWidgetFilter) {
 
-			_Widgets.remoteWidgetFilter = search;
-			_Widgets.remoteWidgetsEl.empty();
+		_Widgets.remoteWidgetFilter = search;
+		_Widgets.remoteWidgetsEl.empty();
 
-			if (search && search.length > 0) {
+		if (search && search.length > 0) {
 
-				search = search.toLowerCase();
+			search = search.toLowerCase();
 
-				_Widgets.remoteWidgetData.forEach(function (obj) {
-					if (obj.name.toLowerCase().indexOf(search) !== -1) {
-						_Widgets.appendWidgetElement(obj, true, _Widgets.remoteWidgetsEl);
-					}
-				});
-
-			} else {
-
-				_Widgets.remoteWidgetData.forEach(function (obj) {
+			_Widgets.remoteWidgetData.forEach(function (obj) {
+				if (obj.name.toLowerCase().indexOf(search) !== -1) {
 					_Widgets.appendWidgetElement(obj, true, _Widgets.remoteWidgetsEl);
-				});
-
-			}
-
-		}
-	},
-	getRemoteWidgets: function(baseUrl, callback, finishCallback) {
-		$.ajax({
-			url: baseUrl + '?sort=treePath',
-			type: 'GET',
-			dataType: 'json',
-			contentType: 'application/json; charset=utf-8',
-			statusCode: {
-				200: function(data) {
-					if (callback) {
-						$.each(data.result, function(i, entity) {
-							callback(entity);
-						});
-						if (finishCallback) {
-							finishCallback();
-						}
-					}
-				},
-				400: function(data, status, xhr) {
-					console.log(data, status, xhr);
-				},
-				401: function(data, status, xhr) {
-					console.log(data, status, xhr);
-				},
-				403: function(data, status, xhr) {
-					console.log(data, status, xhr);
-				},
-				404: function(data, status, xhr) {
-					console.log(data, status, xhr);
-				},
-				422: function(data, status, xhr) {
-					console.log(data, status, xhr);
-				},
-				500: function(data, status, xhr) {
-					console.log(data, status, xhr);
 				}
-			}
-		});
+			});
+
+		} else {
+
+			_Widgets.remoteWidgetData.forEach(function (obj) {
+				_Widgets.appendWidgetElement(obj, true, _Widgets.remoteWidgetsEl);
+			});
+		}
+
+		_Pages.resize();
 	},
 	getTreeParent: function(element, treePath, suffix) {
 
@@ -191,7 +322,7 @@ var _Widgets = {
 					var idString = lowerPart + suffix;
 					var newParent = $('#' + idString);
 
-					if (newParent.size() === 0) {
+					if (newParent.length === 0) {
 						_Widgets.appendFolderElement(parent, idString, _Icons.folder_icon, part);
 						newParent = $('#' + idString);
 					}
@@ -205,7 +336,7 @@ var _Widgets = {
 			var idString = 'other' + suffix;
 			var newParent = $('#' + idString);
 
-			if (newParent.size() === 0) {
+			if (newParent.length === 0) {
 				_Widgets.appendFolderElement(parent, idString, _Icons.folder_icon, 'Uncategorized');
 				newParent = $('#' + idString);
 			}
@@ -220,8 +351,7 @@ var _Widgets = {
 		var expanded = Structr.isExpanded(id);
 
 		parent.append('<div id="' + id + '_folder" class="widget node">'
-			+ '<i class="typeIcon ' + _Icons.getFullSpriteClass(icon) + '" />'
-			+ '<b title="' + name + '" class="name">' + fitStringToWidth(name, 200) + '</b>'
+			+ '<i class="typeIcon ' + _Icons.getFullSpriteClass(icon) + '" /><b title="' + name + '" class="name">' + fitStringToWidth(name, 200) + '</b>'
 			+ '<div id="' + id + '" class="node' + (expanded ? ' hidden' : '') + '"></div>'
 			+ '</div>');
 
@@ -236,27 +366,14 @@ var _Widgets = {
 		var icon = _Icons.widget_icon;
 		var parent = _Widgets.getTreeParent(el ? el : (remote ? _Widgets.remoteWidgetsEl : _Widgets.localWidgetsEl), widget.treePath, remote ? '_remote' : '_local');
 		var div = Structr.node(widget.id);
-		if (div && div.length) {
 
-			var formerParent = div.parent();
-
-			if (!Structr.containsNodes(formerParent)) {
-				_Entities.removeExpandIcon(formerParent);
-				Structr.enableButton($('.delete_icon', formerParent)[0]);
-			}
-
-		} else {
+		if (!div) {
 
 			parent.append('<div id="id_' + widget.id + '" class="node widget">'
 				+ '<i class="typeIcon ' + _Icons.getFullSpriteClass(icon) + '" />'
 				+ '<b title="' + widget.name + '" class="name_">' + fitStringToWidth(widget.name, 200) + '</b> <span class="id">' + widget.id + '</span>'
 				+ '</div>');
 			div = Structr.node(widget.id);
-
-		}
-
-		if (!div) {
-			return;
 		}
 
 		div.draggable({
@@ -298,15 +415,12 @@ var _Widgets = {
 				Command.get(widget.id, 'id,name,source,configuration,description', function(entity) {
 					_Widgets.editWidget(entity, true);
 				});
-
 			});
 
 			_Entities.appendEditPropertiesIcon(div, widget);
-
 		}
 
 		return div;
-
 	},
 	editWidget: function(entity, allowEdit) {
 
@@ -400,7 +514,6 @@ var _Widgets = {
 					activateTab('config');
 					alert('Configuration is not valid JSON - please review, otherwise the widget configuration dialog will not function correctly');
 				}
-
 			};
 
 			saveAndClose.on('click', function() {
@@ -410,11 +523,9 @@ var _Widgets = {
 			dialogSaveButton.on('click', function() {
 				saveWidgetFunction(false);
 			});
-
 		}
 
 		activateTab('source');
-
 	},
 	appendWidgetPropertyEditor: function (container, value, mode, allowEdit) {
 
@@ -427,86 +538,16 @@ var _Widgets = {
 			indentWithTabs: true,
 			readOnly: !allowEdit
 		});
-
 	},
 	appendWidgetHelpText: function(container) {
 
-		var helpText = "\
-		<h2>Source</h2>\
-		<p>The source HTML code of the widget (enriched with structr expressions etc).</p>\
-		<p>The easiest way to get this source is to build the functionality in a Structr page and then \"exporting\" the source of the page. This can be done by using the \"edit=1\" URL parameter. This way the structr-internal expressions and configuration attributes are output without being evaluated.</p>\
-		<h4>Example</h4>\
-		<ol>\
-			<li>Create your widget in the page \"myWidgetPage\"</li>\
-			<li>Go to http://localhost:8082/myWidgetPage?edit=1</li>\
-			<li>View and copy the source code of that page</li>\
-			<li>Paste it into the \"Source\" tab of the \"Edit Widget\" dialog</li>\
-		</ol>\
-		<h2>Configuration</h2>\
-		<p>You can create advanced widgets and make them configurable by inserting template expressions in the widget source and adding the expression into the configuration.\
-		Template expressions look like this \"[configSwitch]\" and can contain any characters (except the closing bracket). If a corresponding entry is found in the configuration, a dialog is displayed when adding the widget to a page.</p>\
-		<p>Elements that look like template expressions are only treated as such if a corresponding entry is found in the configuration. This allows the use of square brackets in the widget source without it being interpreted as a template expression.</p>\
-		<p>The configuration must be a valid JSON string (and is validated as such when trying to save the widget).</p>\
-		<p>Have a look at the widget configuration of \"configurable\" widgets for more examples.</p>\
-		<h4>Basic example</h4>\
-		<pre>\n\
-		{\n\
-			\"configSwitch\": {\n\
-				\"position\": 2,\n\
-				\"default\": \"This is the default text\"\n\
-			},\n\
-			\"selectArray\": {\n\
-				\"position\": 3,\n\
-				\"type\": \"select\",\n\
-				\"options\": [\n\
-					\"choice_one\",\n\
-					\"choice_two\",\n\
-					\"choice_three\"\n\
-				],\n\
-				\"default\": \"choice_two\"\n\
-			},\n\
-			\"selectObject\": {\n\
-				\"position\": 1,\n\
-				\"type\": \"select\",\n\
-				\"options\": {\n\
-					\"choice_one\": \"First choice\",\n\
-					\"choice_two\": \"Second choice\",\n\
-					\"choice_three\": \"Third choice\"\n\
-				},\n\
-				\"default\": \"choice_two\"\n\
-			},\n\
-			\"processDeploymentInfo\": true,\n\
-		}</pre>\
-		<p>Reserved top-level words:</p>\
-		<ul>\
-			<li><b>processDeploymentInfo</b> (<i>boolean, default: false</i>)<br>Special configuration flag which allows the widgets to contain deployment annotations.</li>\
-		</ul>\
-		<p>The supported attributes of the configuration elements are the following:</p>\
-		<ul>\
-			<li><b>title</b><br>The title which is displayed in the left column of the \"Add Widget to Page\" dialog. If this value does not exist, the name of the template expression itself is used.</li>\
-			<li><b>placeholder</b> <i>(only applicable to type=input|textarea)</i><br>The placeholder text which is displayed when the field is empty. If this value does not exist, the <b>title</b> is used..</li>\
-			<li><b>default</b><br>The default value for the element. For type=textarea|input this value is the prefilled. For type=select this value is preselected.</li>\
-			<li><b>position</b> <br> The options will be sorted according to this numeric attribute. If omitted, the object will occur after the objects with a set position in the natural order of the keys.</li>\
-			<li><b>help</b> <i>(optional)</i><br> The help text which will be displayed while hovering over the information icon.</li>\
-			<li><b>type</b>\
-				<ul><li><b>input</b>: A standard input field (<i>default if omitted</i>)</li><li><b>textarea</b>: A textarea with a customizable number of rows (default: 5)</li><li><b>select</b>: A select element</li></ul>\
-			</li>\
-			<li><b>options</b> <i>(only applicable to type=select)</i><br>This field supports two different type of data: Array (of strings) and Object (value=&gt;Label).<br>\
-				If the data encountered is an Array, the elements are rendered as simple option elements. If it is an Object, the option elements will have the key of the object as their value and the value of the element will be displayed as the text.</li>\
-			<li><b>dynamicOptionsFunction</b> <i>(only applicable to type=select)</i><br>The body of a function which is used to populate the options array. The function receives a 'callback' parameter which has to be called with the resulting options.<br>\
-				The dynamic options can be in the same format as the options above. IMPORTANT: If this key is provided, the options key is ignored.</li>\\n\
-			<li><b>rows</b> <i>(only applicable to type=textarea)</i><br>The number of rows the textarea will have initially. If omitted, or not parseable as an integer, it will default to 5.</li>\
-		</ul>\
-		<h2>Description</h2>\
-		<p>The description will be displayed when the user adds the widget to a page. It can contain HTML and usually serves the purpose of explaining what the widget is used for and the function of the configuration switches.</p>";
-
-		container.append(helpText);
+		Structr.fetchHtmlTemplate('widgets/help', {}, function(html) {
+			container.append(html);
+		});
 	},
 	appendVisualExpandIcon: function(el, id, name, hasChildren, expand) {
 
 		if (hasChildren) {
-
-			_Logger.log(_LogType.WIDGETS, 'appendExpandIcon hasChildren?', hasChildren, 'expand?', expand);
 
 			var typeIcon = $(el.children('.typeIcon').first());
 			var icon = $(el).children('.node').hasClass('hidden') ? _Icons.collapsed_icon : _Icons.expanded_icon;
@@ -525,7 +566,6 @@ var _Widgets = {
 				if (collapsed) {
 					Structr.addExpandedNode(id);
 					expandIcon.removeClass(_Icons.getSpriteClassOnly(_Icons.expanded_icon)).addClass(_Icons.getSpriteClassOnly(_Icons.collapsed_icon));
-
 				} else {
 					Structr.removeExpandedNode(id);
 					expandIcon.removeClass(_Icons.getSpriteClassOnly(_Icons.collapsed_icon)).addClass(_Icons.getSpriteClassOnly(_Icons.expanded_icon));
@@ -540,21 +580,19 @@ var _Widgets = {
 
 				button.on('click', expandClickHandler);
 
-				// Prevent expand icon from being draggable
 				button.on('mousedown', function(e) {
 					e.stopPropagation();
 				});
 			}
-
 		} else {
 			el.children('.typeIcon').css({
 				paddingRight: '11px'
 			});
 		}
-
 	},
 	insertWidgetIntoPage: function(widget, target, pageId) {
 
+		let url = _Widgets.getWidgetServerUrl();
 		var widgetSource = widget.source;
 		var widgetDescription = widget.description;
 		var widgetConfig = widget.configuration;
@@ -598,7 +636,6 @@ var _Widgets = {
 						Object.keys(options).forEach(function (option) {
 							buffer += '<option' + ((option === defaultValue) ? ' selected' : '') + ' value="' + option + '">' + options[option] + '</option>';
 						});
-
 					}
 
 					return buffer;
@@ -640,7 +677,6 @@ var _Widgets = {
 							} else {
 
 								buffer += getOptionsAsText(options, defaultValue);
-
 							}
 
 							buffer += '</select></td></tr>';
@@ -667,7 +703,6 @@ var _Widgets = {
 							element: $('#label-' + cleanedLabel)
 						});
 					}
-
 				});
 
 				dialog.append('<button id="appendWidget">Append Widget</button>');
@@ -682,23 +717,18 @@ var _Widgets = {
 					});
 
 					e.stopPropagation();
-					Command.appendWidget(widgetSource, target.id, pageId, _Widgets.url, attrs, widgetConfig.processDeploymentInfo);
+					Command.appendWidget(widgetSource, target.id, pageId, url, attrs, widgetConfig.processDeploymentInfo);
 
 					dialogCancelButton.click();
 					return false;
 				});
 
 			} else {
-
-				// If no matches, directly append widget
-				Command.appendWidget(widgetSource, target.id, pageId, _Widgets.url, {}, (widgetConfig ? widgetConfig.processDeploymentInfo : false));
-
+				Command.appendWidget(widgetSource, target.id, pageId, url, {}, (widgetConfig ? widgetConfig.processDeploymentInfo : false));
 			}
-
 		} else {
 			new MessageBuilder().warning("Ignoring empty Widget").show();
 		}
-
 	},
 	sortWidgetConfigurationByPosition: function (config) {
 		var flattenedConfig = [];

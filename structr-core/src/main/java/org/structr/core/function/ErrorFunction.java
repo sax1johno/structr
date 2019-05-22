@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -24,78 +24,64 @@ import org.structr.core.GraphObject;
 import org.structr.core.app.StructrApp;
 import org.structr.core.property.PropertyKey;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class ErrorFunction extends Function<Object, Object> {
+public class ErrorFunction extends AdvancedScriptingFunction {
 
-	public static final String ERROR_MESSAGE_ERROR = "Usage: ${error(...)}. Example: ${error(\"base\", \"must_equal\", int(5))}";
+	public static final String ERROR_MESSAGE_ERROR = "Usage: ${error(property, token[, detail])}. Example: ${error(\"name\", \"already_taken\"[, \"Another node with that name already exists\"])}";
 
 	@Override
 	public String getName() {
-		return "error()";
+		return "error";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
-		Class entityType = null;
-		String type = null;
+		Class entityType = GraphObject.class;
+		String type      = "GraphObject";
 
 		if (caller != null && caller instanceof GraphObject) {
 
 			entityType = caller.getClass();
 			type = ((GraphObject) caller).getType();
 		}
-		
+
 		try {
-			
+
 			if (sources == null) {
 				throw new IllegalArgumentException();
 			}
 
 			switch (sources.length) {
 
-				case 1:
+				case 2: {
+					final PropertyKey key = StructrApp.getConfiguration().getPropertyKeyForJSONName(entityType, (String)sources[0]);
+					ctx.raiseError(422, new SemanticErrorToken(type, key, (String)sources[1]));
+
+					break;
+				}
+
+				case 3: {
+					final PropertyKey key = StructrApp.getConfiguration().getPropertyKeyForJSONName(entityType, (String)sources[0]);
+					ctx.raiseError(422, new SemanticErrorToken(type, key, (String)sources[1], sources[2]));
+
+					break;
+				}
+
+				default:
 					throw new IllegalArgumentException();
 
-				case 2:
-					{
-						arrayHasLengthAndAllElementsNotNull(sources, 2);
+			}
 
-						final PropertyKey key = StructrApp.getConfiguration().getPropertyKeyForJSONName(entityType, sources[0].toString());
-						ctx.raiseError(422, new SemanticErrorToken(type, key, sources[1].toString()));
-						break;
-					}
-				case 3:
-					{
-						arrayHasLengthAndAllElementsNotNull(sources, 3);
-
-						final PropertyKey key = StructrApp.getConfiguration().getPropertyKeyForJSONName(entityType, sources[0].toString());
-						ctx.raiseError(422, new SemanticErrorToken(type, key, sources[1].toString(), sources[2]));
-						break;
-					}
-				default:
-					logParameterError(caller, sources, ctx.isJavaScriptContext());
-					break;
-					
-				}
-			
 		} catch (final IllegalArgumentException e) {
-		
+
 			logParameterError(caller, sources, ctx.isJavaScriptContext());
 
 			return usage(ctx.isJavaScriptContext());
-			
 		}
-		
-		
 
 		return null;
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {

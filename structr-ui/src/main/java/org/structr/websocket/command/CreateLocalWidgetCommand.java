@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,7 +18,6 @@
  */
 package org.structr.websocket.command;
 
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.core.app.App;
@@ -39,7 +38,7 @@ import org.structr.websocket.message.WebSocketMessage;
 public class CreateLocalWidgetCommand extends AbstractCommand {
 
 	private static final Logger logger     = LoggerFactory.getLogger(CreateLocalWidgetCommand.class.getName());
-	
+
 	static {
 
 		StructrWebSocket.addCommand(CreateLocalWidgetCommand.class);
@@ -48,11 +47,12 @@ public class CreateLocalWidgetCommand extends AbstractCommand {
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
+		setDoTransactionNotifications(true);
+
 		final App app                      = StructrApp.getInstance(getWebSocket().getSecurityContext());
 		final String id	                   = webSocketData.getId();
-		final Map<String, Object> nodeData = webSocketData.getNodeData();
-		final String source                = (String) nodeData.get("source");
-		final String name                  = (String) nodeData.get("name");
+		final String source                = webSocketData.getNodeDataStringValue("source");
+		final String name                  = webSocketData.getNodeDataStringValue("name");
 
 		// check for ID
 		if (id == null) {
@@ -73,18 +73,18 @@ public class CreateLocalWidgetCommand extends AbstractCommand {
 			return;
 
 		}
-		
+
 		try {
-			
+
 			// convertFromInput
 			PropertyMap properties = new PropertyMap();
 
 			properties.put(AbstractNode.type, Widget.class.getSimpleName());
 			properties.put(AbstractNode.name, name);
-			properties.put(Widget.source, source);
+			properties.put(StructrApp.key(Widget.class, "source"), source);
 
 			final Widget widget = app.create(Widget.class, properties);
-			
+
 			TransactionCommand.registerNodeCallback(widget, callback);
 
 		} catch (Throwable t) {

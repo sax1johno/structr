@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -27,6 +27,7 @@ import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractRelationship;
 import org.structr.core.graph.NodeInterface;
+import org.structr.core.graph.TransactionCommand;
 import org.structr.core.property.PropertyMap;
 import org.structr.web.entity.dom.DOMNode;
 import org.structr.websocket.StructrWebSocket;
@@ -36,21 +37,20 @@ import org.w3c.dom.DOMException;
 
 /**
  *
- *
- *
  */
 public class RemoveCommand extends AbstractCommand {
+
+	private static final Logger logger = LoggerFactory.getLogger(RemoveCommand.class.getName());
 
 	static {
 
 		StructrWebSocket.addCommand(RemoveCommand.class);
-
 	}
-
-	private static final Logger logger = LoggerFactory.getLogger(RemoveCommand.class.getName());
 
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
+
+		setDoTransactionNotifications(true);
 
 		final SecurityContext securityContext = getWebSocket().getSecurityContext();
 		final String id = webSocketData.getId();
@@ -73,6 +73,8 @@ public class RemoveCommand extends AbstractCommand {
 						// remove pageId from node and all children ("move to trash")
 						recursivelyRemoveNodesFromPage(domNode, securityContext);
 
+						TransactionCommand.registerNodeCallback(node, callback);
+						
 					} catch (DOMException | FrameworkException ex) {
 
 						logger.error("Could not remove node from page " + domNode, ex);
@@ -97,6 +99,8 @@ public class RemoveCommand extends AbstractCommand {
 								app.delete(rel);
 							}
 						}
+						
+						TransactionCommand.registerNodeCallback(node, callback);
 
 					} catch (Throwable t) {
 
@@ -131,12 +135,14 @@ public class RemoveCommand extends AbstractCommand {
 
 		// Remove node from page
 		final PropertyMap changedProperties = new PropertyMap();
-		changedProperties.put(DOMNode.syncedNodes, Collections.EMPTY_LIST);
-		changedProperties.put(DOMNode.pageId, null);
+
+		changedProperties.put(StructrApp.key(DOMNode.class, "syncedNodes"), Collections.EMPTY_LIST);
+		changedProperties.put(StructrApp.key(DOMNode.class, "pageId"),      null);
+
 		parent.setProperties(securityContext, changedProperties);
 
 		// recurse
-		for (final DOMNode child : parent.getProperty(DOMNode.children)) {
+		for (final DOMNode child : parent.getChildren()) {
 
 			recursivelyRemoveNodesFromPage(child, securityContext);
 		}

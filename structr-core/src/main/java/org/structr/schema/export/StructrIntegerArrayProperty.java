@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,10 +20,13 @@ package org.structr.schema.export;
 
 import java.util.Map;
 import java.util.TreeMap;
+import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
 import org.structr.core.entity.AbstractSchemaNode;
+import org.structr.core.entity.SchemaNode;
 import org.structr.core.entity.SchemaProperty;
+import org.structr.core.property.PropertyMap;
 import org.structr.schema.SchemaHelper.Type;
 import org.structr.schema.json.JsonIntegerArrayProperty;
 import org.structr.schema.json.JsonSchema;
@@ -168,11 +171,11 @@ public class StructrIntegerArrayProperty extends StructrPropertyDefinition imple
 	}
 
 	@Override
-	void deserialize(final SchemaProperty property) {
+	void deserialize(final Map<String, SchemaNode> schemaNodes, final SchemaProperty property) {
 
-		super.deserialize(property);
+		super.deserialize(schemaNodes, property);
 
-		final IntegerArrayPropertyParser intPropertyParser = property.getIntArrayPropertyParser();
+		final IntegerArrayPropertyParser intPropertyParser = property.getIntArrayPropertyParser(schemaNodes);
 		if (intPropertyParser != null) {
 
 			this.exclusiveMinimum = intPropertyParser.isLowerExclusive();
@@ -194,8 +197,9 @@ public class StructrIntegerArrayProperty extends StructrPropertyDefinition imple
 	SchemaProperty createDatabaseSchema(final App app, final AbstractSchemaNode schemaNode) throws FrameworkException {
 
 		final SchemaProperty property = super.createDatabaseSchema(app, schemaNode);
+		final PropertyMap properties  = new PropertyMap();
 
-		property.setProperty(SchemaProperty.propertyType, Type.IntegerArray.name());
+		properties.put(SchemaProperty.propertyType, Type.IntegerArray.name());
 
 		if (minimum != null && maximum != null) {
 
@@ -217,8 +221,10 @@ public class StructrIntegerArrayProperty extends StructrPropertyDefinition imple
 				range.append("]");
 			}
 
-			property.setProperty(SchemaProperty.format, range.toString());
+			properties.put(SchemaProperty.format, range.toString());
 		}
+
+		property.setProperties(SecurityContext.getSuperUserInstance(), properties);
 
 		return property;
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -378,7 +378,7 @@ var _Graph = {
 		$(document).on('click', '#tooltipBtnDel', function() {
 			var self = $(this);
 			var id = self.attr("value");
-			Command.get(id, "id,type,name,sourceId,targetId", function (entity) {
+			Command.get(id, 'id,type,name,sourceId,targetId', function (entity) {
 				if (graphBrowser.getNode(entity.id)) {
 					_Entities.deleteNode(self, entity, false, function (entity) {
 						graphBrowser.dropNode(entity);
@@ -408,7 +408,7 @@ var _Graph = {
 					type: nodeType
 				}, function(obj) {
                                     if(obj != null) {
-					Command.get(obj.id, "id,type,name,color,tag", function(node) {
+					Command.get(obj.id, 'id,type,name,color,tag', function(node) {
 						_Graph.drawNode(node);
 					});
                                     }
@@ -617,9 +617,9 @@ var _Graph = {
 		var savedQueries = JSON.parse(LSWrapper.getItem(savedQueriesKey)) || [];
 		$.each(savedQueries, function(q, query) {
 			if (query.type === 'cypher') {
-				$('#saved-queries').append('<div class="saved-query cypher-query"><i class="replay ' + _Icons.getFullSpriteClass(_Icons.exec_cypher_icon) + '" />' + query.query + '<i class="remove-query ' + _Icons.getFullSpriteClass(_Icons.grey_cross_icon) + '" /></div>');
+				$('#saved-queries').append('<div class="saved-query cypher-query"><i class="replay ' + _Icons.getFullSpriteClass(_Icons.exec_icon) + '" />' + query.query + '<i class="remove-query ' + _Icons.getFullSpriteClass(_Icons.grey_cross_icon) + '" /></div>');
 			} else {
-				$('#saved-queries').append('<div class="saved-query rest-query"><i class="replay ' + _Icons.getFullSpriteClass(_Icons.exec_rest_icon) + '" />' + query.query + '<i class="remove-query ' + _Icons.getFullSpriteClass(_Icons.grey_cross_icon) + '" /></div>');
+				$('#saved-queries').append('<div class="saved-query rest-query"><i class="replay ' + _Icons.getFullSpriteClass(_Icons.exec_blue_icon) + '" />' + query.query + '<i class="remove-query ' + _Icons.getFullSpriteClass(_Icons.grey_cross_icon) + '" /></div>');
 			}
 		});
 
@@ -666,8 +666,10 @@ var _Graph = {
 		relIds = [];
 		hiddenNodeTypes = [];
 		hiddenRelTypes = [];
-		graphBrowser.kill();
-		graphBrowser = undefined;
+		if (graphBrowser) {
+			graphBrowser.kill();
+			graphBrowser = undefined;
+		}
 	},
 
 	drawNode: function(node, x, y) {

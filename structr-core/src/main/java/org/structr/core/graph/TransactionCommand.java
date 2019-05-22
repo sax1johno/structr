@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,7 +19,7 @@
 package org.structr.core.graph;
 
 
-import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
@@ -28,14 +28,18 @@ import org.slf4j.LoggerFactory;
 import org.structr.api.DatabaseService;
 import org.structr.api.NetworkException;
 import org.structr.api.NotInTransactionException;
+import org.structr.api.Predicate;
 import org.structr.api.graph.Node;
 import org.structr.api.graph.Relationship;
+import org.structr.common.SecurityContext;
 import org.structr.common.error.DatabaseServiceNetworkException;
 import org.structr.common.error.DatabaseServiceNotAvailableException;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
+import org.structr.core.GraphObject;
+import org.structr.core.Services;
 import org.structr.core.StructrTransactionListener;
-import org.structr.core.TransactionSource;
+import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.Principal;
 import org.structr.core.property.PropertyKey;
@@ -44,68 +48,85 @@ import org.structr.core.property.PropertyKey;
  * Graph service command for database operations that need to be wrapped in
  * a transaction.
  */
-public class TransactionCommand extends NodeServiceCommand implements AutoCloseable {
+public class TransactionCommand {
 
-	private static final Logger logger                                  = LoggerFactory.getLogger(TransactionCommand.class.getName());
-	private static final Set<StructrTransactionListener> listeners      = new LinkedHashSet<>();
-	private static final ThreadLocal<ModificationQueue> queues          = new ThreadLocal<>();
-	private static final ThreadLocal<ErrorBuffer> buffers               = new ThreadLocal<>();
-	private static final ThreadLocal<TransactionCommand> currentCommand = new ThreadLocal<>();
-	private static final ThreadLocal<TransactionReference> transactions = new ThreadLocal<>();
-	private static final MultiSemaphore                    semaphore    = new MultiSemaphore();
+	private static final Logger logger                             = LoggerFactory.getLogger(TransactionCommand.class.getName());
+	private static final Set<StructrTransactionListener> listeners = new LinkedHashSet<>();
+	private static final ThreadLocal<TransactionCommand> commands  = new ThreadLocal<>();
+	private static final MultiSemaphore                  semaphore = new MultiSemaphore();
 
-	public TransactionCommand beginTx() throws FrameworkException {
+	private TransactionReference transaction = null;
+	private ModificationQueue queue          = null;
+	private ErrorBuffer errorBuffer          = null;
 
-		final DatabaseService graphDb = (DatabaseService)arguments.get("graphDb");
-		TransactionReference tx       = transactions.get();
+
+	private static TransactionCommand getInstance() {
+
+		TransactionCommand cmd = commands.get();
+		if (cmd == null) {
+
+			cmd = new TransactionCommand();
+		}
+
+		return cmd;
+	}
+
+	public static TransactionCommand beginTx(final SecurityContext securityContext) throws FrameworkException {
+
+		final TransactionCommand cmd  = TransactionCommand.getInstance();
+		final DatabaseService graphDb = Services.getInstance().getDatabaseService();
 
 		if (graphDb != null) {
 
-			if (tx == null) {
+			if (cmd.transaction == null) {
 
 				try {
 					// start new transaction
-					tx = new TransactionReference(graphDb.beginTx());
+					cmd.transaction = new TransactionReference(graphDb.beginTx());
 
 				} catch (NetworkException nex) {
 					throw new DatabaseServiceNetworkException(503, nex.getMessage());
 				}
 
-				queues.set(new ModificationQueue());
-				buffers.set(new ErrorBuffer());
-				transactions.set(tx);
-				currentCommand.set(this);
+				cmd.queue = new ModificationQueue();
+				cmd.errorBuffer = new ErrorBuffer();
+
+				commands.set(cmd);
 			}
 
 			// increase depth
-			tx.begin();
+			cmd.transaction.begin();
 
 		} else {
 
 			throw new DatabaseServiceNotAvailableException(503, "Database service is not available, ensure the database is running and that there is a working network connection to it");
 		}
 
-		return this;
+		return cmd;
 	}
 
-	public void commitTx(final boolean doValidation) throws FrameworkException {
+	public static void commitTx(final SecurityContext securityContext, final boolean doValidation) throws FrameworkException {
 
-		final TransactionReference tx = transactions.get();
-		if (tx != null && tx.isToplevel()) {
+		final TransactionCommand cmd  = TransactionCommand.getInstance();
 
-			final ModificationQueue modificationQueue = queues.get();
-			final ErrorBuffer errorBuffer             = buffers.get();
+		if (cmd.transaction != null && cmd.transaction.isToplevel()) {
+
+			final ModificationQueue modificationQueue = cmd.queue;
+			final ErrorBuffer errorBuffer             = cmd.errorBuffer;
 
 			// 0.5: let transaction listeners examine (and prevent?) commit
 			for (final StructrTransactionListener listener : listeners) {
-				listener.beforeCommit(securityContext, modificationQueue.getModificationEvents(), tx.getSource());
+				listener.beforeCommit(securityContext, modificationQueue.getModificationEvents());
 			}
 
 			// 1. do inner callbacks (may cause transaction to fail)
-			if (!modificationQueue.doInnerCallbacks(securityContext, errorBuffer)) {
+			if (securityContext == null || securityContext.doInnerCallbacks()) {
 
-				tx.failure();
-				throw new FrameworkException(422, "Unable to commit transaction, validation failed", errorBuffer);
+				if (!modificationQueue.doInnerCallbacks(securityContext, errorBuffer)) {
+
+					cmd.transaction.failure();
+					throw new FrameworkException(422, "Unable to commit transaction, validation failed", errorBuffer);
+				}
 			}
 
 			// 2. fetch all types of entities modified in this tx
@@ -117,9 +138,9 @@ public class TransactionCommand extends NodeServiceCommand implements AutoClosea
 			try { semaphore.acquire(synchronizationKeys); } catch (InterruptedException iex) { return; }
 
 			// do validation under the protection of the semaphores for each type
-			if (doValidation && !modificationQueue.doValidation(securityContext, errorBuffer, doValidation)) {
+			if (!modificationQueue.doValidation(securityContext, errorBuffer, doValidation)) {
 
-				tx.failure();
+				cmd.transaction.failure();
 
 				// create error
 				throw new FrameworkException(422, "Unable to commit transaction, validation failed", errorBuffer);
@@ -128,12 +149,12 @@ public class TransactionCommand extends NodeServiceCommand implements AutoClosea
 			// finally: execute validatable post-transaction action
 			if (!modificationQueue.doPostProcessing(securityContext, errorBuffer)) {
 
-				tx.failure();
+				cmd.transaction.failure();
 				throw new FrameworkException(422, "Unable to commit transaction, transaction post processing failed", errorBuffer);
 			}
 
 			try {
-				tx.success();
+				cmd.transaction.success();
 
 			} catch (Throwable t) {
 				logger.error("Unable to commit transaction", t);
@@ -141,27 +162,24 @@ public class TransactionCommand extends NodeServiceCommand implements AutoClosea
 		}
 	}
 
-	public ModificationQueue finishTx() {
+	public static ModificationQueue finishTx() {
 
-		final TransactionReference tx       = transactions.get();
+		final TransactionCommand cmd        = TransactionCommand.getInstance();
 		ModificationQueue modificationQueue = null;
 
-		if (tx != null) {
+		if (cmd.transaction != null) {
 
-			if (tx.isToplevel()) {
+			if (cmd.transaction.isToplevel()) {
 
-				modificationQueue = queues.get();
+				modificationQueue = cmd.queue;
 
 				final Set<String> synchronizationKeys = modificationQueue.getSynchronizationKeys();
 
 				// cleanup
-				queues.remove();
-				buffers.remove();
-				currentCommand.remove();
-				transactions.remove();
+				commands.remove();
 
 				try {
-					tx.close();
+					cmd.transaction.close();
 
 				} finally {
 
@@ -171,51 +189,37 @@ public class TransactionCommand extends NodeServiceCommand implements AutoClosea
 
 			} else {
 
-				tx.end();
+				cmd.transaction.end();
 			}
 		}
 
 		return modificationQueue;
 	}
 
-	@Override
-	public void close() throws FrameworkException {
-		finishTx();
-	}
+	public static void disableChangelog() {
 
-	public Collection<ModificationEvent> getModificationEvents() {
+		TransactionCommand command = commands.get();
+		if (command != null) {
 
-		ModificationQueue modificationQueue = queues.get();
-		if (modificationQueue != null) {
+			ModificationQueue modificationQueue = command.getModificationQueue();
+			if (modificationQueue != null) {
 
-			return modificationQueue.getModificationEvents();
+				modificationQueue.disableChangelog();
+
+			} else {
+
+				logger.error("Got empty changeSet from command!");
+			}
+
+		} else {
+
+			throw new NotInTransactionException("Not in transaction.");
 		}
-
-		return null;
-	}
-
-	public void setSource(final TransactionSource source) {
-
-		TransactionReference tx = transactions.get();
-		if (tx != null) {
-			tx.setSource(source);
-		}
-	}
-
-	public TransactionSource getSource() {
-
-		TransactionReference tx = transactions.get();
-		if (tx != null) {
-
-			return tx.getSource();
-		}
-
-		return null;
 	}
 
 	public static void postProcess(final String key, final TransactionPostProcess process) {
 
-		TransactionCommand command = currentCommand.get();
+		TransactionCommand command = commands.get();
 		if (command != null) {
 
 			ModificationQueue modificationQueue = command.getModificationQueue();
@@ -230,15 +234,17 @@ public class TransactionCommand extends NodeServiceCommand implements AutoClosea
 
 		} else {
 
-			logger.error("Trying to register transaction post processing while outside of transaction!");
+			throw new NotInTransactionException("Not in transaction.");
 		}
 
 	}
 
 	public static void nodeCreated(final Principal user, final NodeInterface node) {
 
-		TransactionCommand command = currentCommand.get();
+		TransactionCommand command = commands.get();
 		if (command != null) {
+
+			assertSameTransaction(node, command.getTransactionId());
 
 			ModificationQueue modificationQueue = command.getModificationQueue();
 			if (modificationQueue != null) {
@@ -252,14 +258,16 @@ public class TransactionCommand extends NodeServiceCommand implements AutoClosea
 
 		} else {
 
-			logger.error("Node created while outside of transaction!");
+			throw new NotInTransactionException("Not in transaction.");
 		}
 	}
 
 	public static void nodeModified(final Principal user, final AbstractNode node, final PropertyKey key, final Object previousValue, final Object newValue) {
 
-		TransactionCommand command = currentCommand.get();
+		TransactionCommand command = commands.get();
 		if (command != null) {
+
+			//assertSameTransaction(node, command.getTransactionId());
 
 			ModificationQueue modificationQueue = command.getModificationQueue();
 			if (modificationQueue != null) {
@@ -273,14 +281,16 @@ public class TransactionCommand extends NodeServiceCommand implements AutoClosea
 
 		} else {
 
-			logger.error("Node deleted while outside of transaction!");
+			throw new NotInTransactionException("Not in transaction.");
 		}
 	}
 
 	public static void nodeDeleted(final Principal user, final NodeInterface node) {
 
-		TransactionCommand command = currentCommand.get();
+		TransactionCommand command = commands.get();
 		if (command != null) {
+
+			assertSameTransaction(node, command.getTransactionId());
 
 			ModificationQueue modificationQueue = command.getModificationQueue();
 			if (modificationQueue != null) {
@@ -294,14 +304,16 @@ public class TransactionCommand extends NodeServiceCommand implements AutoClosea
 
 		} else {
 
-			logger.error("Node deleted while outside of transaction!");
+			throw new NotInTransactionException("Not in transaction.");
 		}
 	}
 
 	public static void relationshipCreated(final Principal user, final RelationshipInterface relationship) {
 
-		TransactionCommand command = currentCommand.get();
+		TransactionCommand command = commands.get();
 		if (command != null) {
+
+			assertSameTransaction(relationship, command.getTransactionId());
 
 			ModificationQueue modificationQueue = command.getModificationQueue();
 			if (modificationQueue != null) {
@@ -315,14 +327,16 @@ public class TransactionCommand extends NodeServiceCommand implements AutoClosea
 
 		} else {
 
-			logger.error("Relationships created while outside of transaction!");
+			throw new NotInTransactionException("Not in transaction.");
 		}
 	}
 
 	public static void relationshipModified(final Principal user, final RelationshipInterface relationship, final PropertyKey key, final Object previousValue, final Object newValue) {
 
-		TransactionCommand command = currentCommand.get();
+		TransactionCommand command = commands.get();
 		if (command != null) {
+
+			assertSameTransaction(relationship, command.getTransactionId());
 
 			ModificationQueue modificationQueue = command.getModificationQueue();
 			if (modificationQueue != null) {
@@ -336,14 +350,16 @@ public class TransactionCommand extends NodeServiceCommand implements AutoClosea
 
 		} else {
 
-			logger.error("Relationship deleted while outside of transaction!");
+			throw new NotInTransactionException("Not in transaction.");
 		}
 	}
 
 	public static void relationshipDeleted(final Principal user, final RelationshipInterface relationship, final boolean passive) {
 
-		TransactionCommand command = currentCommand.get();
+		TransactionCommand command = commands.get();
 		if (command != null) {
+
+			assertSameTransaction(relationship, command.getTransactionId());
 
 			ModificationQueue modificationQueue = command.getModificationQueue();
 			if (modificationQueue != null) {
@@ -357,7 +373,7 @@ public class TransactionCommand extends NodeServiceCommand implements AutoClosea
 
 		} else {
 
-			logger.error("Relationship deleted while outside of transaction!");
+			throw new NotInTransactionException("Not in transaction.");
 		}
 	}
 
@@ -373,8 +389,23 @@ public class TransactionCommand extends NodeServiceCommand implements AutoClosea
 		return listeners;
 	}
 
+	public static void simpleBroadcastWarning(final String title, final String text, final Predicate<String> sessionIdPredicate) {
+
+		final Map<String, Object> messageData = new HashMap();
+
+		messageData.put(MaintenanceCommand.COMMAND_TYPE_KEY,    MaintenanceCommand.COMMAND_SUBTYPE_WARNING);
+		messageData.put(MaintenanceCommand.COMMAND_TITLE_KEY,   title);
+		messageData.put(MaintenanceCommand.COMMAND_MESSAGE_KEY, text);
+
+		TransactionCommand.simpleBroadcastGenericMessage(messageData, sessionIdPredicate);
+	}
+
 	public static void simpleBroadcastGenericMessage (final Map<String, Object> data) {
-		simpleBroadcast("GENERIC_MESSAGE", data, null);
+		simpleBroadcastGenericMessage(data, null);
+	}
+
+	public static void simpleBroadcastGenericMessage (final Map<String, Object> data, final Predicate<String> sessionIdPredicate) {
+		simpleBroadcast("GENERIC_MESSAGE", data, sessionIdPredicate);
 	}
 
 	public static void simpleBroadcastException (final Exception ex, final Map<String, Object> data, final boolean printStackTrace) {
@@ -393,49 +424,64 @@ public class TransactionCommand extends NodeServiceCommand implements AutoClosea
 		simpleBroadcast(messageName, data, null);
 	}
 
-	public static void simpleBroadcast (final String messageName, final Map<String, Object> data, final String exemptedSessionId) {
+	public static void simpleBroadcast (final String messageName, final Map<String, Object> data, final Predicate<String> sessionIdPredicate) {
 
-		for (final StructrTransactionListener listener : TransactionCommand.getTransactionListeners()) {
-			listener.simpleBroadcast(messageName, data, exemptedSessionId);
+		try (final Tx tx = StructrApp.getInstance().tx()) {
+
+			for (final StructrTransactionListener listener : TransactionCommand.getTransactionListeners()) {
+				listener.simpleBroadcast(messageName, data, sessionIdPredicate);
+			}
+
+			tx.success();
+
+		} catch (FrameworkException fex) {
+			logger.warn("Exception during simple broadcast", fex);
 		}
-
 	}
 
 	public static boolean inTransaction() {
-		return currentCommand.get() != null;
+		return commands.get() != null;
+	}
+
+	public static long getCurrentTransactionId() {
+
+		final TransactionCommand cmd = commands.get();
+		if (cmd != null) {
+
+			return cmd.getTransactionId();
+		}
+
+		throw new NotInTransactionException("Not in transaction.");
 	}
 
 	public static boolean isDeleted(final Node node) {
 
-		if (!inTransaction()) {
-			throw new NotInTransactionException("Not in transaction.");
+		TransactionCommand cmd = commands.get();
+		if (cmd != null) {
+
+			return cmd.queue.isDeleted(node);
 		}
 
-		final ModificationQueue queue = queues.get();
-		if (queue != null) {
-			return queue.isDeleted(node);
-		}
-
-		return false;
+		throw new NotInTransactionException("Not in transaction.");
 	}
 
 	public static boolean isDeleted(final Relationship rel) {
 
-		if (!inTransaction()) {
+
+		TransactionCommand cmd = commands.get();
+		if (cmd != null) {
+
+			return cmd.queue.isDeleted(rel);
+
+		} else {
+
 			throw new NotInTransactionException("Not in transaction.");
 		}
-
-		final ModificationQueue queue = queues.get();
-		if (queue != null) {
-			return queue.isDeleted(rel);
-		}
-
-		return false;
 	}
 
 	public static void registerNodeCallback(final NodeInterface node, final String callbackId) {
 
-		TransactionCommand command = currentCommand.get();
+		TransactionCommand command = commands.get();
 		if (command != null) {
 
 			ModificationQueue modificationQueue = command.getModificationQueue();
@@ -457,7 +503,7 @@ public class TransactionCommand extends NodeServiceCommand implements AutoClosea
 
 	public static void registerRelCallback(final RelationshipInterface rel, final String callbackId) {
 
-		TransactionCommand command = currentCommand.get();
+		TransactionCommand command = commands.get();
 		if (command != null) {
 
 			ModificationQueue modificationQueue = command.getModificationQueue();
@@ -477,8 +523,22 @@ public class TransactionCommand extends NodeServiceCommand implements AutoClosea
 
 	}
 
+	private static void assertSameTransaction(final GraphObject obj, final long currentTransactionId) {
+
+		final long nodeTransactionId = obj.getSourceTransactionId();
+		if (!Services.isTesting() && currentTransactionId != nodeTransactionId) {
+
+			logger.warn("Possible leaking {} instance detected: created in transaction {}, modified in {}", obj.getClass().getSimpleName(), nodeTransactionId, currentTransactionId);
+			Thread.dumpStack();
+		}
+	}
+
 	// ----- private methods -----
 	private ModificationQueue getModificationQueue() {
-		return queues.get();
+		return queue;
+	}
+
+	private long getTransactionId() {
+		return transaction.getTransactionId();
 	}
 }

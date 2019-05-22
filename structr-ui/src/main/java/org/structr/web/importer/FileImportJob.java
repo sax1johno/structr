@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -26,6 +26,7 @@ import java.util.Locale;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.common.ContextStore;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
@@ -34,7 +35,7 @@ import org.structr.core.entity.Principal;
 import org.structr.core.graph.TransactionCommand;
 import org.structr.core.graph.Tx;
 import org.structr.core.scheduler.ScheduledJob;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 
 abstract class FileImportJob extends ScheduledJob {
 
@@ -46,12 +47,12 @@ abstract class FileImportJob extends ScheduledJob {
 	protected Long fileSize;
 	protected Integer processedChunks = 0;
 
-	public FileImportJob (final FileBase file, final Principal user, final Map<String, Object> configuration) {
+	public FileImportJob (final File file, final Principal user, final Map<String, Object> configuration, final ContextStore ctxStore) {
 
-		super(file.getUuid(), user, configuration);
+		super(file.getUuid(), user, configuration, ctxStore);
 
 		this.fileUuid = file.getUuid();
-		this.filePath = file.getFolderPath();
+		this.filePath = file.getPath();
 		this.fileName = file.getName();
 		this.fileSize = file.getSize();
 	}
@@ -167,8 +168,8 @@ abstract class FileImportJob extends ScheduledJob {
 
 		try (final Tx tx = app.tx()) {
 
-			final FileBase file = app.get(FileBase.class, fileUuid);
-			is                  = file.getInputStream();
+			final File file = app.get(File.class, fileUuid);
+			is              = file.getInputStream();
 
 			tx.success();
 

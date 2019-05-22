@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -25,7 +25,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.lang.StringUtils;
-import org.apache.tika.language.LanguageIdentifier;
+import org.apache.tika.langdetect.OptimaizeLangDetector;
+import org.apache.tika.language.detect.LanguageDetector;
+import org.apache.tika.language.detect.LanguageResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.api.config.Settings;
@@ -36,21 +38,19 @@ import org.structr.api.config.Settings;
  */
 public class FulltextTokenizer extends Writer {
 
-	private static final Logger logger = LoggerFactory.getLogger(FulltextTokenizer.class.getName());
+	private static final Logger logger   = LoggerFactory.getLogger(FulltextTokenizer.class.getName());
+
 	public static final Set<Character> SpecialChars = new LinkedHashSet<>();
 
-	private final int wordCountLimit         = Settings.IndexingLimit.getValue();
 	private final int wordMinLength          = Settings.IndexingMinLength.getValue();
 	private final int wordMaxLength          = Settings.IndexingMaxLength.getValue();
 	private final StringBuilder rawText      = new StringBuilder();
 	private final StringBuilder wordBuffer   = new StringBuilder();
 	private final List<String> words         = new LinkedList<>();
-	private String language                  = "de";
-	private String fileName                  = null;
+	private String language                  = "en";
 	private char lastCharacter               = 0;
 	private int consecutiveCharCount         = 0;
 	private int wordCount                    = 0;
-	private boolean wordCountLimitInfoShown  = false;
 
 	static {
 
@@ -62,71 +62,57 @@ public class FulltextTokenizer extends Writer {
 		SpecialChars.add('Ö');
 		SpecialChars.add('Ü');
 		SpecialChars.add('ß');
-		SpecialChars.add('§');
 		SpecialChars.add('-');
-		SpecialChars.add('%');
-		SpecialChars.add('/');
 		SpecialChars.add('@');
-		SpecialChars.add('$');
-		SpecialChars.add('€');
-		SpecialChars.add('æ');
-		SpecialChars.add('¢');
 		SpecialChars.add('.');
 		SpecialChars.add(',');
-		SpecialChars.add('\'');
-		SpecialChars.add('\"');
-		SpecialChars.add('`');
 	}
 
-	public FulltextTokenizer(final String fileName) {
-		this.fileName = fileName;
+	public FulltextTokenizer() {
 	}
 
 	@Override
 	public void write(final char[] cbuf, final int off, final int len) throws IOException {
 
-		if (wordCount < wordCountLimit) {
+		final int limit  = off + len;
+		final int length = Math.min(limit, cbuf.length);
 
-			final int limit  = off + len;
-			final int length = Math.min(limit, cbuf.length);
+		for (int i=off; i<length; i++) {
 
-			for (int i=off; i<length; i++) {
+			final char c = cbuf[i];
 
-				final char c = cbuf[i];
+			// remove occurrences of more than 10 identical chars in a row
+			if (c == lastCharacter) {
 
-				// remove occurrences of more than 10 identical chars in a row
-				if (c == lastCharacter) {
-
-					if (consecutiveCharCount++ >= 10) {
-						continue;
-					}
-
-				} else {
-
-					consecutiveCharCount = 0;
+				if (consecutiveCharCount++ >= 10) {
+					continue;
 				}
 
-				if (!Character.isAlphabetic(c) && !Character.isDigit(c) && !SpecialChars.contains(c)) {
+			} else {
 
-					flush();
-
-					if (Character.isWhitespace(c)) {
-
-						rawText.append(c);
-
-					} else {
-
-						rawText.append(" ");
-					}
-
-				} else {
-
-					wordBuffer.append(c);
-					rawText.append(c);
-				}
-
-				lastCharacter = c;
+				consecutiveCharCount = 0;
 			}
+
+			if (!Character.isAlphabetic(c) && !Character.isDigit(c) && !SpecialChars.contains(c)) {
+
+				flush();
+
+				if (Character.isWhitespace(c)) {
+
+					rawText.append(c);
+
+				} else {
+
+					rawText.append(" ");
+				}
+
+			} else {
+
+				wordBuffer.append(c);
+				rawText.append(c);
+			}
+
+			lastCharacter = c;
 		}
 	}
 
@@ -145,36 +131,22 @@ public class FulltextTokenizer extends Writer {
 	@Override
 	public void flush() throws IOException {
 
-		final String word = wordBuffer.toString().trim();
-		if (StringUtils.isNotBlank(word)) {
+		String word = wordBuffer.toString().trim();
 
-			// check for numbers
-			if (word.contains(".") || word.contains(",")) {
+		if (accept(word)) {
 
-				// try to separate numbers
-				if (word.matches("[\\-0-9\\.,]+")) {
+			final String[] parts = word.split("[\\.,]+");
+			final int len        = parts.length;
 
-					addWord(word);
+			for (int i=0; i<len; i++) {
 
-				} else {
+				String part = parts[i].trim();
+				part        = part.replaceAll("[\\-/]+", "");
 
-					final String[] parts = word.split("[\\.,]+");
-					final int len        = parts.length;
+				if (StringUtils.isNotBlank(part) && !StringUtils.isNumeric(part)) {
 
-					for (int i=0; i<len; i++) {
-
-						final String part = parts[i].trim();
-
-						if (StringUtils.isNotBlank(part)) {
-
-							addWord(part.toLowerCase());
-						}
-					}
+					addWord(part.toLowerCase());
 				}
-
-			} else {
-
-				addWord(word.toLowerCase());
 			}
 		}
 
@@ -186,10 +158,13 @@ public class FulltextTokenizer extends Writer {
 
 		flush();
 
-		final LanguageIdentifier identifier = new LanguageIdentifier(getRawText());
-		if (identifier.isReasonablyCertain()) {
+		final LanguageDetector detector = new OptimaizeLangDetector();
+		detector.loadModels();
 
-			language = identifier.getLanguage();
+		final LanguageResult result = detector.detect(getRawText());
+		if (result != null) {
+
+			language = result.getLanguage();
 		}
 	}
 
@@ -206,20 +181,29 @@ public class FulltextTokenizer extends Writer {
 			words.add(word);
 
 			wordCount++;
+		}
+	}
 
-			if (wordCount > wordCountLimit && !wordCountLimitInfoShown) {
+	private boolean accept(final String word) {
 
-				logger.info("Indexing word count of {} reached for {}, no more words will be indexed. Set {} in structr.conf to increase this limit.",
+		if (word == null) {
+			return false;
+		}
 
-					new Object[] {
-						wordCountLimit,
-						fileName,
-						Settings.IndexingLimit.getKey()
-					}
-				);
+		int letters = 0;
 
-				wordCountLimitInfoShown = true;
+		for (final char c : word.toCharArray()) {
+
+			if (Character.isDigit(c)) {
+				return false;
+			}
+
+			// might not be suited to handle non-latin characters..
+			if (Character.isLetter(c)) {
+				letters++;
 			}
 		}
+
+		return letters >= 3;
 	}
 }

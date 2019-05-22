@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -21,7 +21,6 @@ package org.structr.websocket.command;
 
 import org.structr.common.error.FrameworkException;
 import org.structr.core.graph.TransactionCommand;
-import org.structr.core.property.PropertyMap;
 import org.structr.web.entity.dom.DOMNode;
 import org.structr.web.entity.dom.ShadowDocument;
 import org.structr.web.entity.dom.Template;
@@ -47,6 +46,8 @@ public class CreateComponentCommand extends AbstractCommand {
 
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
+
+		setDoTransactionNotifications(true);
 
 		String id = webSocketData.getId();
 
@@ -84,6 +85,10 @@ public class CreateComponentCommand extends AbstractCommand {
 
 	public DOMNode create(final DOMNode node) throws FrameworkException {
 
+		if (node == null) {
+			throw new FrameworkException(422, "No node to clone");
+		}
+		
 		final DOMNode clonedNode = (DOMNode) node.cloneNode(false);
 
 		// Child nodes of a template must stay in page tree
@@ -93,14 +98,14 @@ public class CreateComponentCommand extends AbstractCommand {
 		}
 
 		final ShadowDocument hiddenDoc = CreateComponentCommand.getOrCreateHiddenDocument();
-		clonedNode.setProperties(clonedNode.getSecurityContext(), new PropertyMap(DOMNode.ownerDocument, hiddenDoc));
+		clonedNode.setOwnerDocument(hiddenDoc);
 
 		// Change page (owner document) of all children recursively
 		for (DOMNode child : DOMNode.getAllChildNodes(clonedNode)) {
-			child.setProperties(child.getSecurityContext(), new PropertyMap((DOMNode.ownerDocument), hiddenDoc));
+			child.setOwnerDocument(hiddenDoc);
 		}
 
-		node.setProperties(node.getSecurityContext(), new PropertyMap(DOMNode.sharedComponent, clonedNode));
+		node.setSharedComponent(clonedNode);
 
 		return clonedNode;
 	}

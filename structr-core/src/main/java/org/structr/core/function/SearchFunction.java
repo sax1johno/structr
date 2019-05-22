@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,51 +19,44 @@
 package org.structr.core.function;
 
 import java.util.Map;
+import java.util.Map.Entry;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.Query;
 import org.structr.core.app.StructrApp;
 import org.structr.core.converter.PropertyConverter;
+import org.structr.core.function.search.SearchFunctionPredicate;
 import org.structr.core.property.PropertyKey;
-import org.structr.core.property.PropertyMap;
 import org.structr.schema.ConfigurationProvider;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class SearchFunction extends Function<Object, Object> implements QueryFunction {
+public class SearchFunction extends AbstractQueryFunction {
 
 	public static final String ERROR_MESSAGE_SEARCH    = "Usage: ${search(type, key, value)}. Example: ${search(\"User\", \"name\", \"abc\")}";
 	public static final String ERROR_MESSAGE_SEARCH_JS = "Usage: ${{Structr.search(type, key, value)}}. Example: ${{Structr.search(\"User\", \"name\", \"abc\")}}";
 
-	private int start = -1;
-	private int end   = -1;
-
 	@Override
 	public String getName() {
-		return "search()";
+		return "search";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
-		if (sources != null) {
+		final SecurityContext securityContext = ctx.getSecurityContext();
+		final boolean ignoreResultCount       = securityContext.ignoreResultCount();
 
-			final SecurityContext securityContext = ctx.getSecurityContext();
+		try {
+
+			if (sources == null) {
+
+				throw new IllegalArgumentException();
+			}
+
 			final ConfigurationProvider config    = StructrApp.getConfiguration();
 			final Query query                     = StructrApp.getInstance(securityContext).nodeQuery();
 
-			// paging applied by surrounding slice() function
-			if (start >= 0 && end >= 0) {
-
-				final int pageSize = end - start;
-				final int page     = start % pageSize;
-
-				query.pageSize(pageSize);
-				query.page(page);
-			}
+			applyQueryParameters(securityContext, query);
 
 			Class type = null;
 
@@ -97,10 +90,30 @@ public class SearchFunction extends Function<Object, Object> implements QueryFun
 			// extension for native javascript objects
 			if (sources.length == 2 && sources[1] instanceof Map) {
 
-				final PropertyMap map = PropertyMap.inputTypeToJavaType(securityContext, type, (Map)sources[1]);
-				for (final Map.Entry<PropertyKey, Object> entry : map.entrySet()) {
+				final Map<String, Object> queryData = (Map)sources[1];
+				for (final Entry<String, Object> entry : queryData.entrySet()) {
 
-					query.and(entry.getKey(), entry.getValue(), false);
+					final String keyName  = entry.getKey();
+					final Object value    = entry.getValue();
+					final PropertyKey key = StructrApp.key(type, keyName);
+
+					if (value instanceof SearchFunctionPredicate) {
+
+						// allow predicate to modify query
+						((SearchFunctionPredicate)value).configureQuery(securityContext, key, query, false);
+
+					} else {
+
+						final PropertyConverter inputConverter = key.inputConverter(securityContext);
+						if (inputConverter != null) {
+
+							query.and(key, inputConverter.convert(value), false);
+
+						} else {
+
+							query.and(key, value, false);
+						}
+					}
 				}
 
 			} else {
@@ -114,35 +127,46 @@ public class SearchFunction extends Function<Object, Object> implements QueryFun
 
 				for (int c = 1; c < parameter_count; c += 2) {
 
-					final PropertyKey key = config.getPropertyKeyForJSONName(type, sources[c].toString());
+					final PropertyKey key = StructrApp.key(type, sources[c].toString());
 
 					if (key != null) {
 
 						final PropertyConverter inputConverter = key.inputConverter(securityContext);
 						Object value = sources[c + 1];
 
-						if (inputConverter != null) {
+						if (value instanceof SearchFunctionPredicate) {
 
-							value = inputConverter.convert(value);
+							// allow predicate to modify query
+							((SearchFunctionPredicate)value).configureQuery(securityContext, key, query, false);
+
+						} else {
+
+							if (inputConverter != null) {
+
+								value = inputConverter.convert(value);
+							}
+
+							query.and(key, value, false);
 						}
-
-						query.and(key, value, false);
 					}
 
 				}
 			}
 
-			final Object x = query.getAsList();
-
 			// return search results
-			return x;
+			return query.getAsList();
 
-		} else {
+		} catch (final IllegalArgumentException e) {
+
 			logParameterError(caller, sources, ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
+
+		} finally {
+
+			resetQueryParameters(securityContext);
+			securityContext.ignoreResultCount(ignoreResultCount);
 		}
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {
@@ -152,16 +176,5 @@ public class SearchFunction extends Function<Object, Object> implements QueryFun
 	@Override
 	public String shortDescription() {
 		return "Returns a collection of entities of the given type from the database, takes optional key/value pairs. Searches case-insensitve / inexact.";
-	}
-
-	// ----- interface QueryFunction -----
-	@Override
-	public void setRangeStart(final int start) {
-		this.start = start;
-	}
-
-	@Override
-	public void setRangeEnd(final int end) {
-		this.end = end;
 	}
 }

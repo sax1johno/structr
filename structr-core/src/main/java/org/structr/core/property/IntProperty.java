@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -40,6 +40,10 @@ public class IntProperty extends AbstractPrimitiveProperty<Integer> implements N
 
 	public IntProperty(final String name) {
 		super(name);
+	}
+
+	public IntProperty(final String jsonName, final String dbName) {
+		super(jsonName, dbName);
 	}
 
 	@Override
@@ -103,7 +107,7 @@ public class IntProperty extends AbstractPrimitiveProperty<Integer> implements N
 
 				} catch (Throwable t) {
 
-					throw new FrameworkException(422, "Cannot parse input for property " + jsonName(), new NumberToken(declaringClass.getSimpleName(), IntProperty.this));
+					throw new FrameworkException(422, "Cannot parse input " + source + " for property " + jsonName(), new NumberToken(declaringClass.getSimpleName(), IntProperty.this));
 				}
 			}
 
@@ -145,7 +149,7 @@ public class IntProperty extends AbstractPrimitiveProperty<Integer> implements N
 
 				} catch (Throwable t) {
 
-					throw new FrameworkException(422, "Cannot parse input for property " + jsonName(), new NumberToken(declaringClass.getSimpleName(), IntProperty.this));
+					throw new FrameworkException(422, "Cannot parse input " + source + " for property " + jsonName(), new NumberToken(declaringClass.getSimpleName(), IntProperty.this));
 				}
 			}
 
@@ -181,8 +185,8 @@ public class IntProperty extends AbstractPrimitiveProperty<Integer> implements N
 	}
 
 	@Override
-	public void index(GraphObject entity, Object value) {
-		super.index(entity, fixDatabaseProperty(value));
+	public Object getIndexValue(final Object value) {
+		return fixDatabaseProperty(value);
 	}
 
 	// ----- CMIS support -----

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -31,21 +31,6 @@ function sortArray(arrayIn, sortBy) {
 		return sortBy.indexOf(a.id) > sortBy.indexOf(b.id);
 	});
 	return arrayOut;
-}
-
-function without(s, array) {
-	if (!isIn(s, array)) {
-		return array;
-	}
-
-	var res = [];
-	$.each(array, function(i, el) {
-		if (!(el === s)) {
-			res.push(el);
-		}
-	});
-
-	return res;
 }
 
 function isIn(s, array) {
@@ -340,13 +325,15 @@ function getComments(el) {
 	while (f) {
 		if (f.nodeType === 8) {
 			var id = f.nodeValue.extractVal('data-structr-id');
-			var raw = f.nodeValue.extractVal('data-structr-raw-value');
 			if (id) {
-				var comment = {};
-				comment.id = id;
-				comment.node = f;
-				comment.rawContent = raw;
-				comments.push(comment);
+				var raw = f.nodeValue.extractVal('data-structr-raw-value');
+				if (raw !== undefined) {
+					var comment = {};
+					comment.id = id;
+					comment.node = f;
+					comment.rawContent = raw;
+					comments.push(comment);
+				}
 			}
 		}
 		f = f ? f.nextSibling : f;
@@ -425,8 +412,8 @@ var LSWrapper = new (function() {
 		_localStorageObject[key] = value;
 	};
 
-	this.getItem = function (key) {
-		return (_localStorageObject[key] === undefined) ? null : _localStorageObject[key];
+	this.getItem = function (key, defaultValue = null) {
+		return (_localStorageObject[key] === undefined) ? defaultValue : _localStorageObject[key];
 	};
 
 	this.removeItem = function (key) {
@@ -459,6 +446,7 @@ function fastRemoveAllChildren(el) {
  * static list of all logtypes
  */
 var _LogType = {
+	CODE:            "CODE",
 	CONTENTS:        "CONTENTS",
 	CRAWLER:         "CRAWLER",
 	CRUD:            "CRUD",
@@ -467,6 +455,7 @@ var _LogType = {
 	ENTITIES:        "ENTITIES",
 	FAVORITES:       "FAVORITES",
 	FILES:           "FILES",
+	FLOWS:           "FLOWS",
 	FIND_DUPLICATES: "FIND_DUPLICATES",
 	GRAPH:           "GRAPH",
 	INIT:            "INIT",
@@ -482,7 +471,7 @@ var _LogType = {
 		ADD:                        "WS.ADD",
 		APPEND_CHILD:               "WS.APPEND_CHILD",
 		APPEND_FILE:                "WS.APPEND_FILE",
-		APPEND_USER:                "WS.APPEND_USER",
+		APPEND_MEMBER:              "WS.APPEND_MEMBER",
 		APPEND_WIDGET:              "WS.APPEND_WIDGET",
 		AUTOCOMPLETE:               "WS.AUTOCOMPLETE",
 		CHILDREN:                   "WS.CHILDREN",
@@ -494,7 +483,6 @@ var _LogType = {
 		CREATE:                     "WS.CREATE",
 		CREATE_AND_APPEND_DOM_NODE: "WS.CREATE_AND_APPEND_DOM_NODE",
 		CREATE_COMPONENT:           "WS.CREATE_COMPONENT",
-		CREATE_DOM_NODE:            "WS.CREATE_DOM_NODE",
 		CREATE_LOCAL_WIDGET:        "WS.CREATE_LOCAL_WIDGET",
 		CREATE_RELATIONSHIP:        "WS.CREATE_RELATIONSHIP",
 		CREATE_SIMPLE_PAGE:         "WS.CREATE_SIMPLE_PAGE",
@@ -698,20 +686,23 @@ var _Console = new (function() {
 			return;
 		}
 
+		var storedMode = LSWrapper.getItem(consoleModeKey);
+
 		// Get initial mode and prompt from backend
-		Command.console('Console.getMode()', function(data) {
+		// If backend sends no mode, use value from local storage
+		Command.console('Console.getMode()', storedMode, function(data) {
 
 			var message = data.message;
-			var mode = data.data.mode;
+			var mode = storedMode || data.data.mode;
 			var prompt = data.data.prompt;
 			var versionInfo = data.data.versionInfo;
-//			console.log(message, mode, prompt, versionInfo);
+			//console.log(message, mode, prompt, versionInfo);
 
 			var consoleEl = $('#structr-console');
 			_terminal = consoleEl.terminal(function(command, term) {
 				if (command !== '') {
 					try {
-						_runCommand(command, term);
+						_runCommand(command, mode, term);
 					} catch (e) {
 						term.error(new String(e));
 					}
@@ -724,48 +715,50 @@ var _Console = new (function() {
 				height: 470,
 				prompt: prompt + '> ',
 				keydown: function(e) {
-					if (e.which === 17) {
-						return true;
+
+					if (e.which === 9) {
+
+						var term = _terminal;
+
+						if (shiftKey) {
+
+							switch (term.consoleMode) {
+
+								case 'REST':
+									mode = 'JavaScript';
+									break;
+
+								case 'JavaScript':
+									mode = 'StructrScript';
+									break;
+
+								case 'StructrScript':
+									mode = 'Cypher';
+									break;
+
+								case 'Cypher':
+									mode = 'AdminShell';
+									break;
+
+								case 'AdminShell':
+									mode = 'REST';
+									break;
+							}
+
+							var line = 'Console.setMode("' + mode + '")';
+							term.consoleMode = mode;
+							LSWrapper.setItem(consoleModeKey, mode);
+
+							_runCommand(line, mode, term);
+
+							return false;
+						}
 					}
 				},
-				completion: function(term, lineToBeCompleted, callback) {
-
-					if (shiftKey) {
-
-						switch (term.consoleMode) {
-
-							case 'REST':
-								mode = 'JavaScript';
-								break;
-
-							case 'JavaScript':
-								mode = 'StructrScript';
-								break;
-
-							case 'StructrScript':
-								mode = 'Cypher';
-								break;
-
-							case 'Cypher':
-								mode = 'AdminShell';
-								break;
-
-							case 'AdminShell':
-								mode = 'REST';
-								break;
-						}
-
-						var line = 'Console.setMode("' + mode + '")';
-						term.consoleMode = mode;
-
-						_runCommand(line, term);
-
-					} else {
-						Command.console(lineToBeCompleted, function(data) {
-							var commands = JSON.parse(data.data.commands);
-							callback(commands);
-						}, true);
-					}
+				completion: function(lineToBeCompleted, callback) {
+					Command.console(lineToBeCompleted, mode, function(data) {
+						callback(data.data.commands);
+					}, true);
 				}
 			});
 			_terminal.consoleMode = mode;
@@ -809,13 +802,13 @@ var _Console = new (function() {
 		$('#structr-console').slideUp('fast');
 	};
 
-	var _runCommand = function(command, term) {
+	var _runCommand = function(command, mode, term) {
 
 		if (!term) {
 			term = _terminal;
 		}
 
-		Command.console(command, function(data) {
+		Command.console(command, mode, function(data) {
 			var prompt = data.data.prompt;
 			if (prompt) {
 				term.set_prompt(prompt + '> ');
@@ -1070,7 +1063,7 @@ var _Favorites = new (function () {
 });
 
 /**
- * A cache for async GET requests which allows ensures that certain requests are only made once - if used correctly.<br>
+ * A cache for async GET requests which ensures that certain requests are only made once - if used correctly.<br>
  * The cache has one argument - the fetch function - which handles fetching a single object.<br>
  * Upon successfully loading the object, it must be added to the cache via the `addObject` method.<br>
  * It is possible to attach callbacks to the ID we ware waiting for. After the object is loaded<br>
@@ -1084,34 +1077,33 @@ var AsyncObjectCache = function(fetchFunction) {
 	var _cache = {};
 
 	/**
-	 * This methods registers a callback for an object ID.<br>
-	 * If the ID has not been requested before, the fetch function is executed.<br>
-	 * If the ID has been requested before, the callback is added to the callbacks list.<br>
-	 * If the object associated with the ID is present in the cache, the callback is executed directly.
+	 * This methods registers a callback for a resource.<br>
+	 * If the resource has not been requested before, the fetch function is executed.<br>
+	 * If the resource has been requested before, the callback is added to the callbacks list.<br>
+	 * If the result for the cacheId is present in the cache, the callback is executed directly.
 	 *
-	 * @param {string} id The ID to fetch
+	 * @param {string} resource The parameter to pass in the fetchFunction
+	 * @param {string} cacheId The ID under which to cache the result
 	 * @param {function} callback The callback to execute with the fetched object. Needs to take the object as single paramter.
 	 */
-	this.registerCallbackForId = function(id, callback) {
+	this.registerCallback = function(resource, cacheId, callback) {
 
-		if (_cache[id] === undefined) {
+		if (_cache[cacheId] === undefined) {
 
-			_cache[id] = {
+			_cache[cacheId] = {
 				callbacks: [callback]
 			};
 
-			fetchFunction(id);
+			fetchFunction(resource);
 
-		} else if (_cache[id].value === undefined) {
+		} else if (_cache[cacheId].value === undefined) {
 
-			_cache[id].callbacks.push(callback);
+			_cache[cacheId].callbacks.push(callback);
 
 		} else {
 
-			_runSingleCallback(id, callback);
-
+			_runSingleCallback(cacheId, callback, true);
 		}
-
 	};
 
 	/**
@@ -1119,49 +1111,45 @@ var AsyncObjectCache = function(fetchFunction) {
 	 * Callbacks associated with that object will be executed afterwards.
 	 *
 	 * @param {object} obj The object to store in the cache
+	 * @param {string} cacheId The cache identifier for the object - usually a UUID, but also used as a URI
 	 */
-	this.addObject = function(obj) {
+	this.addObject = function(obj, cacheId) {
 
-		if (_cache[obj.id] === undefined) {
+		if (_cache[cacheId] === undefined) {
 
 			// no registered callbacks - simply set the cache object
-			_cache[obj.id] = {
+			_cache[cacheId] = {
 				value: obj
 			};
 
-		} else if (_cache[obj.id].value === undefined) {
+		} else if (_cache[cacheId].value === undefined) {
 
 			// set the cache object and run all registered callbacks
-			_cache[obj.id].value = obj;
-			_runRegisteredCallbacks(obj.id);
-
+			_cache[cacheId].value = obj;
+			_runRegisteredCallbacks(cacheId);
 		}
-
 	};
 
 	this.clear = function() {
 		_cache = {};
 	};
 
-	function _runRegisteredCallbacks (id) {
+	function _runRegisteredCallbacks (cacheId) {
 
-		if (_cache[id] !== undefined && _cache[id].callbacks) {
+		if (_cache[cacheId] !== undefined && _cache[cacheId].callbacks) {
 
-			_cache[id].callbacks.forEach(function(callback) {
-				_runSingleCallback(id, callback);
+			_cache[cacheId].callbacks.forEach(function(callback) {
+				_runSingleCallback(cacheId, callback, false);
 			});
 
-			_cache[id].callbacks = [];
+			_cache[cacheId].callbacks = [];
 		}
-
 	};
 
-	function _runSingleCallback(id, callback) {
+	function _runSingleCallback(cacheId, callback, cacheHit) {
 
 		if (typeof callback === "function") {
-			callback(_cache[id].value);
+			callback(_cache[cacheId].value, cacheHit);
 		}
-
 	};
-
 };

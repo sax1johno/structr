@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -44,6 +44,8 @@ public class DOMNodeChildrenCommand extends AbstractCommand {
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
+		setDoTransactionNotifications(false);
+
 		final DOMNode node = getDOMNode(webSocketData.getId());
 
 		if (node == null) {
@@ -62,7 +64,7 @@ public class DOMNodeChildrenCommand extends AbstractCommand {
 
 		}
 
-		webSocketData.setView(PropertyView.Ui);
+		webSocketData.setView(PropertyView.All);
 		webSocketData.setResult(result);
 
 		// send only over local connection

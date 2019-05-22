@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -26,8 +26,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.zip.ZipEntry;
@@ -36,8 +34,8 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.FileUploadException;
+import org.apache.commons.fileupload.FileItemIterator;
+import org.apache.commons.fileupload.FileItemStream;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
 import org.apache.commons.io.IOUtils;
@@ -46,14 +44,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.api.config.Settings;
 import org.structr.common.AccessMode;
+import org.structr.common.PathHelper;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.StructrApp;
 import org.structr.core.auth.exception.AuthenticationException;
 import org.structr.core.graph.Tx;
+import org.structr.rest.common.HttpHelper;
 import org.structr.rest.service.HttpServiceServlet;
 import org.structr.rest.service.StructrHttpServiceConfig;
-import org.structr.schema.SchemaHelper;
+import org.structr.rest.servlet.AbstractServletBase;
 import org.structr.web.auth.UiAuthenticator;
 import org.structr.web.maintenance.DeployCommand;
 
@@ -61,10 +61,12 @@ import org.structr.web.maintenance.DeployCommand;
 /**
  * Endpoint for deployment file upload
  */
-public class DeploymentServlet extends HttpServlet implements HttpServiceServlet {
+public class DeploymentServlet extends AbstractServletBase implements HttpServiceServlet {
 
 	private static final Logger logger = LoggerFactory.getLogger(DeploymentServlet.class.getName());
 
+	private static final String DOWNLOAD_URL_PARAMETER = "downloadUrl";
+	private static final String REDIRECT_URL_PARAMETER = "redirectUrl";
 	private static final int MEGABYTE = 1024 * 1024;
 	private static final int MEMORY_THRESHOLD = 10 * MEGABYTE;  // above 10 MB, files are stored on disk
 
@@ -118,6 +120,11 @@ public class DeploymentServlet extends HttpServlet implements HttpServiceServlet
 	@Override
 	protected void doPost(final HttpServletRequest request, final HttpServletResponse response) throws ServletException {
 
+		SecurityContext securityContext = null;
+		String redirectUrl              = null;
+
+		setCustomResponseHeaders(response);
+
 		try (final Tx tx = StructrApp.getInstance().tx()) {
 
 			if (!ServletFileUpload.isMultipartContent(request)) {
@@ -126,7 +133,6 @@ public class DeploymentServlet extends HttpServlet implements HttpServiceServlet
 				return;
 			}
 
-			final SecurityContext securityContext;
 			try {
 				securityContext = getConfig().getAuthenticator().initializeAndExamineRequest(request, response);
 
@@ -143,6 +149,13 @@ public class DeploymentServlet extends HttpServlet implements HttpServiceServlet
 				return;
 			}
 
+			tx.success();
+			
+		} catch (Throwable t) {
+			t.printStackTrace();
+		}
+
+		try {
 			// Ensure access mode is frontend
 			securityContext.setAccessMode(AccessMode.Frontend);
 
@@ -156,62 +169,97 @@ public class DeploymentServlet extends HttpServlet implements HttpServiceServlet
 				return;
 			}
 
-			final String pathInfo = request.getPathInfo();
-			String type = null;
-
-			if (StringUtils.isNotBlank(pathInfo)) {
-
-				type = SchemaHelper.normalizeEntityName(StringUtils.stripStart(pathInfo.trim(), "/"));
-
-			}
-
 			uploader.setFileSizeMax(MEGABYTE * Settings.DeploymentMaxFileSize.getValue());
 			uploader.setSizeMax(MEGABYTE * Settings.DeploymentMaxRequestSize.getValue());
 
 			response.setContentType("text/html");
 
-			final List<FileItem> fileItemsList         = uploader.parseRequest(request);
-			final Iterator<FileItem> fileItemsIterator = fileItemsList.iterator();
+			final FileItemIterator fileItemsIterator   = uploader.getItemIterator(request);
 			final Map<String, Object> params           = new HashMap<>();
+			final String directoryPath                 = "/tmp/" + UUID.randomUUID();
+			final String filePath                      = directoryPath + ".zip";
+			final File file                            = new File(filePath);
+
+			String downloadUrl = null;
+			String fileName    = null;
 
 			while (fileItemsIterator.hasNext()) {
 
-				final FileItem item = fileItemsIterator.next();
+				final FileItemStream item = fileItemsIterator.next();
 
-				try {
-					final String directoryPath = "/tmp/" + UUID.randomUUID();
-					final String filePath      = directoryPath + ".zip";
+				if (item.isFormField()) {
 
-					File file = new File(filePath);
-					Files.write(IOUtils.toByteArray(item.getInputStream()), file);
+					final String fieldName = item.getFieldName();
+					final String fieldValue = IOUtils.toString(item.openStream(), "UTF-8");
 
-					unzip(file, directoryPath);
+					if (DOWNLOAD_URL_PARAMETER.equals(fieldName)) {
 
-					DeployCommand deployCommand = StructrApp.getInstance(securityContext).command(DeployCommand.class);
+						downloadUrl = fieldValue;
+						params.put(fieldName, fieldValue);
 
-					final Map<String, Object> attributes = new HashMap<>();
-					attributes.put("source", directoryPath  + "/" + StringUtils.substringBeforeLast(item.getName(), "."));
+					} else if (REDIRECT_URL_PARAMETER.equals(fieldName)) {
 
-					deployCommand.execute(attributes);
+						redirectUrl = fieldValue;
+						params.put(fieldName, fieldValue);
+					}
 
-					file.deleteOnExit();
-					File dir = new File(directoryPath);
+				} else {
 
-					dir.deleteOnExit();
-
-				} catch (IOException ex) {
-					logger.warn("Could not upload file", ex);
+					try (final InputStream is = item.openStream()) {
+						
+						Files.write(IOUtils.toByteArray(is), file);
+						fileName = item.getName();
+					}
 				}
-
 			}
 
-			tx.success();
+			if (StringUtils.isNotBlank(downloadUrl)) {
 
-		} catch (FrameworkException | IOException | FileUploadException t) {
+				HttpHelper.streamURLToFile(downloadUrl, file);
+				fileName = PathHelper.getName(downloadUrl);
+			}
 
+			if (file.exists() && file.length() > 0L) {
+
+				unzip(file, directoryPath);
+
+				DeployCommand deployCommand = StructrApp.getInstance(securityContext).command(DeployCommand.class);
+
+				final Map<String, Object> attributes = new HashMap<>();
+
+				attributes.put("mode", "import");
+				attributes.put("source", directoryPath  + "/" + StringUtils.substringBeforeLast(fileName, "."));
+
+				deployCommand.execute(attributes);
+
+				file.delete();
+				File dir = new File(directoryPath);
+				dir.delete();
+			}
+
+			// send redirect to allow form-based file upload without JavaScript..
+			if (StringUtils.isNotBlank(redirectUrl)) {
+
+				response.sendRedirect(redirectUrl);
+			}
+
+		} catch (Exception t) {
 
 			logger.error("Exception while processing request", t);
-			UiAuthenticator.writeInternalServerError(response);
+
+			// send redirect to allow form-based file upload without JavaScript..
+			if (StringUtils.isNotBlank(redirectUrl)) {
+
+				try {
+					response.sendRedirect(redirectUrl);
+				} catch (IOException ex) {
+					logger.error("Unable to redirect to " + redirectUrl);
+				}
+
+			} else {
+
+				UiAuthenticator.writeInternalServerError(response);
+			}
 		}
 	}
 

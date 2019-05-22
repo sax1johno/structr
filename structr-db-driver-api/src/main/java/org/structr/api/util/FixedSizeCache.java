@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,6 +18,7 @@
  */
 package org.structr.api.util;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.collections4.map.LRUMap;
@@ -47,8 +48,12 @@ public class FixedSizeCache<K, V> {
 		return cache.get(key);
 	}
 
-	public synchronized void remove(final K key) {
-		cache.remove(key);
+	public synchronized void removeAll(final Collection<K> keys) {
+		cache.keySet().removeAll(keys);
+	}
+
+	public synchronized V remove(final K key) {
+		return cache.remove(key);
 	}
 
 	public synchronized void clear() {

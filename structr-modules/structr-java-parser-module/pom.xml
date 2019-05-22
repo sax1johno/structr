@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>org.structr</groupId>
 		<artifactId>structr-modules</artifactId>
-		<version>2.3-SNAPSHOT</version>
+		<version>3.3-SNAPSHOT</version>
 	</parent>
 	<artifactId>structr-java-parser-module</artifactId>
 	<packaging>jar</packaging>
@@ -22,6 +22,13 @@
 			<optional>true</optional>
 		</dependency>
 		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>structr-ui</artifactId>
+			<version>${project.version}</version>
+			<type>test-jar</type>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
 			<optional>true</optional>
@@ -29,16 +36,21 @@
 		<dependency>
 			<groupId>com.github.javaparser</groupId>
 			<artifactId>javaparser-core</artifactId>
-			<version>3.5.3</version>
+			<version>3.5.5</version>
 		</dependency>
 		<dependency>
 			<groupId>com.github.javaparser</groupId>
 			<artifactId>java-symbol-solver-core</artifactId>
-			<version>0.6.1</version>
-		</dependency>		
+			<version>0.6.2</version>
+		</dependency>
 		<dependency>
 			<groupId>com.jayway.restassured</groupId>
 			<artifactId>rest-assured</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testng</groupId>
+			<artifactId>testng</artifactId>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
@@ -55,15 +67,84 @@
 			</testResource>
 		</testResources>
 		<plugins>
+
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
-				<version>2.19.1</version>
+				<version>2.22.1</version>
 				<configuration>
-					<argLine>-Xmx1g -Duser.timezone=UTC -Djava.system.class.loader=org.structr.StructrClassLoader</argLine>
-					<reuseForks>false</reuseForks>
-					<forkCount>1</forkCount>
+					<excludes>
+						<exclude>**/*.java</exclude>
+					</excludes>
 				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-failsafe-plugin</artifactId>
+				<version>2.22.1</version>
+				<configuration>
+					<includes>
+						<include>**/*.java</include>
+					</includes>
+					<argLine>-Xms2g -Xmx2g -Duser.timezone=UTC -Djava.system.class.loader=org.structr.StructrClassLoader</argLine>
+					<reuseForks>false</reuseForks>
+					<forkCount>2</forkCount>
+					<skipTests>${skipTests}</skipTests>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>integration-test</goal>
+							<goal>verify</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>io.fabric8</groupId>
+				<artifactId>docker-maven-plugin</artifactId>
+				<version>0.28.0</version>
+				<executions>
+					<execution>
+						<id>prepare-database</id>
+						<phase>pre-integration-test</phase>
+						<goals>
+							<goal>start</goal>
+						</goals>
+						<configuration>
+							<images>
+								<image>
+									<name>${test.neo4j.version}</name>
+									<alias>database</alias>
+									<run>
+										<ports>
+											<port>7689:7687</port>
+										</ports>
+										<wait>
+											<log>(.?)Bolt enabled on 0.0.0.0:7687.</log>
+											<time>20000</time>
+										</wait>
+										<env>
+											<NEO4J_AUTH>neo4j/admin</NEO4J_AUTH>
+											<NEO4J_ACCEPT_LICENSE_AGREEMENT>yes</NEO4J_ACCEPT_LICENSE_AGREEMENT>
+										</env>
+									</run>
+								</image>
+							</images>
+							<skip>${skipTests}</skip>
+						</configuration>
+					</execution>
+					<execution>
+						<id>remove-database</id>
+						<phase>post-integration-test</phase>
+						<goals>
+							<goal>stop</goal>
+						</goals>
+						<configuration>
+							<skip>${skipTests}</skip>
+						</configuration>
+					</execution>
+				</executions>
 			</plugin>
 			<plugin>
 				<artifactId>maven-jar-plugin</artifactId>
@@ -124,7 +205,7 @@
 						<exclude>src/**/*.sh</exclude>
 					</excludes>
 					<properties>
-						<year>2017</year>
+						<year>2019</year>
 						<owner>Structr GmbH</owner>
 					</properties>
 				</configuration>
@@ -135,14 +216,6 @@
 						</goals>
 					</execution>
 				</executions>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-compiler-plugin</artifactId>
-				<version>2.3.2</version>
-				<configuration>
-					<debug>true</debug>
-				</configuration>
 			</plugin>
 		</plugins>
 	</build>
@@ -207,7 +280,7 @@
 			<name>GNU Affero General Public License, Version 3</name>
 			<url>http://www.gnu.org/licenses/agpl-3.0-standalone.html</url>
 			<comments>
-				Copyright (C) 2010-2017 Structr GmbH
+				Copyright (C) 2010-2019 Structr GmbH
 
 				This file is part of Structr &lt;http://structr.org&gt;.
 

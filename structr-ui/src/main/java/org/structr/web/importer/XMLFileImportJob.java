@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -28,6 +28,7 @@ import javax.xml.stream.XMLStreamException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.AccessMode;
+import org.structr.common.ContextStore;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.Services;
@@ -40,7 +41,7 @@ import org.structr.core.property.PropertyMap;
 import org.structr.module.StructrModule;
 import org.structr.module.xml.XMLModule;
 import org.structr.rest.common.XMLHandler;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 
 public class XMLFileImportJob extends FileImportJob {
 
@@ -48,8 +49,8 @@ public class XMLFileImportJob extends FileImportJob {
 
 	private String contentType;
 
-	public XMLFileImportJob(FileBase file, Principal user, Map<String, Object> configuration) throws FrameworkException {
-		super(file, user, configuration);
+	public XMLFileImportJob(final File file, final Principal user, final Map<String, Object> configuration, final ContextStore ctxStore) throws FrameworkException {
+		super(file, user, configuration, ctxStore);
 
 		contentType = file.getContentType();
 	}
@@ -84,6 +85,7 @@ public class XMLFileImportJob extends FileImportJob {
 			logger.info("Importing XML from {} ({})..", filePath, fileUuid);
 
 			final SecurityContext threadContext = SecurityContext.getInstance(user, AccessMode.Backend);
+			threadContext.setContextStore(ctxStore);
 			final App app                       = StructrApp.getInstance(threadContext);
 			int overallCount                    = 0;
 
@@ -92,6 +94,10 @@ public class XMLFileImportJob extends FileImportJob {
 			threadContext.ignoreResultCount(true);
 			threadContext.setDoTransactionNotifications(false);
 			threadContext.disableEnsureCardinality();
+
+			// experimental: instruct deserialization strategies to set properties on related nodes
+			threadContext.setAttribute("setNestedProperties", true);
+			threadContext.setAttribute("batchType", configuration.get("batchType"));
 
 			try (final InputStream is = getFileInputStream(threadContext)) {
 
@@ -111,22 +117,26 @@ public class XMLFileImportJob extends FileImportJob {
 
 						int count = 0;
 
-						try (final Tx tx = app.tx()) {
+						// test: open transaction
+						Tx tx = app.tx();
 
-							while (iterator.hasNext() && ++count <= batchSize) {
+						// make transaction available in context
+						threadContext.setAttribute("currentTransaction", tx);
 
-								app.create(AbstractNode.class, PropertyMap.inputTypeToJavaType(threadContext, iterator.next()));
+						while (iterator.hasNext() && ++count <= batchSize) {
 
-								overallCount++;
-							}
-
-							tx.success();
-
-							chunks++;
-
-							chunkFinished(chunkStartTime, chunks, batchSize, overallCount);
-
+							app.create(AbstractNode.class, PropertyMap.inputTypeToJavaType(threadContext, iterator.next()));
+							overallCount++;
 						}
+
+						// tx might have changed, reload from context
+						tx = (Tx)threadContext.getAttribute("currentTransaction");
+						tx.success();
+						tx.close();
+
+						chunks++;
+
+						chunkFinished(chunkStartTime, chunks, batchSize, overallCount);
 
 						// do this outside of the transaction!
 						shouldPause();

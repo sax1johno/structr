@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -23,6 +23,7 @@ package org.structr.schema.json;
  *
  */
 public interface JsonStringProperty extends JsonProperty {
+	
 	public JsonStringProperty setContentType(final String contentType);
 	public String getContentType();
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,8 +19,9 @@
 package org.structr.core.parser;
 
 import java.util.List;
+import org.structr.api.util.Iterables;
 import org.structr.common.error.FrameworkException;
-import org.structr.common.error.UnlicensedException;
+import org.structr.common.error.UnlicensedScriptException;
 import org.structr.core.GraphObject;
 import org.structr.schema.action.ActionContext;
 
@@ -77,7 +78,7 @@ public class NoneExpression extends Expression {
 	}
 
 	@Override
-	public Object evaluate(final ActionContext ctx, final GraphObject entity) throws FrameworkException, UnlicensedException {
+	public Object evaluate(final ActionContext ctx, final GraphObject entity) throws FrameworkException, UnlicensedScriptException {
 
 		if (listExpression == null) {
 			return ERROR_MESSAGE_ALL;
@@ -85,9 +86,9 @@ public class NoneExpression extends Expression {
 
 		final Object listSource = listExpression.evaluate(ctx, entity);
 
-		if (listSource != null && listSource instanceof List) {
+		if (listSource != null && listSource instanceof Iterable) {
 
-			final List source         = (List)listSource;
+			final List source         = Iterables.toList((Iterable)listSource);
 			final Object oldDataValue = ctx.getConstant("data");
 
 			for (Object obj : source) {
@@ -119,7 +120,7 @@ public class NoneExpression extends Expression {
 	}
 
 	@Override
-	public Object transform(final ActionContext ctx, final GraphObject entity, final Object source) throws FrameworkException, UnlicensedException {
+	public Object transform(final ActionContext ctx, final GraphObject entity, final Object source) throws FrameworkException, UnlicensedScriptException {
 		return source;
 	}
 }

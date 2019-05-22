@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -28,12 +28,8 @@ import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.RelationshipInterface;
 import org.structr.core.graph.Tx;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class DeleteFunction extends Function<Object, Object> implements BatchableFunction {
+public class DeleteFunction extends CoreFunction implements BatchableFunction {
 
 	private static final Logger logger = LoggerFactory.getLogger(DeleteFunction.class);
 
@@ -44,7 +40,7 @@ public class DeleteFunction extends Function<Object, Object> implements Batchabl
 
 	@Override
 	public String getName() {
-		return "delete()";
+		return "delete";
 	}
 
 	@Override

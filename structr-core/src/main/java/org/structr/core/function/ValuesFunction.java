@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -27,18 +27,14 @@ import org.structr.core.GraphObject;
 import org.structr.core.GraphObjectMap;
 import org.structr.core.property.PropertyKey;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class ValuesFunction extends Function<Object, Object> {
+public class ValuesFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_VALUES = "Usage: ${values(entity, viewName)}. Example: ${values(this, \"ui\")}";
 
 	@Override
 	public String getName() {
-		return "values()";
+		return "values";
 	}
 
 	@Override

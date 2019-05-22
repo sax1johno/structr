@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,21 +18,24 @@
  */
 package org.structr.core.script;
 
+import org.structr.common.CaseHelper;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
+import org.structr.core.function.Functions;
 import org.structr.schema.action.ActionContext;
+import org.structr.schema.action.Function;
+
+import java.awt.*;
 
 public class StructrScriptObject {
 
 	private GraphObject entity          = null;
 	private ActionContext actionContext = null;
-	private Object[] parameters         = null;
 	
-	public StructrScriptObject(final ActionContext actionContext, final GraphObject entity, final Object[] parameters) {
+	public StructrScriptObject(final ActionContext actionContext, final GraphObject entity) {
 
 		this.actionContext = actionContext;
 		this.entity        = entity;
-		this.parameters    = parameters;
 	}
 
 	public void clear() {
@@ -49,13 +52,25 @@ public class StructrScriptObject {
 			return actionContext.getSecurityContext().getUser(false);
 		}
 
-//		final Function<Object, Object> function = Functions.functions.get(name);
-//		
-//		if (function != null) {
-//			
-//				return function.apply(actionContext, entity, parameters);
-//		}
-		
+		if (actionContext.getConstant(name) != null) {
+			return actionContext.getConstant(name);
+		}
+
+		if (actionContext.getAllVariables().containsKey(name)) {
+			return actionContext.getAllVariables().get(name);
+		}
+
+		return null;
+	}
+
+	public Object call(final String name, Object... parameters) throws FrameworkException {
+
+		final Function<Object, Object> function = Functions.get(CaseHelper.toUnderscore(name, false));
+		if (function != null) {
+
+			return function.apply(actionContext, entity, parameters);
+		}
+
 		return null;
 	}
 }

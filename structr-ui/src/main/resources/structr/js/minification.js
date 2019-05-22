@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -92,7 +92,7 @@ var _Minification = {
 	},
 
 	reloadHeadAndFiles: function (fileId) {
-		Command.get(fileId, "id,type,path,size,name,minificationSources,lineBreak,optimizationLevel,errors,warnings", function (f) {
+		Command.get(fileId, 'id,type,path,size,name,minificationSources,lineBreak,optimizationLevel,errors,warnings', function (f) {
 			_Minification.updateHead(f);
 
 			$('#minification-files tbody', dialogText).empty();
@@ -110,8 +110,8 @@ var _Minification = {
 	},
 	getJavaScriptSpecificRows: function (file) {
 		return '<tr><td class="head">Optimization Level</td><td><select class="optimizationLevel" data-target="optimizationLevel" data-before="' + file.optimizationLevel + '"><option>WHITESPACE_ONLY</option><option>SIMPLE_OPTIMIZATIONS</option><option>ADVANCED_OPTIMIZATIONS</option></select></td></tr>'
-			+ '<tr><td class="head">Errors</td><td>' + (file.errors ? file.errors.replaceAll('\n', '<br>') : '') + '</td></tr>'
-			+ '<tr><td class="head">Warnings</td><td>' + (file.warnings ? file.warnings.replaceAll('\n', '<br>') : '') + '</td></tr>';
+			+ '<tr><td class="head">Errors</td><td class="minification-scrollable-cell"><div class="scrollable-cell-content">' + (file.errors ? file.errors.replaceAll('\n', '<br>') : '') + '</div></td></tr>'
+			+ '<tr><td class="head">Warnings</td><td class="minification-scrollable-cell"><div class="scrollable-cell-content">' + (file.warnings ? file.warnings.replaceAll('\n', '<br>') : '') + '</div></td></tr>';
 	},
 	printMinificationSourcesTable: function (file) {
 

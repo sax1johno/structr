@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -60,7 +60,20 @@ public class BooleanSetting extends Setting<Boolean> {
 	 * @param value
 	 */
 	public BooleanSetting(final SettingsGroup group, final String categoryName, final String key, final Boolean value) {
-		super(group, categoryName, key, value);
+		this(group, categoryName, key, value, null);
+	}
+
+	/**
+	 * Constructor to create a BooleanSetting with category name, default
+	 * value and comment.
+	 *
+	 * @param group
+	 * @param categoryName
+	 * @param key
+	 * @param value
+	 */
+	public BooleanSetting(final SettingsGroup group, final String categoryName, final String key, final Boolean value, final String comment) {
+		super(group, categoryName, key, value, comment);
 	}
 
 	@Override
@@ -68,14 +81,14 @@ public class BooleanSetting extends Setting<Boolean> {
 
 		final Tag group = parent.block("div").css("form-group");
 
-		group.block("label").text(getKey());
+		renderLabel(group);
 
 		final Tag trueInput  = group.empty("input").attr(new Attr("type", "radio"), new Attr("name", getKey()), new Attr("value",  "true"));
 		group.block("span").text("Enabled");
 		final Tag falseInput = group.empty("input").attr(new Attr("type", "radio"), new Attr("name", getKey()), new Attr("value", "false"));
 		group.block("span").text("Disabled");
 
-		if (getValue()) {
+		if (getValue(false)) {
 
 			trueInput.attr(new Attr("checked", "checked"));
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -31,11 +31,8 @@ import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
 import org.w3c.dom.DOMException;
 
-//~--- classes ----------------------------------------------------------------
 /**
- * Websocket command to clone a page
- *
- *
+ * Websocket command to clone a page.
  */
 public class ClonePageCommand extends AbstractCommand {
 
@@ -44,26 +41,26 @@ public class ClonePageCommand extends AbstractCommand {
 	static {
 
 		StructrWebSocket.addCommand(ClonePageCommand.class);
-
 	}
 
-	//~--- methods --------------------------------------------------------
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
+		setDoTransactionNotifications(true);
+
 		final SecurityContext securityContext = getWebSocket().getSecurityContext();
-		final String nodeId = webSocketData.getId();
+
+		final String nodeId            = webSocketData.getId();
 		final AbstractNode nodeToClone = getNode(nodeId);
 
 		if (nodeToClone != null) {
 
 			try {
 				final Page pageToClone = nodeToClone instanceof Page ? (Page) nodeToClone : null;
-
 				if (pageToClone != null) {
 
 					final Page newPage = (Page) pageToClone.cloneNode(false);
-					newPage.setProperties(securityContext, new PropertyMap(Page.name, pageToClone.getProperty(Page.name) + "-" + newPage.getIdString()));
+					newPage.setProperties(securityContext, new PropertyMap(Page.name, pageToClone.getProperty(Page.name) + "-" + newPage.getPropertyContainer().getId().toString()));
 
 					DOMNode firstChild = (DOMNode) pageToClone.getFirstChild().getNextSibling();
 
@@ -73,9 +70,9 @@ public class ClonePageCommand extends AbstractCommand {
 
 					if (firstChild != null) {
 						final DOMNode newHtmlNode = DOMNode.cloneAndAppendChildren(securityContext, firstChild);
+						newPage.adoptNode(newHtmlNode);
 						newPage.appendChild(newHtmlNode);
 					}
-
 				}
 
 			} catch (FrameworkException fex) {
@@ -87,24 +84,17 @@ public class ClonePageCommand extends AbstractCommand {
 
 				logger.warn("Could not create node.", dex);
 				getWebSocket().send(MessageBuilder.status().code(422).message(dex.getMessage()).build(), true);
-
 			}
 
 		} else {
 
 			logger.warn("Node with uuid {} not found.", webSocketData.getId());
 			getWebSocket().send(MessageBuilder.status().code(404).build(), true);
-
 		}
-
 	}
 
-	//~--- get methods ----------------------------------------------------
 	@Override
 	public String getCommand() {
-
 		return "CLONE_PAGE";
-
 	}
-
 }

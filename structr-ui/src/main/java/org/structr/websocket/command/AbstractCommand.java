@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,6 +18,7 @@
  */
 package org.structr.websocket.command;
 
+import java.util.regex.Pattern;
 import org.eclipse.jetty.websocket.api.Session;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,22 +38,19 @@ import org.structr.web.entity.dom.ShadowDocument;
 import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.message.WebSocketMessage;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
- * Base class for all WebSocket commands in structr.
- *
- *
+ * Base class for all WebSocket commands in Structr.
  */
 public abstract class AbstractCommand {
 
-	public static final String COMMAND_KEY = "command";
-	public static final String ID_KEY      = "id";
-	private static final Logger logger     = LoggerFactory.getLogger(AbstractCommand.class.getName());
+	public static final Pattern UUID_PATTERN = Pattern.compile("[a-fA-F0-9]{32}");
+	public static final String COMMAND_KEY   = "command";
+	public static final String ID_KEY        = "id";
+	private static final Logger logger       = LoggerFactory.getLogger(AbstractCommand.class.getName());
 
-	protected Session session              = null;
-	protected StructrWebSocket webSocket   = null;
-	protected String callback              = null;
+	protected Session session                = null;
+	protected StructrWebSocket webSocket     = null;
+	protected String callback                = null;
 
 	public abstract void processMessage(final WebSocketMessage webSocketData) throws FrameworkException;
 
@@ -115,7 +113,7 @@ public abstract class AbstractCommand {
 
 	/**
 	 * Returns the graph object with the given id.
-	 * 
+	 *
 	 * If no node with the given id is found and nodeId is not null,
 	 * this method will search for a relationship in the list of relationships
 	 * of the node with the given nodeId.
@@ -126,22 +124,29 @@ public abstract class AbstractCommand {
 	 */
 	public GraphObject getGraphObject(final String id, final String nodeId) {
 
-		final AbstractNode node = getNode(id);
-		if (node != null) {
+		if (isValidUuid(id)) {
 
-			return node;
+			final AbstractNode node = getNode(id);
+			if (node != null) {
+
+				return node;
+
+			} else {
+
+				if (nodeId == null) {
+					logger.warn("Relationship access by UUID is deprecated and not supported by Neo4j, this can take a very long time.");
+				}
+
+				final AbstractRelationship rel = getRelationship(id, nodeId);
+				if (rel != null) {
+
+					return rel;
+				}
+			}
 
 		} else {
 
-			if (nodeId == null) {
-				logger.warn("Relationship access by UUID is deprecated and not supported by Neo4j, this can take a very long time.");
-			}
-
-			final AbstractRelationship rel = getRelationship(id, nodeId);
-			if (rel != null) {
-
-				return rel;
-			}
+			logger.warn("Invalid UUID used for getGraphObject: {} is not a valid UUID.", id);
 		}
 
 		return null;
@@ -178,9 +183,9 @@ public abstract class AbstractCommand {
 	 * with the given nodeId and filtering the relationships.
 	 *
 	 * This avoids the performance issues of getRelationshipById due to missing index support.
-	 * 
+	 *
 	 * If nodeId is null, the method falls back to {@link getRelationship(id)}.
-	 * 
+	 *
 	 *
 	 * @param id
 	 * @param nodeId
@@ -191,20 +196,20 @@ public abstract class AbstractCommand {
 		if (id == null) {
 			return null;
 		}
-		
+
 		if (nodeId == null) {
 			return getRelationship(id);
 		}
-		
+
 		final SecurityContext securityContext = getWebSocket().getSecurityContext();
 		final App app = StructrApp.getInstance(securityContext);
 
 		try (final Tx tx = app.tx()) {
 
 			final AbstractNode node = (AbstractNode) app.getNodeById(nodeId);
-			
+
 			for (final AbstractRelationship rel : node.getRelationships()) {
-				
+
 				if (rel.getUuid().equals(id)) {
 					return rel;
 				}
@@ -217,9 +222,9 @@ public abstract class AbstractCommand {
 		}
 
 		return null;
-		
+
 	}
-	
+
 	/**
 	 * Returns the relationship to which the uuid parameter
 	 * of this command refers to.
@@ -296,20 +301,29 @@ public abstract class AbstractCommand {
 
 		final App app = StructrApp.getInstance();
 
-		ShadowDocument doc = app.nodeQuery(ShadowDocument.class).includeDeletedAndHidden().getFirst();
-		if (doc == null) {
+		try (final Tx tx = app.tx()) {
 
-			final PropertyMap properties = new PropertyMap();
-			properties.put(AbstractNode.type, ShadowDocument.class.getSimpleName());
-			properties.put(AbstractNode.name, "__ShadowDocument__");
-			properties.put(AbstractNode.hidden, true);
-			properties.put(AbstractNode.visibleToAuthenticatedUsers, true);
+			ShadowDocument doc = app.nodeQuery(ShadowDocument.class).includeHidden().getFirst();
+			if (doc == null) {
 
-			doc = app.create(ShadowDocument.class, properties);
+				final PropertyMap properties = new PropertyMap();
+				properties.put(AbstractNode.type, ShadowDocument.class.getSimpleName());
+				properties.put(AbstractNode.name, "__ShadowDocument__");
+				properties.put(AbstractNode.hidden, true);
+				properties.put(AbstractNode.visibleToAuthenticatedUsers, true);
+
+				doc = app.create(ShadowDocument.class, properties);
+			}
+
+			tx.success();
+
+			return doc;
+
+		} catch (FrameworkException fex) {
+			logger.warn("Unable to create container for shared components: {}", fex.getMessage());
 		}
 
-		return doc;
-
+		return null;
 	}
 
 	public void setSession(final Session session) {
@@ -322,5 +336,30 @@ public abstract class AbstractCommand {
 
 	public void setCallback(final String callback) {
 		this.callback = callback;
+	}
+
+	public void setDoTransactionNotifications(final boolean notify) {
+
+		final SecurityContext securityContext = getWebSocket().getSecurityContext();
+
+		if (securityContext != null) {
+			securityContext.setDoTransactionNotifications(notify);
+		}
+
+	}
+
+	// ----- private methods -----
+	private boolean isValidUuid(final String id) {
+
+		if (id != null) {
+
+			if (id.length() != 32) {
+				return false;
+			}
+
+			return UUID_PATTERN.matcher(id).matches();
+		}
+
+		return false;
 	}
 }

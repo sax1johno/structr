@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -28,36 +28,34 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.util.Iterables;
+import org.structr.api.util.ResultStream;
 import org.structr.common.CaseHelper;
 import org.structr.common.GraphObjectComparator;
 import org.structr.common.Permission;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
-import org.structr.core.Services;
 import org.structr.core.Value;
 import org.structr.core.app.App;
 import org.structr.core.app.Query;
 import org.structr.core.app.StructrApp;
-import org.structr.core.graph.BulkDeleteCommand;
+import org.structr.core.entity.AbstractNode;
 import org.structr.core.graph.NodeFactory;
+import org.structr.core.graph.NodeInterface;
+import org.structr.core.graph.RelationshipInterface;
 import org.structr.core.graph.Tx;
 import org.structr.core.graph.search.SearchCommand;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.rest.RestMethodResult;
+import org.structr.rest.exception.IllegalMethodException;
 import org.structr.rest.exception.IllegalPathException;
-import org.structr.rest.exception.NoResultsException;
+import org.structr.rest.exception.NotFoundException;
 import org.structr.rest.servlet.JsonRestServlet;
-import org.structr.schema.ConfigurationProvider;
 
-//~--- classes ----------------------------------------------------------------
 /**
  * Base class for all resource constraints. Constraints can be combined with succeeding constraints to avoid unneccesary evaluation.
- *
- *
- *
  */
 public abstract class Resource {
 
@@ -82,7 +80,7 @@ public abstract class Resource {
 	public abstract String getResourceSignature();
 	public abstract boolean isCollectionResource() throws FrameworkException;
 
-	public abstract Result doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException;
+	public abstract ResultStream doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException;
 	public abstract RestMethodResult doPost(final Map<String, Object> propertySet) throws FrameworkException;
 
 	@Override
@@ -99,25 +97,65 @@ public abstract class Resource {
 		return new RestMethodResult(HttpServletResponse.SC_OK);
 	}
 
+	public RestMethodResult doPatch(List<Map<String, Object>> propertySet) throws FrameworkException {
+		throw new IllegalMethodException("PATCH not allowed on " + getClass().getSimpleName());
+	}
+
 	public RestMethodResult doDelete() throws FrameworkException {
 
-		final App app                 = StructrApp.getInstance(securityContext);
-		Iterable<GraphObject> results = null;
+		final App app      = StructrApp.getInstance(securityContext);
+		final int pageSize = 500;
+		int count          = 0;
+		int chunk          = 0;
+		boolean hasMore    = true;
 
-		// catch 204, DELETE must return 200 if resource is empty
-		try (final Tx tx = app.tx(false, false, false)) {
+		while (hasMore) {
 
-			results = doGet(null, false, NodeFactory.DEFAULT_PAGE_SIZE, NodeFactory.DEFAULT_PAGE).getResults();
+			// will be set to true below if at least one result was processed
+			hasMore = false;
 
-			tx.success();
+			try (final Tx tx = app.tx(true, true, false)) {
 
-		} catch (final NoResultsException nre) {
-			results = null;
-		}
+				chunk++;
 
-		if (results != null) {
+				// don't count all the nodes, just fetch the page
+				securityContext.ignoreResultCount(true);
 
-			app.command(BulkDeleteCommand.class).bulkDelete(results.iterator());
+				// always fetch the first page
+				final ResultStream<GraphObject> result = doGet(null, false, pageSize, 1);
+
+				for (final GraphObject obj : result) {
+
+					hasMore = true;
+
+					if (obj.isNode()) {
+
+						app.delete((NodeInterface)obj);
+
+					} else {
+
+						app.delete((RelationshipInterface)obj);
+					}
+
+					count++;
+				}
+
+				tx.success();
+
+				logger.info("DeleteObjects: {} objects processed", count);
+
+			} catch (NotFoundException nfex) {
+
+				// ignore NotFoundException
+
+			} catch (Throwable t) {
+
+				logger.warn("Exception in DELETE chunk #{}: {}", chunk, t.getMessage());
+
+				// we need to break here, otherwise the delete call will loop
+				// endlessly, trying to delete the erroneous objects.
+				break;
+			}
 		}
 
 		return new RestMethodResult(HttpServletResponse.SC_OK);
@@ -125,8 +163,8 @@ public abstract class Resource {
 
 	public RestMethodResult doPut(final Map<String, Object> propertySet) throws FrameworkException {
 
-		final Result<GraphObject> result = doGet(null, false, NodeFactory.DEFAULT_PAGE_SIZE, NodeFactory.DEFAULT_PAGE);
-		final List<GraphObject> results  = result.getResults();
+		final ResultStream<GraphObject> result = doGet(null, false, NodeFactory.DEFAULT_PAGE_SIZE, NodeFactory.DEFAULT_PAGE);
+		final List<GraphObject> results        = Iterables.toList(result);
 
 		if (results != null && !results.isEmpty()) {
 
@@ -140,7 +178,7 @@ public abstract class Resource {
 			for (final GraphObject obj : results) {
 
 				if (obj.isNode() && !obj.getSyncNode().isGranted(Permission.write, securityContext)) {
-					throw new FrameworkException(403, "Modification not permitted.");
+					throw new FrameworkException(403, "Modification of node " + obj.getProperty(GraphObject.id) + " with type " + obj.getProperty(GraphObject.type) + " by user " + securityContext.getUser(false).getProperty(AbstractNode.id) + " not permitted.");
 				}
 
 				obj.setProperties(securityContext, properties);
@@ -159,7 +197,7 @@ public abstract class Resource {
 	public void configurePropertyView(final Value<String> propertyView) {
 	}
 
-	public void postProcessResultSet(final Result result) {
+	public void postProcessResultSet(final ResultStream result) {
 	}
 
 	public boolean isPrimitiveArray() {
@@ -214,27 +252,11 @@ public abstract class Resource {
 
 	protected void applyDefaultSorting(List<? extends GraphObject> list, PropertyKey sortKey, boolean sortDescending) {
 
-		if (!list.isEmpty()) {
+		String finalSortOrder = sortDescending ? "desc" : "asc";
 
-			String finalSortOrder = sortDescending ? "desc" : "asc";
+		if (sortKey != null) {
 
-			if (sortKey == null) {
-
-				// Apply default sorting, if defined
-				final GraphObject obj = list.get(0);
-
-				final PropertyKey defaultSort = obj.getDefaultSortKey();
-
-				if (defaultSort != null) {
-
-					sortKey = defaultSort;
-					finalSortOrder = obj.getDefaultSortOrder();
-				}
-			}
-
-			if (sortKey != null) {
-				Collections.sort(list, new GraphObjectComparator(sortKey, finalSortOrder));
-			}
+			Collections.sort(list, new GraphObjectComparator(sortKey, finalSortOrder));
 		}
 	}
 
@@ -308,12 +330,11 @@ public abstract class Resource {
 		if (type != null && request != null && !request.getParameterMap().isEmpty()) {
 
 			final boolean exactSearch          = !(parseInteger(request.getParameter(JsonRestServlet.REQUEST_PARAMETER_LOOSE_SEARCH)) == 1);
-			final ConfigurationProvider conf   = Services.getInstance().getConfigurationProvider();
 			final List<PropertyKey> searchKeys = new LinkedList<>();
 
 			for (final String name : request.getParameterMap().keySet()) {
 
-				final PropertyKey key = conf.getPropertyKeyForJSONName(type, getFirstPartOfString(name), false);
+				final PropertyKey key = StructrApp.getConfiguration().getPropertyKeyForJSONName(type, getFirstPartOfString(name), false);
 				if (key != null) {
 
 					// add to list of searchable keys
@@ -353,7 +374,6 @@ public abstract class Resource {
 	/**
 	 * Returns the first part of the given source string when it contains a "."
 	 *
-	 * @param parameter
 	 * @return source
 	 */
 	private String getFirstPartOfString(final String source) {

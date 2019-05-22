@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,37 +20,33 @@ package org.structr.core.function;
 
 import java.util.List;
 import org.structr.common.SecurityContext;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.app.StructrApp;
 import org.structr.core.converter.PropertyConverter;
 import org.structr.core.property.PropertyKey;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class GetOrNullFunction extends Function<Object, Object> {
+public class GetOrNullFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_GET_OR_NULL    = "Usage: ${get_or_null(entity, propertyKey)}. Example: ${get_or_null(this, \"children\")}";
 	public static final String ERROR_MESSAGE_GET_OR_NULL_JS = "Usage: ${{Structr.getOrNull(entity, propertyKey)}}. Example: ${{Structr.getOrNull(this, \"children\")}}";
 
 	@Override
 	public String getName() {
-		return "get_or_null()";
+		return "get_or_null";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
 		final SecurityContext securityContext = ctx.getSecurityContext();
-		
+
 		try {
-			if (!arrayHasLengthAndAllElementsNotNull(sources, 2)) {
-				
-				return null;
-			}
+
+			assertArrayHasLengthAndAllElementsNotNull(sources, 2);
 
 			GraphObject dataObject = null;
 
@@ -70,7 +66,7 @@ public class GetOrNullFunction extends Function<Object, Object> {
 			if (dataObject != null) {
 
 				final String keyName = sources[1].toString();
-				final PropertyKey key = StructrApp.getConfiguration().getPropertyKeyForJSONName(dataObject.getClass(), keyName);
+				final PropertyKey key = StructrApp.key(dataObject.getClass(), keyName);
 
 				if (key != null) {
 
@@ -87,12 +83,14 @@ public class GetOrNullFunction extends Function<Object, Object> {
 				return "";
 			}
 
-		} catch (final IllegalArgumentException e) {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			// silently ignore null arguments
 
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
 
 		return null;
@@ -100,17 +98,11 @@ public class GetOrNullFunction extends Function<Object, Object> {
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {
-
-		if (inJavaScriptContext) {
-			return ERROR_MESSAGE_GET_OR_NULL_JS;
-		}
-
-		return ERROR_MESSAGE_GET_OR_NULL;
+		return (inJavaScriptContext ? ERROR_MESSAGE_GET_OR_NULL_JS :ERROR_MESSAGE_GET_OR_NULL);
 	}
 
 	@Override
 	public String shortDescription() {
 		return "Returns the value with the given name of the given entity, or null";
 	}
-
 }

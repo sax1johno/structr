@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,8 +18,10 @@
  */
 package org.structr.schema.export;
 
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import org.structr.core.entity.SchemaNode;
 import org.structr.core.entity.SchemaProperty;
 import org.structr.schema.json.JsonProperty;
 import org.structr.schema.json.JsonReferenceProperty;
@@ -112,8 +114,8 @@ public abstract class StructrReferenceProperty extends StructrPropertyDefinition
 
 
 	@Override
-	void deserialize(final SchemaProperty schemaProperty) {
-		super.deserialize(schemaProperty);
+	void deserialize(final Map<String, SchemaNode> schemaNodes, final SchemaProperty schemaProperty) {
+		super.deserialize(schemaNodes, schemaProperty);
 	}
 
 }

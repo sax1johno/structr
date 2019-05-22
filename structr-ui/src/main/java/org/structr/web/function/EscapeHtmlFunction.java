@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,45 +18,41 @@
  */
 package org.structr.web.function;
 
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 import org.structr.web.entity.dom.DOMNode;
 
-/**
- *
- */
-public class EscapeHtmlFunction extends Function<Object, Object> {
+public class EscapeHtmlFunction extends UiCommunityFunction {
 
 	public static final String ERROR_MESSAGE_ESCAPE_HTML    = "Usage: ${escape_html(text)}. Example: ${escape_html(\"test & test\")}";
 	public static final String ERROR_MESSAGE_ESCAPE_HTML_JS = "Usage: ${{Structr.escape_html(text)}}. Example: ${{Structr.escape_html(\"test & test\")}}";
 
 	@Override
 	public String getName() {
-		return "escape_html()";
+		return "escape_html";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
 		try {
-			
-			if (!arrayHasLengthAndAllElementsNotNull(sources, 1)) {
-				
-				logParameterError(caller, sources, ctx.isJavaScriptContext());
 
-				return usage(ctx.isJavaScriptContext());
-			}
+			assertArrayHasLengthAndAllElementsNotNull(sources, 1);
 
 			return DOMNode.escapeForHtmlAttributes(sources[0].toString());
 
-		} catch (final Throwable e) {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
-			
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
+			return usage(ctx.isJavaScriptContext());
+
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return null;
 		}
-
 	}
 
 	@Override
@@ -68,5 +64,4 @@ public class EscapeHtmlFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "";
 	}
-
 }

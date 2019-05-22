@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,10 +19,13 @@
 package org.structr.schema.export;
 
 import java.util.Map;
+import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
 import org.structr.core.entity.AbstractSchemaNode;
+import org.structr.core.entity.SchemaNode;
 import org.structr.core.entity.SchemaProperty;
+import org.structr.core.property.PropertyMap;
 import org.structr.schema.SchemaHelper.Type;
 import org.structr.schema.json.JsonSchema;
 import org.structr.schema.json.JsonStringProperty;
@@ -34,7 +37,7 @@ import org.structr.schema.json.JsonStringProperty;
 public class StructrStringProperty extends StructrPropertyDefinition implements JsonStringProperty {
 
 	private String contentType;
-	
+
 	public StructrStringProperty(final StructrTypeDefinition parent, final String name) {
 		super(parent, name);
 	}
@@ -59,10 +62,10 @@ public class StructrStringProperty extends StructrPropertyDefinition implements 
 	}
 
 	@Override
-	void deserialize(final SchemaProperty property) {
-		
-		super.deserialize(property);
-		
+	void deserialize(final Map<String, SchemaNode> schemaNodes, final SchemaProperty property) {
+
+		super.deserialize(schemaNodes, property);
+
 		setFormat(property.getFormat());
 		setContentType(property.getContentType());
 	}
@@ -82,15 +85,18 @@ public class StructrStringProperty extends StructrPropertyDefinition implements 
 
 		return map;
 	}
-	
+
 	@Override
 	SchemaProperty createDatabaseSchema(final App app, final AbstractSchemaNode schemaNode) throws FrameworkException {
 
 		final SchemaProperty property = super.createDatabaseSchema(app, schemaNode);
+		final PropertyMap properties  = new PropertyMap();
 
-		property.setProperty(SchemaProperty.propertyType, Type.String.name());
-		property.setProperty(SchemaProperty.format, getFormat());
-		property.setProperty(SchemaProperty.contentType, getContentType());
+		properties.put(SchemaProperty.propertyType, getTypeToSerialize().name());
+		properties.put(SchemaProperty.format, getFormat());
+		properties.put(SchemaProperty.contentType, getContentType());
+
+		property.setProperties(SecurityContext.getSuperUserInstance(), properties);
 
 		return property;
 	}
@@ -106,5 +112,10 @@ public class StructrStringProperty extends StructrPropertyDefinition implements 
 	@Override
 	public String getContentType() {
 		return contentType;
+	}
+
+	// ----- protected methods -----
+	protected Type getTypeToSerialize() {
+		return Type.String;
 	}
 }

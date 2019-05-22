@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,43 +18,40 @@
  */
 package org.structr.core.function;
 
-import java.util.Collection;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class IsCollectionFunction extends Function<Object, Object> {
+public class IsCollectionFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_IS_COLLECTION = "Usage: ${is_collection(value)}. Example: ${is_collection(this)}";
 
 	@Override
 	public String getName() {
-		return "is_collection()";
+		return "is_collection";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
 		try {
-			if (!arrayHasLengthAndAllElementsNotNull(sources, 1)) {
-				
-				return false;
-			}
 
-			return (sources[0] instanceof Collection);
+			assertArrayHasLengthAndAllElementsNotNull(sources, 1);
 
-		} catch (final IllegalArgumentException e) {
+			return (sources[0] instanceof Iterable);
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+		} catch (ArgumentNullException pe) {
 
+			// silently ignore null arguments
+			return false;
+
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {
@@ -65,5 +62,4 @@ public class IsCollectionFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Returns true if the given argument is a collection";
 	}
-
 }

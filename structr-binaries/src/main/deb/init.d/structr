@@ -12,6 +12,10 @@
 
 cd /usr/lib/structr/
 
+# set max open files limits to recommended value
+ulimit -Hn 50000
+ulimit -Sn 40000
+
 PID_FILE="/var/run/structr.pid"
 
 case "$1" in
@@ -36,8 +40,7 @@ case "$1" in
   ;;
   restart)
 
-        /usr/lib/structr/bin/stop
-        /usr/lib/structr/bin/start
+        /usr/lib/structr/bin/stop && /usr/lib/structr/bin/start
         ;;
   stop)
         /usr/lib/structr/bin/stop

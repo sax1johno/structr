@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -34,6 +34,8 @@ import org.structr.common.error.FrameworkException;
 import org.structr.core.graph.ModificationQueue;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.RelationshipInterface;
+import org.structr.core.graph.TransactionCommand;
+import org.structr.core.property.GenericProperty;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.core.script.Scripting;
@@ -45,11 +47,6 @@ import org.structr.schema.action.ActionContext;
  *
  */
 public class GraphObjectMap extends PropertyMap implements GraphObject {
-
-	@Override
-	public long getId() {
-		return -1;
-	}
 
 	@Override
 	public String getUuid() {
@@ -73,6 +70,11 @@ public class GraphObjectMap extends PropertyMap implements GraphObject {
 
 	@Override
 	public Object setProperty(final PropertyKey key, final Object value) throws FrameworkException {
+		return setProperty(key, value, false);
+	}
+
+	@Override
+	public Object setProperty(final PropertyKey key, final Object value, final boolean isCreation) throws FrameworkException {
 		properties.put(key, value);
 		return null;
 	}
@@ -80,6 +82,16 @@ public class GraphObjectMap extends PropertyMap implements GraphObject {
 	@Override
 	public <T> T getProperty(final PropertyKey<T> propertyKey) {
 		return (T)properties.get(propertyKey);
+	}
+
+	@Override
+	public void setProperties(final SecurityContext securityContext, final PropertyMap properties) throws FrameworkException {
+		setProperties(securityContext, properties, false);
+	}
+
+	@Override
+	public void setProperties(final SecurityContext securityContext, final PropertyMap properties, final boolean isCreation) throws FrameworkException {
+		properties.putAll(properties);
 	}
 
 	@Override
@@ -93,16 +105,6 @@ public class GraphObjectMap extends PropertyMap implements GraphObject {
 	}
 
 	@Override
-	public PropertyKey getDefaultSortKey() {
-		return null;
-	}
-
-	@Override
-	public String getDefaultSortOrder() {
-		return "asc";
-	}
-
-	@Override
 	public void unlockReadOnlyPropertiesOnce() {
 	}
 
@@ -111,18 +113,15 @@ public class GraphObjectMap extends PropertyMap implements GraphObject {
 	}
 
 	@Override
-	public boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
-		return true;
+	public void onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException {
 	}
 
 	@Override
-	public boolean onModification(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
-		return true;
+	public void onModification(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
 	}
 
 	@Override
-	public boolean onDeletion(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final PropertyMap properties) throws FrameworkException {
-		return true;
+	public void onDeletion(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final PropertyMap properties) throws FrameworkException {
 	}
 
 	@Override
@@ -156,6 +155,17 @@ public class GraphObjectMap extends PropertyMap implements GraphObject {
 	@Override
 	public boolean isValid(final ErrorBuffer errorBuffer) {
 		return true;
+	}
+
+	public static GraphObjectMap fromMap(final Map<String, Object> map) {
+
+		final GraphObjectMap newGraphObjectMap = new GraphObjectMap();
+
+		for (final Map.Entry<String, Object> prop : map.entrySet()) {
+
+			newGraphObjectMap.put(new GenericProperty(prop.getKey()), prop.getValue());
+		}
+		return newGraphObjectMap;
 	}
 
 	public Map<String, Object> toMap() {
@@ -231,14 +241,6 @@ public class GraphObjectMap extends PropertyMap implements GraphObject {
 	}
 
 	@Override
-	public void updateInIndex() {
-	}
-
-	@Override
-	public void removeFromIndex() {
-	}
-
-	@Override
 	public void indexPassiveProperties() {
 	}
 
@@ -304,5 +306,10 @@ public class GraphObjectMap extends PropertyMap implements GraphObject {
 	@Override
 	public RelationshipInterface getSyncRelationship() {
 		return null;
+	}
+
+	@Override
+	public long getSourceTransactionId() {
+		return TransactionCommand.getCurrentTransactionId();
 	}
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -23,54 +23,38 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
+import org.structr.api.search.QueryContext;
 import org.structr.api.search.SortType;
 
 /**
  *
  */
-public class AdvancedCypherQuery implements PageableQuery {
+public class AdvancedCypherQuery implements CypherQuery {
 
-	private final Map<String, Object> parameters = new HashMap<>();
-	private final List<String> typeLabels        = new LinkedList<>();
-	private final StringBuilder buffer           = new StringBuilder();
-	private String sourceTypeLabel               = null;
-	private String targetTypeLabel               = null;
-	private AbstractCypherIndex<?> index         = null;
-	private boolean sortDescending               = false;
-	private SortType sortType                    = null;
-	private String sortKey                       = null;
-	private int page                             = 0;
-	private int pageSize                         = 0;
-	private int count                            = 0;
+	private final Map<String, Object> parameters    = new HashMap<>();
+	private final List<String> typeLabels           = new LinkedList<>();
+	private final StringBuilder buffer              = new StringBuilder();
+	private String sourceTypeLabel                  = null;
+	private String targetTypeLabel                  = null;
+	private AbstractCypherIndex<?> index            = null;
+	private boolean sortDescending                  = false;
+	private SortType sortType                       = null;
+	private String sortKey                          = null;
+	private int page                                = 0;
+	private int pageSize                            = 0;
+	private int count                               = 0;
+	private QueryContext queryContext               = null;
 
-	public AdvancedCypherQuery(final AbstractCypherIndex<?> index) {
+	public AdvancedCypherQuery(final QueryContext queryContext, final AbstractCypherIndex<?> index) {
+
+		this.queryContext = queryContext;
+		this.pageSize = 1000000;
 		this.index    = index;
-		this.pageSize = 100000;
 	}
 
 	@Override
 	public String toString() {
 		return getStatement();
-	}
-
-	public int getHashCode() {
-
-		int hashCode = 23;
-
-		hashCode += 27 * typeLabels.hashCode();
-		hashCode += 37 * getStatement().hashCode();
-		hashCode += 47 * deepHashCode(parameters);
-
-		if (sortKey != null) {
-			hashCode += 57 * sortKey.hashCode();
-		}
-
-		if (sortDescending) {
-			hashCode += 1;
-		}
-
-		return hashCode;
 	}
 
 	@Override
@@ -81,6 +65,10 @@ public class AdvancedCypherQuery implements PageableQuery {
 	@Override
 	public int pageSize() {
 		return this.pageSize;
+	}
+
+	public String getSortKey() {
+		return sortKey;
 	}
 
 	@Override
@@ -100,7 +88,7 @@ public class AdvancedCypherQuery implements PageableQuery {
 					buf.append(buffer);
 				}
 
-				buf.append(index.getQuerySuffix());
+				buf.append(index.getQuerySuffix(this));
 				break;
 
 			case 1:
@@ -112,7 +100,7 @@ public class AdvancedCypherQuery implements PageableQuery {
 					buf.append(buffer);
 				}
 
-				buf.append(index.getQuerySuffix());
+				buf.append(index.getQuerySuffix(this));
 				break;
 
 			default:
@@ -127,7 +115,7 @@ public class AdvancedCypherQuery implements PageableQuery {
 						buf.append(buffer);
 					}
 
-					buf.append(index.getQuerySuffix());
+					buf.append(index.getQuerySuffix(this));
 
 					if (it.hasNext()) {
 						buf.append(" UNION ");
@@ -143,22 +131,18 @@ public class AdvancedCypherQuery implements PageableQuery {
 				case Default:
 					// default is "String"
 					// no COALESCE needed => much faster
-					buf.append(" ORDER BY n.`");
-					buf.append(sortKey);
-					buf.append("` ");
-					
+					buf.append(" ORDER BY sortKey");
+
 					break;
 
 				default:
 					// other types are numeric
-					buf.append(" ORDER BY COALESCE(n.`");
-					buf.append(sortKey);
-					buf.append("`, ");
-					
+					buf.append(" ORDER BY COALESCE(sortKey, ");
+
 					// COALESCE needs a correctly typed minimum value,
 					// so we need to supply a value based on the sort
 					// type.
-					
+
 					buf.append("-1");
 					buf.append(")");
 			}
@@ -168,10 +152,13 @@ public class AdvancedCypherQuery implements PageableQuery {
 			}
 		}
 
-		buf.append(" SKIP ");
-		buf.append(page * pageSize);
-		buf.append(" LIMIT ");
-		buf.append(pageSize);
+		if (queryContext.isSliced()) {
+
+			buf.append(" SKIP ");
+			buf.append(queryContext.getSkip());
+			buf.append(" LIMIT ");
+			buf.append(queryContext.getLimit());
+		}
 
 		return buf.toString();
 	}
@@ -189,24 +176,24 @@ public class AdvancedCypherQuery implements PageableQuery {
 		buffer.append(")");
 	}
 
+	@Override
 	public void and() {
 		buffer.append(" AND ");
 	}
 
+	@Override
 	public void not() {
 		buffer.append(" NOT ");
 	}
 
+	@Override
 	public void andNot() {
 		buffer.append(" AND NOT ");
 	}
 
+	@Override
 	public void or() {
 		buffer.append(" OR ");
-	}
-
-	public void noop() {
-		buffer.append(" True ");
 	}
 
 	public void typeLabel(final String typeLabel) {
@@ -228,11 +215,11 @@ public class AdvancedCypherQuery implements PageableQuery {
 			final String paramKey = "param" + count++;
 
 			if (isProperty) {
-				
+
 				if (caseInsensitive) {
 					buffer.append("toLower(");
 				}
-				
+
 				buffer.append("n.`");
 			}
 
@@ -326,6 +313,7 @@ public class AdvancedCypherQuery implements PageableQuery {
 		parameters.put(paramKey2, value2);
 	}
 
+	@Override
 	public void sort(final SortType sortType, final String sortKey, final boolean sortDescending) {
 
 		this.sortDescending = sortDescending;
@@ -341,18 +329,8 @@ public class AdvancedCypherQuery implements PageableQuery {
 		this.targetTypeLabel = targetTypeLabel;
 	}
 
-	private int deepHashCode(final Map<String, Object> map) {
-
-		final StringBuilder buf = new StringBuilder();
-
-		for (final Entry<String, Object> entry : map.entrySet()) {
-
-			buf.append("|");
-			buf.append(entry.getKey());
-			buf.append("|");
-			buf.append(entry.getValue());
-		}
-
-		return buf.toString().hashCode();
+	@Override
+	public QueryContext getQueryContext() {
+		return queryContext;
 	}
 }

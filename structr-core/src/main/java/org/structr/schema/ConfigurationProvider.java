@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -29,7 +29,6 @@ import org.structr.core.GraphObject;
 import org.structr.core.PropertyGroup;
 import org.structr.core.PropertyValidator;
 import org.structr.core.Transformation;
-import org.structr.core.ViewTransformation;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.RelationshipInterface;
 import org.structr.core.property.PropertyKey;
@@ -72,10 +71,6 @@ public interface ConfigurationProvider {
 
 	public PropertyGroup getPropertyGroup(final Class type, final String key);
 
-	public void registerViewTransformation(final Class type, final String view, final ViewTransformation transformation);
-
-	public ViewTransformation getViewTransformation(final Class type, final String view);
-
 	public Set<String> getPropertyViews();
 	public Set<String> getPropertyViewsForType(final Class type);
 	public void registerDynamicViews(final Set<String> dynamicViews);
@@ -85,12 +80,12 @@ public interface ConfigurationProvider {
 	public Set<PropertyKey> getPropertySet(final Class type, final String propertyView);
 
 	public PropertyKey getPropertyKeyForDatabaseName(final Class type, final String dbName);
-
 	public PropertyKey getPropertyKeyForDatabaseName(final Class type, final String dbName, final boolean createGeneric);
 
 	public PropertyKey getPropertyKeyForJSONName(final Class type, final String jsonName);
-
 	public PropertyKey getPropertyKeyForJSONName(final Class type, final String jsonName, final boolean createIfNotFound);
+
+	public void setPropertyKeyForJSONName(final Class type, final String jsonName, final PropertyKey key);
 
 	public Set<PropertyValidator> getPropertyValidators(final SecurityContext securityContext, final Class type, final PropertyKey propertyKey);
 
@@ -113,6 +108,14 @@ public interface ConfigurationProvider {
 	 * @param propertyKey
 	 */
 	public void registerProperty(final Class type, final PropertyKey propertyKey);
+
+	/**
+	 * Unregisters the given property with the given type.
+	 *
+	 * @param type
+	 * @param propertyKey
+	 */
+	public void unregisterProperty(final Class type, final PropertyKey propertyKey);
 
 	/**
 	 * Registers the given property with the given type AND ALL SUPERTYPES.

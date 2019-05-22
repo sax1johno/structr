@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,21 +18,14 @@
  */
 package org.structr.core.entity;
 
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
-import org.structr.api.graph.Node;
-import org.structr.api.util.FixedSizeCache;
 import org.structr.api.util.Iterables;
-import org.structr.common.SecurityContext;
 import org.structr.common.error.ErrorBuffer;
-import org.structr.common.error.FrameworkException;
-import org.structr.core.graph.ModificationQueue;
 import org.structr.core.property.GenericProperty;
 import org.structr.core.property.PropertyKey;
-import org.structr.core.property.PropertyMap;
 import org.structr.schema.NonIndexed;
 
 /**
@@ -41,11 +34,9 @@ import org.structr.schema.NonIndexed;
  */
 public class GenericNode extends AbstractNode implements NonIndexed {
 
-	private static final FixedSizeCache<Long, Set<PropertyKey>> propertyKeys = new FixedSizeCache<>(1000);
-
 	@Override
 	public int hashCode() {
-		return getNodeId().hashCode();
+		return getUuid().hashCode();
 	}
 
 	@Override
@@ -59,21 +50,6 @@ public class GenericNode extends AbstractNode implements NonIndexed {
 	}
 
 	@Override
-	public boolean onCreation(SecurityContext securityContext, ErrorBuffer errorBuffer) throws FrameworkException {
-		return true;
-	}
-
-	@Override
-	public boolean onModification(SecurityContext securityContext, ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException {
-		return true;
-	}
-
-	@Override
-	public boolean onDeletion(SecurityContext securityContext, ErrorBuffer errorBuffer, PropertyMap properties) throws FrameworkException {
-		return true;
-	}
-
-	@Override
 	public boolean isValid(ErrorBuffer errorBuffer) {
 		return true;
 	}
@@ -81,29 +57,20 @@ public class GenericNode extends AbstractNode implements NonIndexed {
 	@Override
 	public Set<PropertyKey> getPropertyKeys(final String propertyView) {
 
-		final Node node = getNode();
-		if (node != null) {
+		final Set<PropertyKey> keys = new TreeSet<>(new PropertyKeyComparator());
 
-			final long id = node.getId();
-			Set<PropertyKey> keys = propertyKeys.get(id);
-			if (keys == null) {
+		// add all properties from a schema entity (if existing)
+		keys.addAll(Iterables.toList(super.getPropertyKeys(propertyView)));
 
-				keys = new TreeSet<>(new PropertyKeyComparator());
+		// add properties that are physically present on the node
+		keys.addAll(Iterables.toList(Iterables.map(new GenericPropertyKeyMapper(), dbNode.getPropertyKeys())));
 
-				// add all properties from a schema entity (if existing)
-				keys.addAll(Iterables.toList(super.getPropertyKeys(propertyView)));
+		return keys;
+	}
 
-				// add properties that are physically present on the node
-				keys.addAll(Iterables.toList(Iterables.map(new GenericPropertyKeyMapper(), dbNode.getPropertyKeys())));
-
-				propertyKeys.put(id, keys);
-			}
-
-			return keys;
-		}
-
-		// return the whole set
-		return Collections.EMPTY_SET;
+	@Override
+	protected boolean isGenericNode() {
+		return true;
 	}
 
 	// ----- nested classes -----
@@ -126,35 +93,6 @@ public class GenericNode extends AbstractNode implements NonIndexed {
 			}
 
 			throw new NullPointerException();
-		}
-	}
-
-	private class GenericRelation extends ManyToMany {
-
-		private String relType = null;
-
-		public GenericRelation(final String relType) {
-			this.relType = relType;
-		}
-
-		@Override
-		public Class getSourceType() {
-			return GenericNode.class;
-		}
-
-		@Override
-		public Class getTargetType() {
-			return GenericNode.class;
-		}
-
-		@Override
-		public String name() {
-			return relType;
-		}
-
-		@Override
-		public boolean isInternal() {
-			return false;
 		}
 	}
 }

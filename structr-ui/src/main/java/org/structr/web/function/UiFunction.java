@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -35,18 +35,18 @@ import org.structr.rest.common.HttpHelper;
 public abstract class UiFunction extends Function<Object, Object> {
 
 	protected String getFromUrl(final ActionContext ctx, final String requestUrl, final String username, final String password) throws IOException, FrameworkException {
-		
+
 		return HttpHelper.get(requestUrl, username, password, ctx.getHeaders());
 	}
 
 	protected GraphObjectMap headFromUrl(final ActionContext ctx, final String requestUrl, final String username, final String password) throws IOException, FrameworkException {
 
 		final Map<String, String> headers = HttpHelper.head(requestUrl, password, username, ctx.getHeaders());
-		
+
 		final GraphObjectMap response = new GraphObjectMap();
 		response.setProperty(new IntProperty("status"), headers.get("status"));
 		headers.remove("status");
-		
+
 		final GraphObjectMap map = new GraphObjectMap();
 
 		for (final Entry<String, String> entry : headers.entrySet()) {
@@ -54,6 +54,6 @@ public abstract class UiFunction extends Function<Object, Object> {
 			map.put(new StringProperty(entry.getKey()), entry.getValue());
 		}
 
-		return map;		
+		return map;
 	}
 }

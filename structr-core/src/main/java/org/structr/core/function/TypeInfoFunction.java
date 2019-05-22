@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -21,40 +21,35 @@ package org.structr.core.function;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.SchemaHelper;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-public class TypeInfoFunction extends Function<Object, Object> {
+public class TypeInfoFunction extends AdvancedScriptingFunction {
 
 	public static final String ERROR_MESSAGE_TYPE_INFO    = "Usage: ${type_info(type[, view])}. Example ${type_info('User', 'public')}";
 	public static final String ERROR_MESSAGE_TYPE_INFO_JS = "Usage: ${Structr.type_info(type[, view])}. Example ${Structr.type_info('User', 'public')}";
+
+	@Override
+	public String getName() {
+		return "type_info";
+	}
 
 	@Override
 	public Object apply(ActionContext ctx, Object caller, Object[] sources) throws FrameworkException {
 
 		try {
 
-			if (arrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 1, 2)) {
+			assertArrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 1, 2);
 
-				final String typeName = sources[0].toString();
-				final Class type = SchemaHelper.getEntityClassForRawType(typeName);
-				final String viewName = (sources.length == 2 ? sources[1].toString() : null);
+			final String typeName = sources[0].toString();
+			final Class type      = SchemaHelper.getEntityClassForRawType(typeName);
+			final String viewName = (sources.length == 2 ? sources[1].toString() : null);
 
-				return SchemaHelper.getSchemaTypeInfo(ctx.getSecurityContext(), typeName, type, viewName);
+			return SchemaHelper.getSchemaTypeInfo(ctx.getSecurityContext(), typeName, type, viewName);
 
-			} else {
+		} catch (IllegalArgumentException e) {
 
-				logParameterError(caller, sources, ctx.isJavaScriptContext());
-				return usage(ctx.isJavaScriptContext());
-
-			}
-
-		} catch (final IllegalArgumentException e) {
-
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			logParameterError(caller, sources, e.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
-
 	}
 
 	@Override
@@ -66,10 +61,4 @@ public class TypeInfoFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Returns the type information for the specified type";
 	}
-
-	@Override
-	public String getName() {
-		return "type_info()";
-	}
-
 }

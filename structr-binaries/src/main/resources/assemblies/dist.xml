@@ -53,8 +53,32 @@
 	</fileSets>
 	<files>
 		<file>
-			<source>${project.parent.basedir}/structr-ui/seed.zip</source>
-			<outputDirectory>/</outputDirectory>
+			<source>${project.parent.basedir}/structr-ui/src/main/resources/bin/commons-daemon/amd64/prunsrv.exe</source>
+			<outputDirectory>/bin/commons-daemon/amd64</outputDirectory>
+		</file>
+		<file>
+			<source>${project.parent.basedir}/structr-ui/src/main/resources/bin/commons-daemon/LICENSE.txt</source>
+			<outputDirectory>/bin/commons-daemon</outputDirectory>
+		</file>
+		<file>
+			<source>${project.parent.basedir}/structr-ui/src/main/resources/bin/commons-daemon/LICENSE.txt</source>
+			<outputDirectory>/bin/commons-daemon</outputDirectory>
+		</file>
+		<file>
+			<source>${project.parent.basedir}/structr-ui/src/main/resources/bin/commons-daemon/NOTICE.txt</source>
+			<outputDirectory>/bin/commons-daemon</outputDirectory>
+		</file>
+		<file>
+			<source>${project.parent.basedir}/structr-ui/src/main/resources/bin/commons-daemon/prunmgr.exe</source>
+			<outputDirectory>/bin/commons-daemon</outputDirectory>
+		</file>
+		<file>
+			<source>${project.parent.basedir}/structr-ui/src/main/resources/bin/commons-daemon/prunsrv.exe</source>
+			<outputDirectory>/bin/commons-daemon</outputDirectory>
+		</file>
+		<file>
+			<source>${project.parent.basedir}/structr-ui/src/main/resources/bin/commons-daemon/RELEASE-NOTES.txt</source>
+			<outputDirectory>/bin/commons-daemon</outputDirectory>
 		</file>
 		<file>
 			<source>${project.parent.basedir}/structr-ui/src/main/resources/bin/add_mail_templates.sh</source>
@@ -91,10 +115,6 @@
 		</file>
 		<file>
 			<source>${project.parent.basedir}/structr-ui/src/main/resources/bin/start</source>
-			<outputDirectory>/bin</outputDirectory>
-		</file>
-		<file>
-			<source>${project.parent.basedir}/structr-ui/src/main/resources/bin/start.bat</source>
 			<outputDirectory>/bin</outputDirectory>
 		</file>
 		<file>

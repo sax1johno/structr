@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,20 +20,23 @@ package org.structr.bolt.index;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.structr.api.search.QueryContext;
+import org.structr.api.search.SortType;
 
 /**
  *
  */
-public class SimpleCypherQuery implements PageableQuery {
+public class SimpleCypherQuery implements CypherQuery {
 
 	private final Map<String, Object> params = new LinkedHashMap<>();
+	private QueryContext queryContext        = new QueryContext();
 	private String base                      = null;
 	private int pageSize                     = 0;
 	private int page                         = 0;
 
 	public SimpleCypherQuery(final String base) {
 
-		this.pageSize = 10000;
+		this.pageSize = 100000;
 		this.base     = base;
 	}
 
@@ -63,5 +66,30 @@ public class SimpleCypherQuery implements PageableQuery {
 	@Override
 	public Map<String, Object> getParameters() {
 		return params;
+	}
+
+	@Override
+	public void and() {
+	}
+
+	@Override
+	public void or() {
+	}
+
+	@Override
+	public void not() {
+	}
+
+	@Override
+	public void andNot() {
+	}
+
+	@Override
+	public void sort(final SortType sortType, final String sortKey, final boolean sortDescending) {
+	}
+
+	@Override
+	public QueryContext getQueryContext() {
+		return queryContext;
 	}
 }

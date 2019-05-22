@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -45,7 +45,10 @@ public class ImportConsoleCommand extends AdminConsoleCommand {
 			final DeployCommand cmd = StructrApp.getInstance(securityContext).command(DeployCommand.class);
 
 			cmd.setLogBuffer(writable);
-			cmd.execute(toMap("mode", "import", "source", getParameter(parameters, 1)));
+			cmd.execute(toMap(
+					"mode",   "import",
+					"source", getParameter(parameters, 1)
+			));
 
 		} else {
 
@@ -60,7 +63,7 @@ public class ImportConsoleCommand extends AdminConsoleCommand {
 
 	@Override
 	public void detailHelp(final Writable writable) throws IOException {
-		writable.println("import <source> - imports an application from the given source directory.");
+		writable.println("import <source>  -  imports an application from the given source directory.");
 	}
 
 	@Override

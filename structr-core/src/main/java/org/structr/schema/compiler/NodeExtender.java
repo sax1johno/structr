@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -21,6 +21,7 @@ package org.structr.schema.compiler;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -37,15 +38,20 @@ import javax.tools.JavaCompiler;
 import javax.tools.JavaFileManager;
 import javax.tools.JavaFileObject;
 import javax.tools.ToolProvider;
+import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.Predicate;
 import org.structr.api.config.Settings;
 import org.structr.common.error.DiagnosticErrorToken;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.core.Services;
 import org.structr.core.app.StructrApp;
+import org.structr.core.entity.AbstractNode;
 import org.structr.core.graph.TransactionCommand;
 import org.structr.module.JarConfigurationProvider;
+import org.structr.schema.SourceFile;
+import org.structr.schema.SourceLine;
 
 /**
  *
@@ -60,14 +66,15 @@ public class NodeExtender {
 	private static final ClassLoader classLoader     = fileManager.getClassLoader(null);
 	private static final Map<String, Class> classes  = new TreeMap<>();
 
-	private List<JavaFileObject> jfiles  = null;
+	private List<SourceFile> sources     = null;
 	private Set<String> fqcns            = null;
 	private String initiatedBySessionId  = null;
 
-	public NodeExtender() {
+	public NodeExtender(final String initiatedBySessionId) {
 
-		jfiles      = new ArrayList<>();
-		fqcns       = new LinkedHashSet<>();
+		this.initiatedBySessionId = initiatedBySessionId;
+		this.sources              = new ArrayList<>();
+		this.fqcns                = new LinkedHashSet<>();
 	}
 
 	public static ClassLoader getClassLoader() {
@@ -82,19 +89,24 @@ public class NodeExtender {
 		return classes;
 	}
 
-	public void addClass(final String className, final String content) throws ClassNotFoundException {
+	public void addClass(final String className, final SourceFile sourceFile) throws ClassNotFoundException {
 
-		if (className != null && content != null) {
+		if (className != null && sourceFile != null) {
 
 			final String packageName = JarConfigurationProvider.DYNAMIC_TYPES_PACKAGE;
 
-			jfiles.add(new CharSequenceJavaFileObject(className, content));
+			sources.add(sourceFile);
 			fqcns.add(packageName.concat(".".concat(className)));
 
 			if (Settings.LogSchemaOutput.getValue()) {
 
 				System.out.println("########################################################################################################################################################");
-				System.out.println(content);
+
+				int count = 0;
+
+				for (final SourceLine line : sourceFile.getLines()) {
+					System.out.println(StringUtils.rightPad(++count + ": ", 6) + line);
+				}
 			}
 		}
 	}
@@ -104,11 +116,15 @@ public class NodeExtender {
 		final Writer errorWriter     = new StringWriter();
 		final List<Class> newClasses = new LinkedList<>();
 
-		if (!jfiles.isEmpty()) {
+		if (!sources.isEmpty()) {
 
-			logger.debug("Compiling {} dynamic entities...", jfiles.size());
+			logger.info("Compiling {} dynamic entities...", sources.size());
 
-			Boolean success = compiler.getTask(errorWriter, fileManager, new Listener(errorBuffer), null, null, jfiles).call();
+			final long t0 = System.currentTimeMillis();
+
+			Boolean success = compiler.getTask(errorWriter, fileManager, new Listener(errorBuffer), Arrays.asList("-g"), null, sources).call();
+
+			logger.info("Compiling done in {} ms", System.currentTimeMillis() - t0);
 
 			if (success) {
 
@@ -129,32 +145,26 @@ public class NodeExtender {
 					}
 				}
 
-				if (success) {
-
-					for (final Class oldType : classes.values()) {
-						StructrApp.getConfiguration().unregisterEntityType(oldType);
-					}
-
-					// clear classes map
-					classes.clear();
-
-					// add new classes to map
-					for (final Class newType : newClasses) {
-						classes.put(newType.getName(), newType);
-					}
-
-					logger.info("Successfully compiled {} dynamic entities: {}", new Object[] { jfiles.size(), jfiles.stream().map(f -> f.getName().replaceFirst("/", "")).collect(Collectors.joining(", ")) });
-
-					final Map<String, Object> data = new LinkedHashMap();
-					data.put("success", true);
-					TransactionCommand.simpleBroadcast("SCHEMA_COMPILED", data, getInitiatedBySessionId());
-
-					Services.getInstance().setOverridingSchemaTypesAllowed(false);
-
+				for (final Class oldType : classes.values()) {
+					StructrApp.getConfiguration().unregisterEntityType(oldType);
 				}
 
-			}
+				// clear classes map
+				classes.clear();
 
+				// add new classes to map
+				for (final Class newType : newClasses) {
+					classes.put(newType.getName(), newType);
+				}
+
+				logger.info("Successfully compiled {} dynamic entities: {}", new Object[] { sources.size(), sources.stream().map(f -> f.getName().replaceFirst("/", "")).collect(Collectors.joining(", ")) });
+
+				final Map<String, Object> data = new LinkedHashMap();
+				data.put("success", true);
+				TransactionCommand.simpleBroadcast("SCHEMA_COMPILED", data, Predicate.allExcept(getInitiatedBySessionId()));
+
+				Services.getInstance().setOverridingSchemaTypesAllowed(false);
+			}
 		}
 
 		return classes;
@@ -174,24 +184,44 @@ public class NodeExtender {
 
 		public Listener(final ErrorBuffer errorBuffer) {
 			this.errorBuffer = errorBuffer;
-}
+		}
 
 		@Override
 		public void report(Diagnostic<? extends JavaFileObject> diagnostic) {
 
 			if (diagnostic.getKind().equals(Kind.ERROR)) {
 
-				final JavaFileObject obj = diagnostic.getSource();
-				String name        = "unknown";
-
-				if (obj != null && obj instanceof CharSequenceJavaFileObject) {
-					name = ((CharSequenceJavaFileObject)obj).getClassName();
-				}
+				final int errorContext    = 5;
+				final int errorLineNumber = Long.valueOf(diagnostic.getLineNumber()).intValue();
+				final SourceFile obj      = (SourceFile)diagnostic.getSource();
+				String name               = obj.getName();
 
 				errorBuffer.add(new DiagnosticErrorToken(name, diagnostic));
 
-				// log also to log file
-				logger.warn("Unable to compile dynamic entity {}: {}", new Object[] { name, diagnostic.getMessage(Locale.ENGLISH) });
+				if (Settings.LogSchemaErrors.getValue()) {
+
+					final SourceFile sourceFile = (SourceFile)diagnostic.getSource();
+					final List<SourceLine> code = sourceFile.getLines();
+					final SourceLine line       = code.get(errorLineNumber - 1);
+					final AbstractNode source   = (AbstractNode)line.getCodeSource();
+
+					System.out.println("Code source: " + source.getUuid() + " of type " + source.getClass().getSimpleName() + " name " + source.getName());
+					System.out.println("Line with error:");
+					System.out.println(line);
+					System.out.println("Error: " + diagnostic.getMessage(Locale.ENGLISH));
+
+					/*
+					final String src = ((JavaFileObject) diagnostic.getSource()).getCharContent(true).toString();
+					
+					// Add line numbers
+					final AtomicInteger index = new AtomicInteger();
+					final List<String> code   = Arrays.asList(src.split("\\R")).stream().map(line -> (index.getAndIncrement()+1) + ": " + line).collect(Collectors.toList());
+					final String context      = StringUtils.join(code.subList(Math.max(0, errorLineNumber - errorContext), Math.min(code.size(), errorLineNumber + errorContext)), "\n");
+					
+					// log also to log file
+					logger.error("Unable to compile dynamic entity {}:{}: {}\n{}", name, diagnostic.getLineNumber(), diagnostic.getMessage(Locale.ENGLISH), context);
+					*/
+				}
 			}
 		}
 	}

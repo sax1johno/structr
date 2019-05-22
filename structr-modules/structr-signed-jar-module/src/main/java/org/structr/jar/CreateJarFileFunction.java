@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2018 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -229,7 +229,7 @@ public class CreateJarFileFunction extends UiFunction {
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {
-		return "create_jar_file()";
+		return "create_jar_file";
 	}
 
 	@Override

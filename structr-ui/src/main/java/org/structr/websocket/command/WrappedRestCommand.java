@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -60,8 +60,9 @@ public class WrappedRestCommand extends AbstractCommand {
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) throws FrameworkException {
 
-		final Map<String, Object> nodeData   = webSocketData.getNodeData();
-		final String method                  = (String) nodeData.get("method");
+		setDoTransactionNotifications(true);
+
+		final String method                  = webSocketData.getNodeDataStringValue("method");
 
 		if (method == null || ! (method.equals("POST") || method.equals("PUT")) ) {
 
@@ -89,7 +90,7 @@ public class WrappedRestCommand extends AbstractCommand {
 		resourceMap.putAll(resourceProvider.getResources());
 
 		final StructrWebSocket socket        = this.getWebSocket();
-		final String url                     = (String) nodeData.get("url");
+		final String url                     = webSocketData.getNodeDataStringValue("url");
 
 		// mimic HTTP request
 		final HttpServletRequest wrappedRequest = new HttpServletRequestWrapper(socket.getRequest()) {
@@ -139,7 +140,7 @@ public class WrappedRestCommand extends AbstractCommand {
 		final StaticValue fakePropertyView = new StaticValue(PropertyView.Public);
 		try {
 
-			resource = ResourceHelper.applyViewTransformation(wrappedRequest, socket.getSecurityContext(), ResourceHelper.optimizeNestedResourceChain(socket.getSecurityContext(), wrappedRequest, resourceMap, fakePropertyView), fakePropertyView);
+			resource = ResourceHelper.optimizeNestedResourceChain(socket.getSecurityContext(), wrappedRequest, resourceMap, fakePropertyView);
 
 		} catch (IllegalPathException | NotFoundException e) {
 
@@ -149,7 +150,7 @@ public class WrappedRestCommand extends AbstractCommand {
 
 		}
 
-		final String data                    = (String) nodeData.get("data");
+		final String data                    = webSocketData.getNodeDataStringValue("data");
 		final Gson gson                      = new GsonBuilder().create();
 		final Map<String, Object> jsonData   = gson.fromJson(data, Map.class);
 

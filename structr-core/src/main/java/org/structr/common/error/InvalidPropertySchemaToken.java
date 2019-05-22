@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -24,7 +24,7 @@ package org.structr.common.error;
  */
 public class InvalidPropertySchemaToken extends ErrorToken {
 
-	public InvalidPropertySchemaToken(final String type, final String source, final String errorToken, final String reason) {
-		super(type, null, errorToken, reason);
+	public InvalidPropertySchemaToken(final String type, final String property, final String source, final String errorToken, final String reason) {
+		super(type, property, errorToken, reason);
 	}
 }

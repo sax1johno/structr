@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,22 +19,17 @@
 package org.structr.core.function;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class UnwindFunction extends Function<Object, Object> {
+public class UnwindFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_UNWIND = "Usage: ${unwind(list1, ...)}. Example: ${unwind(this.children)}";
 
 	@Override
 	public String getName() {
-		return "unwind()";
+		return "unwind";
 	}
 
 	@Override
@@ -43,15 +38,15 @@ public class UnwindFunction extends Function<Object, Object> {
 		final List list = new ArrayList();
 		for (final Object source : sources) {
 
-			if (source instanceof Collection) {
+			if (source instanceof Iterable) {
 
 				// filter null objects
-				for (Object obj : (Collection)source) {
+				for (Object obj : (Iterable)source) {
 					if (obj != null) {
 
-						if (obj instanceof Collection) {
+						if (obj instanceof Iterable) {
 
-							for (final Object elem : (Collection)obj) {
+							for (final Object elem : (Iterable)obj) {
 
 								if (elem != null) {
 
@@ -74,7 +69,6 @@ public class UnwindFunction extends Function<Object, Object> {
 
 		return list;
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {

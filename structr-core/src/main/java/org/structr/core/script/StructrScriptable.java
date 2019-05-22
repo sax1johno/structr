@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -27,28 +27,24 @@ import java.util.Map;
 import java.util.Set;
 import javax.servlet.http.HttpServletRequest;
 import jdk.nashorn.api.scripting.ScriptUtils;
-import org.mozilla.javascript.Context;
-import org.mozilla.javascript.IdFunctionCall;
-import org.mozilla.javascript.IdFunctionObject;
-import org.mozilla.javascript.NativeArray;
-import org.mozilla.javascript.NativeJavaMethod;
-import org.mozilla.javascript.NativeObject;
-import org.mozilla.javascript.ScriptRuntime;
-import org.mozilla.javascript.Scriptable;
-import org.mozilla.javascript.ScriptableObject;
-import org.mozilla.javascript.TopLevel;
-import org.mozilla.javascript.Wrapper;
+import org.mozilla.javascript.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.CaseHelper;
+import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
+import org.structr.common.error.UnlicensedScriptException;
 import org.structr.core.Export;
 import org.structr.core.GraphObject;
+import org.structr.core.GraphObjectMap;
 import org.structr.core.app.StructrApp;
 import org.structr.core.converter.PropertyConverter;
 import org.structr.core.function.Functions;
 import org.structr.core.function.GrantFunction;
+import org.structr.core.parser.CacheExpression;
+import org.structr.core.parser.ConstantExpression;
 import org.structr.core.property.EnumProperty;
+import org.structr.core.property.GenericProperty;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.schema.action.ActionContext;
@@ -63,10 +59,10 @@ public class StructrScriptable extends ScriptableObject {
 	private static final Logger logger = LoggerFactory.getLogger(StructrScriptable.class.getName());
 	private static final Object[] IDs  = { "id", "type" };
 
-	private ActionContext actionContext     = null;
-	private FrameworkException exception    = null;
-	private GraphObject entity              = null;
-	private Context scriptingContext        = null;
+	protected ActionContext actionContext     = null;
+	protected FrameworkException exception    = null;
+	protected GraphObject entity              = null;
+	protected Context scriptingContext        = null;
 
 	public StructrScriptable(final ActionContext actionContext, final GraphObject entity, final Context scriptingContext) {
 
@@ -204,8 +200,10 @@ public class StructrScriptable extends ScriptableObject {
 					if (parameters.length == 1) {
 
 						final String fileName = parameters[0].toString();
+						final String source   = actionContext.getJavascriptLibraryCode(fileName);
 
-						context.evaluateString(scope, actionContext.getJavascriptLibraryCode(fileName), fileName, 1, null);
+						// use cached / compiled source code for JS libs
+						Scripting.compileOrGetCached(context, source, fileName, 1).exec(context, scope);
 
 					} else {
 
@@ -223,6 +221,92 @@ public class StructrScriptable extends ScriptableObject {
 		if ("batch".equals(name)) {
 
 			return new IdFunctionObject(new BatchFunctionCall(actionContext, this), null, 0, 0);
+		}
+
+		if ("cache".equals(name)) {
+
+			return new IdFunctionObject(new IdFunctionCall() {
+
+				@Override
+				public Object execIdCall(final IdFunctionObject info, final Context context, final Scriptable scope, final Scriptable thisObject, final Object[] parameters) {
+
+					final CacheExpression cacheExpr = new CacheExpression();
+
+					Object retVal = null;
+
+					try {
+						for (int i = 0; i < parameters.length; i++) {
+							cacheExpr.add(new ConstantExpression(parameters[i]));
+						}
+
+						retVal = cacheExpr.evaluate(actionContext, entity);
+
+					} catch (FrameworkException ex) {
+						exception = ex;
+					}
+
+					return retVal;
+				}
+			}, null, 0, 0);
+		}
+
+		if ("slice".equals(name)) {
+
+			return new IdFunctionObject(new SliceFunctionCall(actionContext, entity, scriptingContext), null, 0, 0);
+
+		}
+
+		if ("doPrivileged".equals(name) || "do_privileged".equals(name)) {
+
+			return new IdFunctionObject(new IdFunctionCall() {
+
+				@Override
+				public Object execIdCall(final IdFunctionObject info, final Context context, final Scriptable scope, final Scriptable thisObject, final Object[] parameters) {
+
+					// backup security context
+					final SecurityContext securityContext = StructrScriptable.this.actionContext.getSecurityContext();
+
+					// copy context store from outer context
+					final SecurityContext superUserSecurityContext = SecurityContext.getSuperUserInstance(securityContext.getRequest());
+					superUserSecurityContext.setContextStore(securityContext.getContextStore());
+
+					try {
+
+						// replace security context with super user context
+						actionContext.setSecurityContext(superUserSecurityContext);
+
+						if (parameters != null && parameters.length == 1) {
+
+							final Object param = parameters[0];
+							if (param instanceof Script) {
+
+								final Script script = (Script)param;
+								return script.exec(context, scope);
+
+							} else {
+
+								// ...
+							}
+
+						} else {
+
+							//...
+						}
+
+						return null;
+
+					} finally {
+
+						// overwrite context store with possibly changed context store
+						securityContext.setContextStore(superUserSecurityContext.getContextStore());
+
+						// restore saved security context
+						StructrScriptable.this.actionContext.setSecurityContext(securityContext);
+					}
+
+				}
+
+			}, null, 0, 0);
 		}
 
 		// execute builtin function?
@@ -243,15 +327,23 @@ public class StructrScriptable extends ScriptableObject {
 		return exception;
 	}
 
+	public void clearException() {
+		exception = null;
+	}
+
 	// ----- private methods -----
 	private Object wrap(final Context context, final Scriptable scope, final String key, final Object value) {
 
-		if (value instanceof Collection) {
-			return new StructrArray(scope, key, wrapCollection(context, scope, key, (Collection)value));
+		if (value instanceof Iterable) {
+			return new StructrArray(scope, key, wrapIterable(context, scope, key, (Iterable)value));
 		}
 
 		if (value instanceof Object[]) {
 			return new StructrArray(scope, key, (Object[])value);
+		}
+
+		if (value instanceof GraphObjectMap) {
+			return new GraphObjectMapWrapper(context, scope, (GraphObjectMap)value);
 		}
 
 		if (value instanceof GraphObject) {
@@ -267,9 +359,14 @@ public class StructrScriptable extends ScriptableObject {
 			return ((Enum)value).name();
 		}
 
+		if (value instanceof NativeObject) {
+
+			return (NativeObject)value;
+		}
+
 		if (value instanceof Map && !(value instanceof PropertyMap)) {
 
-			return new MapWrapper((Map)value);
+			return new MapWrapper(context, scope, (Map)value);
 		}
 
 		if (value instanceof Date) {
@@ -277,27 +374,34 @@ public class StructrScriptable extends ScriptableObject {
 			return context.newObject(scope, "Date", new Object[] {((Date)value).getTime()});
 		}
 
+		if (value instanceof NativeJavaObject) {
+
+			return wrap(context, scope, key, ((NativeJavaObject)value).unwrap());
+		}
+
 		return value;
 	}
 
-	private Object[] wrapCollection(final Context context, final Scriptable scope, final String key, final Collection collection) {
+	private Object[] wrapIterable(final Context context, final Scriptable scope, final String key, final Iterable iterable) {
 
-		final int size       = collection.size();
-		final Object[] array = new Object[size];
-		int i                = 0;
+		final ArrayList list = new ArrayList();
 
-		for (final Object obj : collection) {
-			array[i++] = wrap(context, scope, key, obj);
+		for (final Object obj : iterable) {
+			list.add(wrap(context, scope, key, obj));
 		}
 
-		return array;
+		return list.toArray();
 	}
 
 	public Object unwrap(final Object source) {
 
 		if (source != null) {
 
-			if (source instanceof Wrapper) {
+			if (source instanceof ConsString) {
+
+				return source.toString();
+			
+			} else if (source instanceof Wrapper) {
 
 				return unwrap(((Wrapper)source).unwrap());
 
@@ -360,7 +464,9 @@ public class StructrScriptable extends ScriptableObject {
 
 				return wrap(context, scope, null, function.apply(actionContext, entity, unwrappedParameters));
 
-			} catch (FrameworkException fex) {
+			} catch (final UnlicensedScriptException uex) {
+				uex.log(logger);
+			} catch (final FrameworkException fex) {
 				exception = fex;
 			}
 
@@ -499,8 +605,26 @@ public class StructrScriptable extends ScriptableObject {
 			final Method method = StructrApp.getConfiguration().getAnnotatedMethods(obj.getClass(), Export.class).get(name);
 			if (method != null) {
 
-				return new NativeJavaMethod(method, name);
+				return new NativeJavaMethod(method, name) {
+
+					@Override
+					public Object call(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+
+						if (method.getParameterCount() == 0) {
+
+							return wrap(context, this, null, super.call(cx, scope, thisObj, new Object[]{}));
+						} else if (args.length == 0) {
+
+							return wrap(context, this, null, super.call(cx, scope, thisObj, new Object[]{ new NativeObject() }));
+						} else {
+
+							return wrap(context, this, null, super.call(cx, scope, thisObj, args));
+						}
+
+					}
+				};
 			}
+
 
 			// default: direct evaluation of object
 			try {
@@ -531,50 +655,54 @@ public class StructrScriptable extends ScriptableObject {
 		@Override
 		public void put(String string, Scriptable s, Object o) {
 
-			final PropertyKey key = getKey(string);
-			if (key != null) {
+			if (obj instanceof GraphObjectMap) {
 
 				try {
 
-					// call enclosing class's unwrap method instead of ours
-					Object value = StructrScriptable.this.unwrap(o);
-//
-//					if (source instanceof Scriptable && "Date".equals(((Scriptable)source).getClassName())) {
-//						return Context.jsToJava(source, Date.class);
-//					}
-//
-//					// ECMA will return numbers a double, all the time.....
-//					if (value instanceof Double && key instanceof NumericalPropertyKey) {
-//						value = ((NumericalPropertyKey)key).convertToNumber((Double)value);
-//					}
-//
-					// use inputConverter of EnumProperty to convert to native enums
-					if (key instanceof EnumProperty) {
-
-						// should we really use the inputConverter here??
-						PropertyConverter inputConverter = key.inputConverter(actionContext.getSecurityContext());
-						if (inputConverter != null) {
-
-							value = inputConverter.convert(value);
-						}
-
-
-					} else {
-
-						final Class valueType   = key.valueType();
-						final Class relatedType = key.relatedType();
-
-						// do not convert entity / collection properties
-						if (valueType != null && relatedType == null) {
-
-							value = Context.jsToJava(value, valueType);
-						}
-					}
-
-					obj.setProperty(key, value);
+					obj.setProperty(new GenericProperty(string), StructrScriptable.this.unwrap(o));
 
 				} catch (FrameworkException fex) {
 					exception = fex;
+				}
+
+			} else {
+
+				final PropertyKey key = getKey(string);
+				if (key != null) {
+
+					try {
+
+						// call enclosing class's unwrap method instead of ours
+						Object value = StructrScriptable.this.unwrap(o);
+
+						// use inputConverter of EnumProperty to convert to native enums
+						if (key instanceof EnumProperty) {
+
+							// should we really use the inputConverter here??
+							PropertyConverter inputConverter = key.inputConverter(actionContext.getSecurityContext());
+							if (inputConverter != null) {
+
+								value = inputConverter.convert(value);
+							}
+
+
+						} else {
+
+							final Class valueType   = key.valueType();
+							final Class relatedType = key.relatedType();
+
+							// do not convert entity / collection properties
+							if (valueType != null && relatedType == null) {
+
+								value = Context.jsToJava(value, valueType);
+							}
+						}
+
+						obj.setProperty(key, value);
+
+					} catch (FrameworkException fex) {
+						exception = fex;
+					}
 				}
 			}
 		}
@@ -739,12 +867,81 @@ public class StructrScriptable extends ScriptableObject {
 
 	}
 
-	public class MapWrapper extends ScriptableObject implements Map {
+	public class GraphObjectMapWrapper extends ScriptableObject implements Wrapper {
+
+		private Context context      = null;
+		private Scriptable prototype = null;
+		private Scriptable scope     = null;
+		private GraphObjectMap obj   = null;
+
+		public GraphObjectMapWrapper(final Context context, final Scriptable scope, final GraphObjectMap obj) {
+
+			this.context = context;
+			this.scope = scope;
+			this.obj = obj;
+		}
+
+		@Override
+		public String toString() {
+			return obj.toString();
+		}
+
+		@Override
+		public String getClassName() {
+			return "Map";
+		}
+
+		@Override
+		public Object get(String name, Scriptable start) {
+			return wrap(context, scope, name, obj.toMap().get(name));
+		}
+
+		@Override
+		public Object[] getIds() {
+			return obj.toMap().keySet().toArray();
+		}
+
+		@Override
+		public Object getDefaultValue(Class<?> hint) {
+			return obj.toMap().toString();
+		}
+
+		@Override
+		public int size() {
+			return obj.size();
+		}
+
+		@Override
+		public boolean isEmpty() {
+			return obj.isEmpty();
+		}
+
+		@Override
+		public Scriptable getPrototype() {
+			return prototype;
+		}
+
+		@Override
+		public void setPrototype(Scriptable s) {
+			this.prototype = s;
+		}
+
+		@Override
+		public Object unwrap() {
+			return obj;
+		}
+	}
+
+	public class MapWrapper extends ScriptableObject implements Map<String, Object> {
 
 		private Map<String, Object> map = null;
+		private Context context      = null;
+		private Scriptable scope     = null;
 
-		public MapWrapper(final Map<String, Object> map) {
-			this.map = map;
+		public MapWrapper(final Context context, final Scriptable scope, final Map<String, Object> obj) {
+			this.context = context;
+			this.scope = scope;
+			this.map = obj;
 		}
 
 		@Override
@@ -759,7 +956,7 @@ public class StructrScriptable extends ScriptableObject {
 
 		@Override
 		public Object get(String name, Scriptable start) {
-			return map.get(name);
+			return wrap(context, scope, name, map.get(name));
 		}
 
 		@Override
@@ -773,6 +970,16 @@ public class StructrScriptable extends ScriptableObject {
 		}
 
 		@Override
+		public int size() {
+			return map.size();
+		}
+
+		@Override
+		public boolean isEmpty() {
+			return map.isEmpty();
+		}
+
+		@Override
 		public boolean containsKey(Object key) {
 			return map.containsKey(key);
 		}
@@ -783,8 +990,13 @@ public class StructrScriptable extends ScriptableObject {
 		}
 
 		@Override
-		public Object put(Object key, Object value) {
-			return map.put(null, value);
+		public Object get(Object key) {
+			return map.get(key);
+		}
+
+		@Override
+		public Object put(String key, Object value) {
+			return map.put(key, value);
 		}
 
 		@Override

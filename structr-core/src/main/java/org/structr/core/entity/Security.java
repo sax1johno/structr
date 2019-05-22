@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -17,9 +17,6 @@
  * along with Structr.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.structr.core.entity;
-
-
-//~--- JDK imports ------------------------------------------------------------
 
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -52,8 +49,8 @@ public class Security extends ManyToMany<Principal, NodeInterface> {
 
 	public Security() {}
 
-	public Security(SecurityContext securityContext, Relationship dbRelationship) {
-		init(securityContext, dbRelationship, Security.class);
+	public Security(SecurityContext securityContext, Relationship dbRelationship, final long transactionId) {
+		init(securityContext, dbRelationship, Security.class, transactionId);
 	}
 
 	@Override

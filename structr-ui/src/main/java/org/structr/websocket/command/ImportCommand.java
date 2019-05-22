@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -30,48 +30,39 @@ import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
 
-//~--- classes ----------------------------------------------------------------
-
-/**
- *
- *
- */
 public class ImportCommand extends AbstractCommand {
 
 	private static final Logger logger = LoggerFactory.getLogger(ImportCommand.class.getName());
 
-	//~--- static initializers --------------------------------------------
-
 	static {
 
 		StructrWebSocket.addCommand(ImportCommand.class);
-
 	}
 
-	//~--- methods --------------------------------------------------------
-
 	@Override
-	public void processMessage(final WebSocketMessage webSocketData) {
+	public void processMessage(final WebSocketMessage webSocketData) throws FrameworkException {
+
+		setDoTransactionNotifications(true);
 
 		final SecurityContext securityContext = getWebSocket().getSecurityContext();
-		final Map<String, Object> properties  = webSocketData.getNodeData();
-		final String code                     = (String) properties.get("code");
-		final String address                  = (String) properties.get("address");
-		final String name                     = (String) properties.get("name");
-		final boolean publicVisible           = (Boolean) properties.get("publicVisible");
-		final boolean authVisible             = (Boolean) properties.get("authVisible");
-		final boolean processDeploymentInfo   = (Boolean) properties.get("processDeploymentInfo");
-		
+		final String code                     = webSocketData.getNodeDataStringValue("code");
+		final String address                  = webSocketData.getNodeDataStringValue("address");
+		final String name                     = webSocketData.getNodeDataStringValue("name");
+		final boolean publicVisible           = webSocketData.getNodeDataBooleanValue("publicVisible");
+		final boolean authVisible             = webSocketData.getNodeDataBooleanValue("authVisible");
+		final boolean includeInExport         = webSocketData.getNodeDataBooleanValue("includeInExport");
+		final boolean processDeploymentInfo   = webSocketData.getNodeDataBooleanValue("processDeploymentInfo");
+
 		try {
 
-			final Importer pageImporter = new Importer(securityContext, code, address, name, publicVisible, authVisible);
-			
+			final Importer pageImporter = new Importer(securityContext, code, address, name, publicVisible, authVisible, includeInExport);
+
 			if (processDeploymentInfo) {
-		
+
 				pageImporter.setIsDeployment(true);
 				pageImporter.setCommentHandler(new DeploymentCommentHandler());
 			}
-			
+
 			final boolean parseOk       = pageImporter.parse();
 
 			if (parseOk) {
@@ -89,9 +80,6 @@ public class ImportCommand extends AbstractCommand {
 					resultData.put("id", pageId);
 					getWebSocket().send(MessageBuilder.status().code(200).message("Successfully created page " + name).data(resultData).build(), true);
 
-					// try to import graph gist source code from HTML comment
-					pageImporter.importDataComments();
-					
 				} else {
 
 					getWebSocket().send(MessageBuilder.status().code(400).message("Error while creating page " + name).data(resultData).build(), true);
@@ -107,13 +95,8 @@ public class ImportCommand extends AbstractCommand {
 
 	}
 
-	//~--- get methods ----------------------------------------------------
-
 	@Override
 	public String getCommand() {
-
 		return "IMPORT";
-
 	}
-
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,52 +18,45 @@
  */
 package org.structr.core.function;
 
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class GetCounterFunction extends Function<Object, Object> {
+public class GetCounterFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_GET_COUNTER = "Usage: ${get_counter(level)}. Example: ${get_counter(1)}";
 
 	@Override
 	public String getName() {
-		return "get_counter()";
+		return "get_counter";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
 		try {
-			if (!arrayHasLengthAndAllElementsNotNull(sources, 1)) {
-				
-				return 0;
-			}
 
-			try {
+			assertArrayHasLengthAndAllElementsNotNull(sources, 1);
 
-				return ctx.getCounter(parseInt(sources[0]));
+			return ctx.getCounter(parseInt(sources[0]));
 
-			} catch (NumberFormatException nfe) {
+		} catch (NumberFormatException nfe) {
 
-				logException(nfe, "{}: NumberFormatException parsing counter level \"{}\" in element \"{}\". Parameters: {}", new Object[] { getName(), sources[0].toString(), caller, getParametersAsString(sources) });
+			logException(nfe, "{}: NumberFormatException parsing counter level \"{}\" in element \"{}\". Parameters: {}", new Object[] { getReplacement(), sources[0].toString(), caller, getParametersAsString(sources) });
 
-			}
+		} catch (ArgumentNullException pe) {
 
-		} catch (final IllegalArgumentException e) {
+			// silently ignore null arguments
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+		} catch (ArgumentCountException pe) {
 
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
 
 		return 0;
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {
@@ -74,5 +67,4 @@ public class GetCounterFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Returns the value of the counter with the given index";
 	}
-
 }

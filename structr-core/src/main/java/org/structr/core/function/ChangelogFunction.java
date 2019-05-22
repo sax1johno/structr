@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -22,16 +22,21 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.regex.Pattern;
+import org.apache.commons.io.FileUtils;
 import org.mozilla.javascript.NativeObject;
 import org.mozilla.javascript.ScriptRuntime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.api.config.Settings;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.GraphObjectMap;
@@ -42,95 +47,85 @@ import org.structr.core.property.EndNodeProperty;
 import org.structr.core.property.Property;
 import org.structr.core.property.StringProperty;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-public class ChangelogFunction extends Function<Object, Object> {
+public class ChangelogFunction extends AdvancedScriptingFunction {
+
+	protected static final Pattern uuidPattern = Pattern.compile("[a-f0-9]{32}");
 
 	public static final String ERROR_MESSAGE_CHANGELOG = "Usage: ${changelog(entity[, resolve=false[, filterKey, filterValue...]])}. Example: ${changelog(current, false, 'verb', 'change', 'timeTo', now)}";
-	public static final String ERROR_MESSAGE_CHANGELOG_JS = "Usage: ${{Structr.changelog(entity[, resolve=false[, filterObject]])}}. Example: ${{Structr.changelog(Structr.get('current', false, {verb:\"change\", timeTo: new Date()}))}}";
+	public static final String ERROR_MESSAGE_CHANGELOG_JS = "Usage: ${{Structr.changelog(entity[, resolve=false[, filterObject]])}}. Example: ${{Structr.changelog(Structr.get('current'), false, {verb:\"change\", timeTo: new Date()}))}}";
 
 	private static final Logger logger = LoggerFactory.getLogger(ChangelogFunction.class.getName());
 
-	// Properties for the changelog entries
-	private static final Property<String>  changelog_verb                        = new StringProperty("verb");
-	private static final Property<String>  changelog_time                        = new StringProperty("time");
-	private static final Property<String>  changelog_userId                      = new StringProperty("userId");
-	private static final Property<String>  changelog_userName                    = new StringProperty("userName");
-	private static final Property<String>  changelog_target                      = new StringProperty("target");
-	private static final Property<AbstractNode> changelog_targetObj              = new EndNodeProperty<>("targetObj");
-	private static final Property<String>  changelog_rel                         = new StringProperty("rel");
-	private static final Property<String>  changelog_relId                       = new StringProperty("relId");
-	private static final Property<String>  changelog_relDir                      = new StringProperty("relDir");
-	private static final Property<String>  changelog_key                         = new StringProperty("key");
-	private static final Property<String>  changelog_prev                        = new StringProperty("prev");
-	private static final Property<String>  changelog_val                         = new StringProperty("val");
-
 	@Override
 	public String getName() {
-		return "changelog()";
+		return "changelog";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
-		if (!Settings.ChangelogEnabled.getValue()) {
+		try {
 
-			logger.warn("changelog function used even though the changelog is disabled - please check your configuration. (This function might still return results if the changelog was enabled earlier.)");
+			assertArrayHasMinLengthAndAllElementsNotNull(sources, 1);
 
-		}
+			final String changelog = getChangelogForObject(sources[0]);
 
-		if (sources.length >= 1) {
+			if (changelog != null && !("".equals(changelog))) {
 
-			if (sources[0] instanceof GraphObject) {
+				final ChangelogFilter changelogFilter = new ChangelogFilter();
+				changelogFilter.setIsUserCentricChangelog(isUserCentric());
 
-				final String changelog = ((GraphObject) sources[0]).getProperty(GraphObject.structrChangeLog);
+				if (sources.length >= 3 && sources[2] != null) {
 
-				if (changelog != null && !("".equals(changelog))) {
+					if (sources[2] instanceof NativeObject) {
 
-					final ChangelogFilter changelogFilter = new ChangelogFilter();
+						changelogFilter.processJavaScriptConfigurationObject((NativeObject) sources[2]);
 
-					if (sources.length >= 3 && sources[2] != null) {
+					} else {
 
-						if (sources[2] instanceof NativeObject) {
+						final int maxLength = sources.length;
 
-							changelogFilter.processJavaScriptConfigurationObject((NativeObject) sources[2]);
+						for (int i = 2; (i + 2) <= maxLength; i += 2) {
 
-						} else {
-
-							final int maxLength = sources.length;
-
-							for (int i = 2; (i + 2) <= maxLength; i += 2) {
-
-								if (sources[i] != null && sources[i+1] != null) {
-									changelogFilter.addFilterEntry(sources[i].toString(), sources[i+1]);
-								}
-
-							}
-
-							if (maxLength % 2 == 1 && sources[maxLength-1] != null) {
-								logger.warn("Ignoring dangling filterKey: {}", sources[maxLength-1]);
+							if (sources[i] != null && sources[i+1] != null) {
+								changelogFilter.addFilterEntry(sources[i].toString(), sources[i+1]);
 							}
 						}
-					}
 
-					if (sources.length >= 2 && Boolean.TRUE.equals(sources[1])) {
-						changelogFilter.setResolveTargets(true);
+						if (maxLength % 2 == 1 && sources[maxLength-1] != null) {
+							logger.warn("Ignoring dangling filterKey: {}", sources[maxLength-1]);
+						}
 					}
-
-					return changelogFilter.getFilteredChangelog(changelog);
 				}
 
-				return new ArrayList();
+				if (sources.length >= 2 && Boolean.TRUE.equals(sources[1])) {
+					changelogFilter.setResolveTargets(true);
+				}
 
-			} else {
-
-				logger.warn("First parameter must be of type GraphObject: \"{}\"", sources[0]);
-				return usage(ctx.isJavaScriptContext());
+				return changelogFilter.getFilteredChangelog(changelog);
 			}
 
-		} else {
+			return new ArrayList();
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+		} catch (IOException ioex) {
+
+			logger.error("Unable to create changelog file: {}", ioex.getMessage());
+			return usage(ctx.isJavaScriptContext());
+
+		} catch (ArgumentNullException pe) {
+
+			// silently ignore null arguments
+			return null;
+
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
+			return usage(ctx.isJavaScriptContext());
+
+		} catch (IllegalArgumentException iae) {
+
+			logger.warn(iae.getMessage());
 			return usage(ctx.isJavaScriptContext());
 		}
 	}
@@ -143,6 +138,97 @@ public class ChangelogFunction extends Function<Object, Object> {
 	@Override
 	public String shortDescription() {
 		return "Returns the changelog object";
+	}
+
+	private String getChangelogForObject (final Object obj) throws IOException {
+
+		if (obj instanceof GraphObject) {
+
+			return getChangelogForGraphObject((GraphObject)obj);
+
+		} else if (obj instanceof String) {
+
+			return getChangelogForString((String) obj);
+
+		} else {
+
+			throw new IllegalArgumentException("First parameter must be either graph object or UUID string. Was: " + obj);
+		}
+	}
+
+	protected String getChangelogForGraphObject (final GraphObject obj) throws IOException {
+
+		return getChangelogForUUID(obj.getUuid(), (obj.isNode() ? "n" : "r"));
+
+	}
+
+	protected String getChangelogForString (final String inputString) throws IOException {
+
+		if (uuidPattern.matcher(inputString).matches()) {
+
+			String changelog = getChangelogForUUID(inputString, "n");
+
+			if (changelog.equals("")) {
+				changelog = getChangelogForUUID(inputString, "r");
+			}
+
+			return changelog;
+
+		} else {
+
+			throw new IllegalArgumentException("Given string is not a UUID: " + inputString);
+		}
+	}
+
+	protected String getChangelogForUUID (final String uuid, final String changelogType) throws IOException {
+
+		java.io.File file = getChangeLogFileOnDisk(changelogType, uuid, false);
+
+		if (file.exists()) {
+
+			return FileUtils.readFileToString(file, "utf-8");
+
+		} else {
+
+			return "";
+		}
+	}
+
+	public static java.io.File getChangeLogFileOnDisk(final String typeFolderName, final String uuid, final boolean create) {
+
+		final String changelogPath = Settings.ChangelogPath.getValue();
+		final String uuidPath      = getDirectoryPath(uuid);
+		final java.io.File file    = new java.io.File(changelogPath + java.io.File.separator + typeFolderName + java.io.File.separator + uuidPath + java.io.File.separator + uuid);
+
+		// create parent directory tree
+		file.getParentFile().mkdirs();
+
+		// create file only if requested
+		if (!file.exists() && create) {
+
+			try {
+
+				file.createNewFile();
+
+			} catch (IOException ioex) {
+
+				logger.error("Unable to create changelog file {}: {}", file, ioex.getMessage());
+			}
+		}
+
+		return file;
+	}
+
+	static String getDirectoryPath(final String uuid) {
+
+		return (uuid != null)
+			? uuid.substring(0, 1) + "/" + uuid.substring(1, 2) + "/" + uuid.substring(2, 3) + "/" + uuid.substring(3, 4)
+			: null;
+
+	}
+
+	protected boolean isUserCentric () {
+		return false;
 	}
 
 	private class ChangelogFilter {
@@ -163,6 +249,25 @@ public class ChangelogFunction extends Function<Object, Object> {
 
 		private boolean _resolveTargets = false;
 		private boolean _noFilterConfig = true;
+		private boolean _isUserCentricChangelog = false;
+
+		// Properties for the changelog entries
+		private final Property<String>  changelog_verb                        = new StringProperty("verb");
+		private final Property<String>  changelog_time                        = new StringProperty("time");
+		private final Property<String>  changelog_userId                      = new StringProperty("userId");
+		private final Property<String>  changelog_userName                    = new StringProperty("userName");
+		private final Property<String>  changelog_target                      = new StringProperty("target");
+		private final Property<AbstractNode> changelog_targetObj              = new EndNodeProperty<>("targetObj");
+		private final Property<String>  changelog_rel                         = new StringProperty("rel");
+		private final Property<String>  changelog_relId                       = new StringProperty("relId");
+		private final Property<String>  changelog_relDir                      = new StringProperty("relDir");
+		private final Property<String>  changelog_key                         = new StringProperty("key");
+		private final Property<String>  changelog_prev                        = new StringProperty("prev");
+		private final Property<String>  changelog_val                         = new StringProperty("val");
+
+		public void setIsUserCentricChangelog(final boolean userCentric) {
+			_isUserCentricChangelog = userCentric;
+		}
 
 		public void addFilterEntry (final String filterKey, final Object filterValue) {
 
@@ -262,15 +367,15 @@ public class ChangelogFunction extends Function<Object, Object> {
 			for (final String entry : changelog.split("\n")) {
 
 				final JsonObject jsonObj = _jsonParser.parse(entry).getAsJsonObject();
-				final String verb = jsonObj.get("verb").getAsString();
-				final long time = jsonObj.get("time").getAsLong();
-				final String userId = jsonObj.get("userId").getAsString();
-				final String userName = jsonObj.get("userName").getAsString();
-				final String relType = (jsonObj.has("rel") ? jsonObj.get("rel").getAsString() : null);
-				final String relId = (jsonObj.has("relId") ? jsonObj.get("relId").getAsString() : null);
-				final String relDir = (jsonObj.has("relDir") ? jsonObj.get("relDir").getAsString() : null);
-				final String target = (jsonObj.has("target") ? jsonObj.get("target").getAsString() : null);
-				final String key = (jsonObj.has("key") ? jsonObj.get("key").getAsString() : null);
+				final String verb     = jsonObj.get("verb").getAsString();
+				final long time       = jsonObj.get("time").getAsLong();
+				final String userId   = (jsonObj.has("userId") ? jsonObj.get("userId").getAsString() : null);
+				final String userName = (jsonObj.has("userName") ? jsonObj.get("userName").getAsString() : null);
+				final String relType  = (jsonObj.has("rel") ? jsonObj.get("rel").getAsString() : null);
+				final String relId    = (jsonObj.has("relId") ? jsonObj.get("relId").getAsString() : null);
+				final String relDir   = (jsonObj.has("relDir") ? jsonObj.get("relDir").getAsString() : null);
+				final String target   = (jsonObj.has("target") ? jsonObj.get("target").getAsString() : null);
+				final String key      = (jsonObj.has("key") ? jsonObj.get("key").getAsString() : null);
 
 				if (doesFilterApply(verb, time, userId, userName, relType, relDir, target, key)) {
 
@@ -278,8 +383,11 @@ public class ChangelogFunction extends Function<Object, Object> {
 
 					obj.put(changelog_verb, verb);
 					obj.put(changelog_time, time);
-					obj.put(changelog_userId, userId);
-					obj.put(changelog_userName, userName);
+
+					if (!_isUserCentricChangelog) {
+						obj.put(changelog_userId, userId);
+						obj.put(changelog_userName, userName);
+					}
 
 					switch (verb) {
 						case "create":
@@ -307,6 +415,12 @@ public class ChangelogFunction extends Function<Object, Object> {
 							obj.put(changelog_key, key);
 							obj.put(changelog_prev, _gson.toJson(jsonObj.get("prev")));
 							obj.put(changelog_val, _gson.toJson(jsonObj.get("val")));
+
+							obj.put(changelog_target, target);
+							if (_resolveTargets) {
+								obj.put(changelog_targetObj, _app.getNodeById(target));
+							}
+
 							list.add(obj);
 							break;
 
@@ -314,9 +428,7 @@ public class ChangelogFunction extends Function<Object, Object> {
 							logger.warn("Unknown verb in changelog: \"{}\"", verb);
 							break;
 					}
-
 				}
-
 			}
 
 			return list;

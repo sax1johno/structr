@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -23,7 +23,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +31,7 @@ import org.structr.common.AccessMode;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.Services;
+import org.structr.core.app.StructrApp;
 import org.structr.core.auth.Authenticator;
 import org.structr.core.auth.exception.AuthenticationException;
 import org.structr.core.auth.exception.UnauthorizedException;
@@ -39,13 +39,8 @@ import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.Principal;
 import org.structr.core.entity.ResourceAccess;
 import org.structr.core.entity.SuperUser;
+import org.structr.core.property.PropertyKey;
 
-//~--- classes ----------------------------------------------------------------
-
-/**
- *
- *
- */
 public class RestAuthenticator implements Authenticator {
 
 	private static final Logger logger       = LoggerFactory.getLogger(RestAuthenticator.class.getName());
@@ -104,6 +99,8 @@ public class RestAuthenticator implements Authenticator {
 	@Override
 	public SecurityContext initializeAndExamineRequest(final HttpServletRequest request, final HttpServletResponse response) throws FrameworkException {
 
+		logger.warn("KAI: RestAuthenticator.initializeAndExamineRequest");
+
 		SecurityContext securityContext;
 
 		Principal user = SessionHelper.checkSessionAuthentication(request);
@@ -149,7 +146,7 @@ public class RestAuthenticator implements Authenticator {
 			 // allow cross site resource sharing (read only)
 			final String maxAge = Settings.AccessControlMaxAge.getValue();
 			if (StringUtils.isNotBlank(maxAge)) {
-				response.setHeader("Access-Control-MaxAge", maxAge);
+				response.setHeader("Access-Control-Max-Age", maxAge);
 			}
 
 			final String allowMethods = Settings.AccessControlAllowMethods.getValue();
@@ -193,14 +190,14 @@ public class RestAuthenticator implements Authenticator {
 		final boolean validUser             = (user != null);
 
 		// super user is always authenticated
-		if (validUser && (user instanceof SuperUser || user.getProperty(Principal.isAdmin))) {
+		if (validUser && (user instanceof SuperUser || user.isAdmin())) {
 			return;
 		}
 
 		// no grants => no access rights
 		if (resourceAccess == null) {
 
-			logger.info("No resource access grant found for signature {}.", rawResourceSignature);
+			logger.info("No resource access grant found for signature {}. Method was {}. ({})", rawResourceSignature, method, (validUser ? "authenticated users" : "public users"));
 
 			throw new UnauthorizedException("Forbidden");
 
@@ -315,7 +312,10 @@ public class RestAuthenticator implements Authenticator {
 	@Override
 	public Principal doLogin(final HttpServletRequest request, final String emailOrUsername, final String password) throws AuthenticationException, FrameworkException {
 
-		final Principal user = AuthHelper.getPrincipalForPassword(Principal.eMail, emailOrUsername, password);
+		logger.warn("KAI: RestAuthenticator.doLogin");
+
+		final PropertyKey<String> eMailKey = StructrApp.key(Principal.class, "eMail");
+		final Principal user               = AuthHelper.getPrincipalForPassword(eMailKey, emailOrUsername, password);
 
 		SessionHelper.clearInvalidSessions(user);
 
@@ -332,10 +332,10 @@ public class RestAuthenticator implements Authenticator {
 				AuthHelper.doLogout(request, user);
 			}
 
-			final HttpSession session = request.getSession(false);
-			if (session != null) {
+			final String sessionId = request.getRequestedSessionId();
+			if (sessionId != null) {
 
-				session.invalidate();
+				SessionHelper.invalidateSession(sessionId);
 			}
 
 		} catch (IllegalStateException | FrameworkException ex) {
@@ -378,12 +378,9 @@ public class RestAuthenticator implements Authenticator {
 		Principal user = null;
 
 		// First, check session (JSESSIONID cookie)
-		final HttpSession session = request.getSession(false);
+		if (request.getSession(false) != null) {
 
-		if (session != null) {
-
-			user = AuthHelper.getPrincipalForSessionId(session.getId());
-
+			user = AuthHelper.getPrincipalForSessionId(request.getSession(false).getId());
 		}
 
 		if (user == null) {

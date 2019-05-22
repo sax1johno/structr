@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,6 +19,7 @@
 package org.structr.schema.json;
 
 import java.net.URI;
+import java.util.Set;
 
 /**
  *
@@ -33,6 +34,8 @@ public interface JsonProperty extends Comparable<JsonProperty> {
 	public String getName();
 	public String getType();
 	public String getFormat();
+	public String getHint();
+	public String getCategory();
 
 	public String getDefaultValue();
 
@@ -40,12 +43,21 @@ public interface JsonProperty extends Comparable<JsonProperty> {
 	public boolean isRequired();
 	public boolean isUnique();
 	public boolean isIndexed();
+	public boolean isReadOnly();
+	public Set<String> getTransformators();
+	public Set<String> getValidators();
 
+	public JsonProperty setHint(final String hint);
+	public JsonProperty setCategory(final String category);
 	public JsonProperty setFormat(final String format);
 	public JsonProperty setName(final String name);
 	public JsonProperty setRequired(final boolean isRequired);
 	public JsonProperty setCompound(final boolean isCompoundUnique);
 	public JsonProperty setUnique(final boolean isUnique);
 	public JsonProperty setIndexed(final boolean isIndexed);
+	public JsonProperty setReadOnly(final boolean isReadOnly);
 	public JsonProperty setDefaultValue(final String defaultValue);
+
+	public JsonProperty addValidator(final String fqcn);
+	public JsonProperty addTransformer(final String fqcn);
 }

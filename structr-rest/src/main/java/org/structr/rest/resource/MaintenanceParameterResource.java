@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -23,14 +23,14 @@ import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import org.structr.agent.Task;
 import org.structr.api.service.Command;
+import org.structr.api.util.ResultStream;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.Result;
 import org.structr.core.graph.BulkChangeNodePropertyKeyCommand;
 import org.structr.core.graph.BulkCopyRelationshipPropertyCommand;
 import org.structr.core.graph.BulkCreateLabelsCommand;
-import org.structr.core.graph.BulkDeleteSoftDeletedNodesCommand;
 import org.structr.core.graph.BulkFixNodePropertiesCommand;
+import org.structr.core.graph.BulkMigrateChangelogCommand;
 import org.structr.core.graph.BulkRebuildIndexCommand;
 import org.structr.core.graph.BulkSetNodePropertiesCommand;
 import org.structr.core.graph.BulkSetRelationshipPropertiesCommand;
@@ -43,14 +43,12 @@ import org.structr.rest.RestMethodResult;
 import org.structr.rest.exception.NotAllowedException;
 import org.structr.rest.maintenance.SnapshotCommand;
 import org.structr.schema.SchemaHelper;
-import org.structr.schema.importer.GraphGistImporter;
 import org.structr.schema.importer.RDFImporter;
+import org.structr.schema.importer.SchemaAnalyzer;
 import org.structr.schema.importer.SchemaJsonImporter;
 import org.structr.util.StructrLicenseManager;
 
 /**
- *
- *
  */
 public class MaintenanceParameterResource extends Resource {
 
@@ -58,7 +56,6 @@ public class MaintenanceParameterResource extends Resource {
 
 	static {
 
-		maintenanceCommandMap.put("importGist", GraphGistImporter.class);
 		maintenanceCommandMap.put("importRdf", RDFImporter.class);
 		maintenanceCommandMap.put("importSchemaJson", SchemaJsonImporter.class);
 		maintenanceCommandMap.put("rebuildIndex", BulkRebuildIndexCommand.class);
@@ -70,12 +67,13 @@ public class MaintenanceParameterResource extends Resource {
 		maintenanceCommandMap.put("changeNodePropertyKey", BulkChangeNodePropertyKeyCommand.class);
 		maintenanceCommandMap.put("setRelationshipProperties", BulkSetRelationshipPropertiesCommand.class);
 		maintenanceCommandMap.put("copyRelationshipProperties", BulkCopyRelationshipPropertyCommand.class);
-		maintenanceCommandMap.put("deleteSoftDeletedNodes", BulkDeleteSoftDeletedNodesCommand.class);
 		maintenanceCommandMap.put("createLicense", StructrLicenseManager.CreateLicenseCommand.class);
 		maintenanceCommandMap.put("setUuid", BulkSetUuidCommand.class);
 		maintenanceCommandMap.put("sync", SyncCommand.class);
 		maintenanceCommandMap.put("snapshot", SnapshotCommand.class);
 		maintenanceCommandMap.put("flushCaches", FlushCachesCommand.class);
+		maintenanceCommandMap.put("analyzeSchema", SchemaAnalyzer.class);
+		maintenanceCommandMap.put("migrateChangelog", BulkMigrateChangelogCommand.class);
 
 	}
 
@@ -98,7 +96,7 @@ public class MaintenanceParameterResource extends Resource {
 	}
 
 	@Override
-	public Result doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
+	public ResultStream doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
 		throw new NotAllowedException("GET not allowed, use POST to run maintenance commands");
 	}
 
@@ -163,5 +161,9 @@ public class MaintenanceParameterResource extends Resource {
 		}
 
 		maintenanceCommandMap.put(key, command);
+	}
+
+	public static Class getMaintenanceCommandClass(final String key) {
+		return maintenanceCommandMap.get(key);
 	}
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,23 +20,17 @@ package org.structr.core.function;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import org.structr.common.error.FrameworkException;
-import static org.structr.core.function.Functions.NULL_STRING;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class SizeFunction extends Function<Object, Object> {
+public class SizeFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_SIZE = "Usage: ${size(collection)}. Example: ${size(this.children)}";
 
 	@Override
 	public String getName() {
-		return "size()";
+		return "size";
 	}
 
 	@Override
@@ -47,11 +41,12 @@ public class SizeFunction extends Function<Object, Object> {
 
 			if (source != null) {
 
-				if (source instanceof Collection) {
+				if (source instanceof Iterable) {
 
 					// filter null objects
-					for (Object obj : (Collection)source) {
-						if (obj != null && !NULL_STRING.equals(obj)) {
+					for (Object obj : (Iterable)source) {
+
+						if (obj != null) {
 
 							list.add(obj);
 						}
@@ -61,7 +56,7 @@ public class SizeFunction extends Function<Object, Object> {
 
 					list.addAll(Arrays.asList((Object[])source));
 
-				} else if (source != null && !NULL_STRING.equals(source)) {
+				} else if (source != null) {
 
 					list.add(source);
 				}
@@ -73,7 +68,6 @@ public class SizeFunction extends Function<Object, Object> {
 		return 0;
 	}
 
-
 	@Override
 	public String usage(boolean inJavaScriptContext) {
 		return ERROR_MESSAGE_SIZE;
@@ -83,5 +77,4 @@ public class SizeFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Returns the size of the given collection";
 	}
-
 }

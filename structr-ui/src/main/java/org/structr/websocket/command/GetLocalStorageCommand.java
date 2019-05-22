@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -33,6 +33,8 @@ public class GetLocalStorageCommand extends AbstractCommand {
 
 	private static final Logger logger = LoggerFactory.getLogger(GetLocalStorageCommand.class.getName());
 
+	private static final String LOCAL_STORAGE_STRING_KEY = "localStorageString";
+
 	static {
 
 		StructrWebSocket.addCommand(GetLocalStorageCommand.class);
@@ -41,10 +43,12 @@ public class GetLocalStorageCommand extends AbstractCommand {
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
+		setDoTransactionNotifications(false);
+
 		final SecurityContext securityContext = getWebSocket().getSecurityContext();
 
 		try {
-			webSocketData.setNodeData("localStorageString", securityContext.getUser(false).getProperty(User.localStorage));
+			webSocketData.setNodeData(LOCAL_STORAGE_STRING_KEY, ((User)securityContext.getUser(false)).getLocalStorage());
 
 			// send only over local connection (no broadcast)
 			getWebSocket().send(webSocketData, true);

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,26 +18,24 @@
  */
 package org.structr.core.function;
 
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
-import org.structr.core.entity.MailTemplate;
+import org.structr.core.property.PropertyKey;
 import org.structr.core.script.Scripting;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class TemplateFunction extends Function<Object, Object> {
+public class TemplateFunction extends AdvancedScriptingFunction {
 
 	public static final String ERROR_MESSAGE_TEMPLATE    = "Usage: ${template(name, locale, source)}. Example: ${template(\"TEXT_TEMPLATE_1\", \"en_EN\", this)}";
 	public static final String ERROR_MESSAGE_TEMPLATE_JS = "Usage: ${{Structr.template(name, locale, source)}}. Example: ${{Structr.template(\"TEXT_TEMPLATE_1\", \"en_EN\", Structr.get('this'))}}";
 
 	@Override
 	public String getName() {
-		return "template()";
+		return "template";
 	}
 
 	@Override
@@ -50,43 +48,48 @@ public class TemplateFunction extends Function<Object, Object> {
 
 		try {
 
-			if (!(arrayHasLengthAndAllElementsNotNull(sources, 3) && sources[2] instanceof GraphObject)) {
+			assertArrayHasLengthAndAllElementsNotNull(sources, 3);
 
-				return null;
-			}
+			if (sources[2] instanceof GraphObject) {
 
-			final App app                      = StructrApp.getInstance(ctx.getSecurityContext());
-			final String name                  = sources[0].toString();
-			final String locale                = sources[1].toString();
-			final MailTemplate template        = app.nodeQuery(MailTemplate.class).andName(name).and(MailTemplate.locale, locale).getFirst();
-			final GraphObject templateInstance = (GraphObject)sources[2];
+				final Class type                    = StructrApp.getConfiguration().getNodeEntityClass("MailTemplate");
+				final PropertyKey<String> localeKey = StructrApp.key(type, "locale");
+				final PropertyKey<String> textKey   = StructrApp.key(type, "text");
+				final App app                       = StructrApp.getInstance(ctx.getSecurityContext());
+				final String name                   = sources[0].toString();
+				final String locale                 = sources[1].toString();
+				final GraphObject template          = app.nodeQuery(type).andName(name).and(localeKey, locale).getFirst();
+				final GraphObject templateInstance  = (GraphObject)sources[2];
 
-			if (template != null) {
+				if (template != null) {
 
-				final String text = template.getProperty(MailTemplate.text);
-				if (text != null) {
+					final String text = template.getProperty(textKey);
+					if (text != null) {
 
-					// recursive replacement call, be careful here
-					return Scripting.replaceVariables(ctx, templateInstance, text);
+						// recursive replacement call, be careful here
+						return Scripting.replaceVariables(ctx, templateInstance, text);
+					}
+
+				} else {
+
+					logger.warn("No MailTemplate found for parameters: {}", getParametersAsString(sources));
 				}
 
-			} else {
-
-				logger.warn("No MailTemplate found for parameters: {}", getParametersAsString(sources));
-
+				return "";
 			}
 
-		} catch (final IllegalArgumentException e) {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			// silently ignore null arguments
 
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
 
-		return "";
+		return null;
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {
@@ -97,5 +100,4 @@ public class TemplateFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Returns a MailTemplate object with the given name, replaces the placeholders with values from the given entity";
 	}
-
 }

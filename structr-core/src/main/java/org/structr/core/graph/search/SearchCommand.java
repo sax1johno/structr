@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,27 +20,30 @@ package org.structr.core.graph.search;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.api.Predicate;
-import org.structr.api.QueryResult;
 import org.structr.api.graph.PropertyContainer;
 import org.structr.api.index.Index;
 import org.structr.api.search.Occurrence;
+import org.structr.api.search.QueryContext;
+import org.structr.api.util.Iterables;
+import org.structr.api.util.PagingIterable;
+import org.structr.api.util.ResultStream;
 import org.structr.common.GraphObjectComparator;
-import org.structr.common.PagingHelper;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.common.geo.GeoCodingResult;
 import org.structr.common.geo.GeoHelper;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.AbstractRelationship;
@@ -87,46 +90,53 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 
 	private final SearchAttributeGroup rootGroup = new SearchAttributeGroup(Occurrence.REQUIRED);
 	private SearchAttributeGroup currentGroup    = rootGroup;
+	private Comparator<T> comparator             = null;
 	private PropertyKey sortKey                  = null;
 	private boolean publicOnly                   = false;
-	private boolean includeDeletedAndHidden      = true;
+	private boolean includeHidden                = true;
 	private boolean sortDescending               = false;
 	private boolean doNotSort                    = false;
+	private Class type                           = null;
 	private int pageSize                         = Integer.MAX_VALUE;
 	private int page                             = 1;
+	private QueryContext queryContext            = new QueryContext();
 
-	public abstract Factory<S, T> getFactory(final SecurityContext securityContext, final boolean includeDeletedAndHidden, final boolean publicOnly, final int pageSize, final int page);
+	public abstract Factory<S, T> getFactory(final SecurityContext securityContext, final boolean includeHidden, final boolean publicOnly, final int pageSize, final int page);
 	public abstract boolean isRelationshipSearch();
 	public abstract Index<S> getIndex();
 
-	private Result<T> doSearch() throws FrameworkException {
+	private ResultStream<T> doSearch() throws FrameworkException {
 
 		if (page == 0 || pageSize <= 0) {
 
-			return Result.EMPTY_RESULT;
+			return PagingIterable.EMPTY_ITERABLE;
 		}
 
-		final Factory<S, T> factory  = getFactory(securityContext, includeDeletedAndHidden, publicOnly, pageSize, page);
+		final Factory<S, T> factory  = getFactory(securityContext, includeHidden, publicOnly, pageSize, page);
 		boolean hasGraphSources      = false;
 		boolean hasSpatialSource     = false;
 
-		if (securityContext.getUser(false) == null) {
+		if (securityContext.getUser(false) == null && !isRelationshipSearch()) {
 
 			rootGroup.add(new PropertySearchAttribute(GraphObject.visibleToPublicUsers, true, Occurrence.REQUIRED, true));
+
+		} else if (securityContext.getUser(false) == null && isRelationshipSearch()) {
+
+			rootGroup.add(new RelationshipVisibilitySearchAttribute());
 
 		}
 
 		// special handling of deleted and hidden flags
-		if (!includeDeletedAndHidden && !isRelationshipSearch()) {
+		if (!includeHidden && !isRelationshipSearch()) {
 
 			rootGroup.add(new PropertySearchAttribute(NodeInterface.hidden,  true, Occurrence.FORBIDDEN, true));
-			rootGroup.add(new PropertySearchAttribute(NodeInterface.deleted, true, Occurrence.FORBIDDEN, true));
 		}
 
 		// At this point, all search attributes are ready
 		final List<SourceSearchAttribute> sources    = new ArrayList<>();
 		boolean hasEmptySearchFields                 = false;
-		Result intermediateResult                    = null;
+		boolean hasRelationshipVisibilitySearch      = false;
+		Iterable indexHits                           = null;
 
 		// check for optional-only queries
 		// (some query types seem to allow no MUST occurs)
@@ -178,14 +188,15 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 
 				sources.add((SourceSearchAttribute)attr);
 
-				// don't remove attribute from filter list
-				//it.remove();
-
 				hasGraphSources = true;
 			}
 
 			if (attr instanceof EmptySearchAttribute) {
 				hasEmptySearchFields = true;
+			}
+
+			if (attr instanceof RelationshipVisibilitySearchAttribute) {
+				hasRelationshipVisibilitySearch = true;
 			}
 		}
 
@@ -193,7 +204,7 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 		// use filters to filter sources otherwise
 		if (!hasSpatialSource && !sources.isEmpty()) {
 
-			intermediateResult = new Result(new ArrayList<>(), null, false, false);
+			indexHits = new LinkedList<>();
 
 		} else {
 
@@ -207,18 +218,34 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 			final Index<S> index = getIndex();
 			if (index != null) {
 
+				// paging needs to be done AFTER instantiating all nodes
+				if (hasEmptySearchFields || comparator != null) {
+					factory.disablePaging();
+				}
+
 				// do query
-				final QueryResult hits = getIndex().query(rootGroup);
-				intermediateResult     = factory.instantiate(hits);
+				indexHits = Iterables.map(factory, index.query(getQueryContext(), rootGroup));
+				//indexHits = new PagingIterable<>(Iterables.map(factory, index.query(getQueryContext(), rootGroup)), pageSize, page);
+
+				if (comparator != null) {
+
+					// pull results into memory
+					final List<T> rawResult = Iterables.toList(indexHits);
+
+					// sort result
+					Collections.sort(rawResult, comparator);
+
+					// return paging iterable
+					return new PagingIterable(rawResult, pageSize, page);
+				}
 			}
 		}
 
-		if (intermediateResult != null && (hasEmptySearchFields || hasGraphSources || hasSpatialSource)) {
+		if (indexHits != null && (hasEmptySearchFields || hasGraphSources || hasSpatialSource || hasRelationshipVisibilitySearch)) {
 
 			// sorted result set
-			final Set<GraphObject> intermediateResultSet = new LinkedHashSet<>(intermediateResult.getResults());
-			final List<GraphObject> finalResult          = new ArrayList<>();
-			int resultCount                              = 0;
+			final Set<T> intermediateResultSet = new LinkedHashSet<>(Iterables.toList(indexHits));
+			final List<T> finalResult          = new ArrayList<>();
 
 			// We need to find out whether there was a source for any of the possible sets that we want to merge.
 			// If there was only a single source, the final result is the result of that source. If there are
@@ -227,7 +254,7 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 			if (hasGraphSources) {
 
 				// merge sources according to their occur flag
-				final Set<GraphObject> mergedSources = mergeSources(sources);
+				final Set<T> mergedSources = mergeSources(sources);
 
 				if (hasSpatialSource) {
 
@@ -241,7 +268,7 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 			}
 
 			// Filter intermediate result
-			for (final GraphObject obj : intermediateResultSet) {
+			for (final T obj : intermediateResultSet) {
 
 				boolean addToResult = true;
 
@@ -255,27 +282,28 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 				if (addToResult) {
 
 					finalResult.add(obj);
-					resultCount++;
 				}
 			}
 
 			// sort list
 			Collections.sort(finalResult, new GraphObjectComparator(sortKey, sortDescending));
 
+			return new PagingIterable(finalResult, pageSize, page);
+
 			// return paged final result
-			return new Result(PagingHelper.subList(finalResult, pageSize, page), resultCount, true, false);
+			//return new Result(PagingHelper.subList(finalResult, pageSize, page), resultCount, true, false);
 
 		} else {
 
 			// no filtering
-			return intermediateResult;
+			return new PagingIterable(indexHits, pageSize, page);
 		}
 	}
 
-	private Set<GraphObject> mergeSources(List<SourceSearchAttribute> sources) {
+	private Set<T> mergeSources(List<SourceSearchAttribute> sources) {
 
-		final Set<GraphObject> mergedResult = new LinkedHashSet<>();
-		boolean alreadyAdded                = false;
+		final Set<T> mergedResult = new LinkedHashSet<>();
+		boolean alreadyAdded      = false;
 
 		for (final Iterator<SourceSearchAttribute> it = sources.iterator(); it.hasNext();) {
 
@@ -312,28 +340,21 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 	}
 
 	@Override
-	public Result<T> getResult() throws FrameworkException {
+	public ResultStream<T> getResultStream() throws FrameworkException {
 		return doSearch();
 	}
 
 	@Override
 	public List<T> getAsList() throws FrameworkException {
-
-		final Result<T> result = getResult();
-		if (result != null) {
-
-			return result.getResults();
-		}
-
-		return Collections.emptyList();
+		return Iterables.toList(doSearch());
 	}
 
 	@Override
 	public T getFirst() throws FrameworkException {
 
-		final Result<T> result = getResult();
+		final List<T> result = getAsList();
 
-		if (result == null || result.isEmpty()) {
+		if (result.isEmpty()) {
 
 			return null;
 		}
@@ -387,6 +408,15 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 	}
 
 	@Override
+	public org.structr.core.app.Query<T> comparator(final Comparator<T> comparator) {
+
+		this.doNotSort  = false;
+		this.comparator = comparator;
+
+		return this;
+	}
+
+	@Override
 	public org.structr.core.app.Query<T> pageSize(final int pageSize) {
 		this.pageSize = pageSize;
 		return this;
@@ -411,14 +441,14 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 	}
 
 	@Override
-	public org.structr.core.app.Query<T> includeDeletedAndHidden() {
-		this.includeDeletedAndHidden = true;
+	public org.structr.core.app.Query<T> includeHidden() {
+		this.includeHidden = true;
 		return this;
 	}
 
 	@Override
-	public org.structr.core.app.Query<T> includeDeletedAndHidden(final boolean includeDeletedAndHidden) {
-		this.includeDeletedAndHidden = includeDeletedAndHidden;
+	public org.structr.core.app.Query<T> includeHidden(final boolean includeHidden) {
+		this.includeHidden = includeHidden;
 		return this;
 	}
 
@@ -433,6 +463,8 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 	@Override
 	public org.structr.core.app.Query<T> andType(final Class type) {
 
+		this.type = type;
+
 		currentGroup.getSearchAttributes().add(new TypeSearchAttribute(type, Occurrence.REQUIRED, true));
 		return this;
 	}
@@ -440,12 +472,16 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 	@Override
 	public org.structr.core.app.Query<T> orType(final Class type) {
 
+		this.type = type;
+
 		currentGroup.getSearchAttributes().add(new TypeSearchAttribute(type, Occurrence.OPTIONAL, true));
 		return this;
 	}
 
 	@Override
 	public org.structr.core.app.Query<T> andTypes(final Class type) {
+
+		this.type = type;
 
 		andType(type);
 
@@ -455,9 +491,16 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 	@Override
 	public org.structr.core.app.Query<T> orTypes(final Class type) {
 
+		this.type = type;
+
 		orType(type);
 
 		return this;
+	}
+
+	@Override
+	public Class getType() {
+		return this.type;
 	}
 
 	@Override
@@ -600,9 +643,19 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 	}
 
 	@Override
+	public <P> org.structr.core.app.Query<T> andRange(final PropertyKey<P> key, final P rangeStart, final P rangeEnd, final boolean includeStart, final boolean includeEnd) {
+
+		currentGroup.getSearchAttributes().add(new RangeSearchAttribute(key, rangeStart, rangeEnd, Occurrence.REQUIRED, includeStart, includeEnd));
+
+		assertPropertyIsIndexed(key);
+
+		return this;
+	}
+
+	@Override
 	public <P> org.structr.core.app.Query<T> andRange(final PropertyKey<P> key, final P rangeStart, final P rangeEnd) {
 
-		currentGroup.getSearchAttributes().add(new RangeSearchAttribute(key, rangeStart, rangeEnd, Occurrence.REQUIRED));
+		currentGroup.getSearchAttributes().add(new RangeSearchAttribute(key, rangeStart, rangeEnd, Occurrence.REQUIRED, true, true));
 
 		assertPropertyIsIndexed(key);
 
@@ -612,7 +665,7 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 	@Override
 	public <P> org.structr.core.app.Query<T> orRange(final PropertyKey<P> key, final P rangeStart, final P rangeEnd) {
 
-		currentGroup.getSearchAttributes().add(new RangeSearchAttribute(key, rangeStart, rangeEnd, Occurrence.OPTIONAL));
+		currentGroup.getSearchAttributes().add(new RangeSearchAttribute(key, rangeStart, rangeEnd, Occurrence.OPTIONAL, true, true));
 
 		assertPropertyIsIndexed(key);
 
@@ -780,6 +833,23 @@ public abstract class SearchCommand<S extends PropertyContainer, T extends Graph
 		allSupertypes.removeAll(baseTypes);
 
 		return allSupertypes;
+	}
+
+	@Override
+	public void setQueryContext(final QueryContext queryContext) {
+		this.queryContext = queryContext;
+	}
+
+	@Override
+	public QueryContext getQueryContext() {
+		return queryContext;
+	}
+
+	@Override
+	public org.structr.core.app.Query<T> isPing(final boolean isPing) {
+
+		getQueryContext().isPing(isPing);
+		return this;
 	}
 
 	// ----- private methods ----

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,54 +18,50 @@
  */
 package org.structr.core.function;
 
-import java.util.Collection;
 import org.apache.commons.lang3.StringUtils;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class JoinFunction extends Function<Object, Object> {
+public class JoinFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_JOIN = "Usage: ${join(collection, separator)}. Example: ${join(this.names, \",\")}";
 
 	@Override
 	public String getName() {
-		return "join()";
+		return "join";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
 		try {
-			if (!arrayHasLengthAndAllElementsNotNull(sources, 2)) {
-				
-				return "";
-			}
 
-			if (sources[0] instanceof Collection) {
+			assertArrayHasLengthAndAllElementsNotNull(sources, 2);
 
-				return StringUtils.join((Collection)sources[0], sources[1].toString());
-			}
+			if (sources[0] instanceof Iterable) {
 
-			if (sources[0].getClass().isArray()) {
+				return StringUtils.join((Iterable)sources[0], sources[1].toString());
+
+			} else if (sources[0].getClass().isArray()) {
 
 				return StringUtils.join((Object[])sources[0], sources[1].toString());
 			}
 
-		} catch (final IllegalArgumentException e) {
+			return "";
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+		} catch (ArgumentNullException pe) {
 
+			// silently ignore null arguments
+			return "";
+
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
-
-		return "";
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {
@@ -76,5 +72,4 @@ public class JoinFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Joins all its parameters to a single string";
 	}
-
 }

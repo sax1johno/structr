@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -34,13 +34,16 @@ import org.eclipse.jetty.websocket.api.Session;
 import org.eclipse.jetty.websocket.api.WebSocketException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.Predicate;
 import org.structr.api.graph.RelationshipType;
+import org.structr.api.util.Iterables;
+import org.structr.common.AccessControllable;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.StructrTransactionListener;
-import org.structr.core.TransactionSource;
 import org.structr.core.entity.AbstractNode;
+import org.structr.core.entity.Group;
 import org.structr.core.graph.ModificationEvent;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.RelationshipInterface;
@@ -84,15 +87,15 @@ public class WebsocketController implements StructrTransactionListener {
 		broadcast(webSocketData, null);
 	}
 
-	private void broadcast(final WebSocketMessage webSocketData, final String exemptedSessionId) {
+	private void broadcast(final WebSocketMessage webSocketData, final Predicate<String> receiverSessionPredicate) {
 
 		// session must be valid to be received by the client
 		webSocketData.setSessionValid(true);
 
-		final String pagePath                        = (String) webSocketData.getNodeData().get("pagePath");
+		final String pagePath                        = webSocketData.getNodeDataStringValue("pagePath");
 		final String encodedPath                     = URIUtil.encodePath(pagePath);
 		final List<StructrWebSocket> clientsToRemove = new LinkedList<>();
-		final List<? extends GraphObject> result     = webSocketData.getResult();
+		final Iterable<? extends GraphObject> result = webSocketData.getResult();
 		final String command                         = webSocketData.getCommand();
 		final GraphObject obj                        = webSocketData.getGraphObject();
 
@@ -112,30 +115,11 @@ public class WebsocketController implements StructrTransactionListener {
 
 				final SecurityContext securityContext = socket.getSecurityContext();
 
-				if (exemptedSessionId != null && exemptedSessionId.equals(securityContext.getSessionId())) {
-					// session id is supposed to be exempted from this broadcast message
+				if (receiverSessionPredicate != null && !receiverSessionPredicate.accept(securityContext.getSessionId())) {
 					continue;
 				}
 
-				// if the object IS NOT of type AbstractNode AND the client is NOT priviledged OR
-				// if the object IS of type AbstractNode AND the client has no access to the node
-				// THEN skip sending a message
-				if (obj instanceof AbstractNode) {
-
-					final AbstractNode node = (AbstractNode)obj;
-
-					if (node.isHidden() || !securityContext.isVisible(node)) {
-						continue;
-					}
-
-				} else {
-
-					if (!socket.isPrivilegedUser(socket.getCurrentUser())) {
-						continue;
-					}
-				}
-
-				if (result != null && !result.isEmpty() && BroadcastCommands.contains(command)) {
+				if (result != null && BroadcastCommands.contains(command)) {
 
 					final WebSocketMessage clientData = webSocketData.copy();
 
@@ -176,28 +160,17 @@ public class WebsocketController implements StructrTransactionListener {
 		}
 	}
 
-	private <T extends GraphObject> List<T> filter(final SecurityContext securityContext, final List<T> all) {
-
-		List<T> filteredResult = new LinkedList<>();
-		for (T obj : all) {
-
-			if (securityContext.isVisible((AbstractNode) obj)) {
-
-				filteredResult.add(obj);
-			}
-		}
-
-		return filteredResult;
-
+	private <T extends GraphObject> Iterable<T> filter(final SecurityContext securityContext, final Iterable<T> all) {
+		return Iterables.filter(e -> { return securityContext.isVisible((AccessControllable)e); }, all);
 	}
 
 	// ----- interface StructrTransactionListener -----
 	@Override
-	public void beforeCommit(final SecurityContext securityContext, final Collection<ModificationEvent> modificationEvents, final TransactionSource source) {
+	public void beforeCommit(final SecurityContext securityContext, final Collection<ModificationEvent> modificationEvents) {
 	}
 
 	@Override
-	public void afterCommit(final SecurityContext securityContext, final Collection<ModificationEvent> modificationEvents, final TransactionSource source) {
+	public void afterCommit(final SecurityContext securityContext, final Collection<ModificationEvent> modificationEvents) {
 
 		for (final ModificationEvent event : modificationEvents) {
 
@@ -214,10 +187,8 @@ public class WebsocketController implements StructrTransactionListener {
 	}
 
 	@Override
-	public void simpleBroadcast(final String commandName, final Map<String, Object> data, final String exemptedSessionId) {
-
-		broadcast(MessageBuilder.forName(commandName).data(data).build(), exemptedSessionId);
-
+	public void simpleBroadcast(final String commandName, final Map<String, Object> data, final Predicate<String> sessionIdPredicate) {
+		broadcast(MessageBuilder.forName(commandName).data(data).build(), sessionIdPredicate);
 	}
 
 	// ----- private methods -----
@@ -244,7 +215,7 @@ public class WebsocketController implements StructrTransactionListener {
 				final WebSocketMessage message = createMessage("CREATE", callbackId);
 
 				message.setGraphObject(node);
-				message.setResult(Arrays.asList(new GraphObject[]{node}));
+				message.setResult(Arrays.asList(node));
 				message.setCode(201);
 
 				return message;
@@ -258,28 +229,36 @@ public class WebsocketController implements StructrTransactionListener {
 				if (securityContext != null) {
 
 					// only include changed properties (+ id and type)
-					LinkedHashSet<String> propertySet = new LinkedHashSet();
+					final LinkedHashSet<String> propertySet = new LinkedHashSet();
+
 					propertySet.add("id");
 					propertySet.add("type");
+
 					for (Iterator<PropertyKey> it = modificationEvent.getModifiedProperties().keySet().iterator(); it.hasNext(); ) {
+
 						final String jsonName = ((PropertyKey)it.next()).jsonName();
 						if (!propertySet.contains(jsonName)) {
+
 							propertySet.add(jsonName);
 						}
 					}
+
 					for (Iterator<PropertyKey> it = modificationEvent.getRemovedProperties().keySet().iterator(); it.hasNext(); ) {
+
 						final String jsonName = ((PropertyKey)it.next()).jsonName();
 						if (!propertySet.contains(jsonName)) {
+
 							propertySet.add(jsonName);
 						}
 					}
+
 					if (propertySet.size() > 2) {
 						securityContext.setCustomView(propertySet);
 					}
 				}
 
 				message.setGraphObject(node);
-				message.setResult(Arrays.asList(new GraphObject[]{node}));
+				message.setResult(Arrays.asList(node));
 				message.setId(node.getUuid());
 				message.getModifiedProperties().addAll(modificationEvent.getModifiedProperties().keySet());
 				message.getRemovedProperties().addAll(modificationEvent.getRemovedProperties().keySet());
@@ -342,9 +321,9 @@ public class WebsocketController implements StructrTransactionListener {
 							message.setNodeData("refId", ((AbstractNode) refNode).getUuid());
 						}
 
-					} else if (endNode instanceof User) {
+					} else if (endNode instanceof User || endNode instanceof Group) {
 
-						message.setCommand("APPEND_USER");
+						message.setCommand("APPEND_MEMBER");
 						message.setNodeData("refId", startNode.getUuid());
 
 					} else if (endNode instanceof AbstractFile) {

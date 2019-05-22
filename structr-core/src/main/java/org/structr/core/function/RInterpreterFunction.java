@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -21,46 +21,64 @@ package org.structr.core.function;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
 /**
  * Interpretes R code
  */
-public class RInterpreterFunction extends Function<Object, Object> {
+public class RInterpreterFunction extends AdvancedScriptingFunction {
 
 	public static final String ERROR_MESSAGE_R    = "Usage: ${r(<R code>)}";
 	public static final String ERROR_MESSAGE_R_JS = "Usage: ${{Structr.r(<R code>)}}";
-	
+
+	@Override
+	public String getName() {
+		return "r";
+	}
+
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
-		
-		if (arrayHasLengthAndAllElementsNotNull(sources, 1)) {
+
+		try {
+
+			assertArrayHasLengthAndAllElementsNotNull(sources, 1);
 
 			final String script = sources[0].toString();
-			
+
 			// create a script engine manager:
 			ScriptEngineManager manager = new ScriptEngineManager();
+
 			// create a Renjin engine:
 			ScriptEngine engine = manager.getEngineByName("Renjin");
+
 			// check if the engine has loaded correctly:
 			if (engine == null) {
-				throw new RuntimeException("Renjin Script Engine not found on the classpath.");
-			}
-			
-			try {
-			
-				return engine.eval(script);
-				
-			} catch (final ScriptException e) {
-				
-				logger.error("Error while executing R script: {}", new Object[] { script, e });
+				throw new RuntimeException("Renjin Script Engine not found in the classpath.");
 			}
 
+			try {
+
+				return engine.eval(script);
+
+			} catch (final ScriptException e) {
+
+				logger.error("Error while executing R script: {}", new Object[] { script, e });
+				return null;
+			}
+
+		} catch (ArgumentNullException pe) {
+
+			// silently ignore null arguments
+			return null;
+
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
+			return usage(ctx.isJavaScriptContext());
 		}
-		
-		return null;
 	}
 
 	@Override
@@ -72,10 +90,4 @@ public class RInterpreterFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "";
 	}
-
-	@Override
-	public String getName() {
-		return "r()";
-	}
-	
 }

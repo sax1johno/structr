@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,56 +18,114 @@
  */
 package org.structr.ldap;
 
+import java.io.IOException;
+import java.net.URI;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import org.apache.directory.api.ldap.model.cursor.CursorException;
 import org.apache.directory.api.ldap.model.entry.Attribute;
 import org.apache.directory.api.ldap.model.entry.Entry;
+import org.apache.directory.api.ldap.model.exception.LdapException;
 import org.apache.directory.api.ldap.model.exception.LdapInvalidAttributeValueException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.config.Settings;
+import org.structr.api.util.Iterables;
 import org.structr.common.PropertyView;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.Export;
 import org.structr.core.Services;
-import org.structr.core.property.Property;
-import org.structr.core.property.StringProperty;
+import org.structr.core.app.StructrApp;
+import org.structr.core.entity.Group;
+import org.structr.core.property.PropertyKey;
+import org.structr.schema.SchemaService;
+import org.structr.schema.json.JsonObjectType;
+import org.structr.schema.json.JsonSchema;
 import org.structr.web.entity.User;
 
 /**
  *
  */
-public class LDAPUser extends User {
+public interface LDAPUser extends User {
 
-	private static final Logger logger = LoggerFactory.getLogger(LDAPUser.class);
-	
-	public static final Property<String> distinguishedName = new StringProperty("distinguishedName").unique().indexed();
-	public static final Property<String> description       = new StringProperty("description").indexed();
-	public static final Property<String> commonName        = new StringProperty("commonName").indexed();
-	public static final Property<String> entryUuid         = new StringProperty("entryUuid").unique().indexed();
+	static final Logger logger = LoggerFactory.getLogger(LDAPGroup.class);
 
+	static class Impl { static {
 
-	public static final org.structr.common.View uiView = new org.structr.common.View(LDAPUser.class, PropertyView.Ui,
-		distinguishedName, entryUuid, commonName, description
-	);
+		final JsonSchema schema    = SchemaService.getDynamicSchema();
+		final JsonObjectType type  = schema.addType("LDAPUser");
 
-	public static final org.structr.common.View publicView = new org.structr.common.View(LDAPUser.class, PropertyView.Public,
-		distinguishedName, entryUuid, commonName, description
-	);
+		type.setExtends(schema.getType("User"));
+		type.setImplements(URI.create("https://structr.org/v1.1/definitions/LDAPUser"));
 
-	public void initializeFrom(final Entry entry) throws FrameworkException, LdapInvalidAttributeValueException {
+		type.addStringProperty("distinguishedName", PropertyView.Public, PropertyView.Ui).setUnique(true).setIndexed(true);
+		type.addLongProperty("lastLDAPSync");
 
-		setProperty(LDAPUser.description, getString(entry, "description"));
-		setProperty(LDAPUser.entryUuid,   getString(entry, "entryUUID"));
-		setProperty(LDAPUser.name,        getString(entry, "uid"));
-		setProperty(LDAPUser.commonName,  getString(entry, "cn"));
-		setProperty(LDAPUser.eMail,       getString(entry, "mail"));
-	}
+		type.addPropertyGetter("distinguishedName", String.class);
+		type.addPropertySetter("distinguishedName", String.class);
 
-	@Override
-	public boolean isValidPassword(final String password) {
+		type.overrideMethod("onAuthenticate",   true, LDAPUser.class.getName() + ".onAuthenticate(this);");
+		type.overrideMethod("initializeFrom",  false, LDAPUser.class.getName() + ".initializeFrom(this, arg0);");
+		type.overrideMethod("isValidPassword", false, "return " + LDAPUser.class.getName() + ".isValidPassword(this, arg0);");
+	}}
 
-		final LDAPService ldapService = Services.getInstance().getService(LDAPService.class);
-		final String dn               = getProperty(distinguishedName);
+	String getDistinguishedName();
+
+	void initializeFrom(final Entry entry) throws FrameworkException;
+	void setDistinguishedName(final String distinguishedName) throws FrameworkException;
+
+	static void initializeFrom(final LDAPUser thisUser, final Entry entry) throws FrameworkException {
+
+		final LDAPService ldapService      = Services.getInstance().getService(LDAPService.class);
+		final Map<String, String> mappings = new LinkedHashMap<>();
 
 		if (ldapService != null) {
+
+			mappings.putAll(ldapService.getPropertyMapping());
+		}
+
+		try {
+
+			// apply mappings
+			for (final String key : mappings.keySet()) {
+
+				final String structrName = mappings.get(key);
+				final String ldapName    = key;
+
+				thisUser.setProperty(StructrApp.key(LDAPUser.class, structrName), LDAPUser.getString(entry, ldapName));
+			}
+
+			// update lastUpdate timestamp
+			thisUser.setProperty(StructrApp.key(LDAPUser.class, "lastLDAPSync"), System.currentTimeMillis());
+
+
+		} catch (final LdapInvalidAttributeValueException ex) {
+			ex.printStackTrace();
+		}
+	}
+
+	static boolean isValidPassword(final LDAPUser thisUser, final String password) {
+
+		final LDAPService ldapService = Services.getInstance().getService(LDAPService.class);
+		final String dn               = thisUser.getDistinguishedName();
+		boolean hasLDAPGroups         = false;
+
+		if (ldapService != null) {
+
+			// delete this user if there is no group association left
+			for (final Group group : Iterables.toList(thisUser.getGroups())) {
+
+				if (group instanceof LDAPGroup) {
+
+					hasLDAPGroups = true;
+					break;
+				}
+			}
+
+			if (!hasLDAPGroups) {
+
+				logger.info("LDAPUser {} with UUID {} is not associated with an LDAPGroup, authentication denied.", thisUser.getName(), thisUser.getUuid());
+				return false;
+			}
 
 			return ldapService.canSuccessfullyBind(dn, password);
 
@@ -79,26 +137,36 @@ public class LDAPUser extends User {
 		return false;
 	}
 
-	@Export
-	public void printDebug() {
+	static void onAuthenticate(final LDAPUser thisUser) {
 
-		final LDAPService ldapService = Services.getInstance().getService(LDAPService.class);
-		final String dn               = getProperty(distinguishedName);
+		final PropertyKey<Long> lastUpdateKey = StructrApp.key(LDAPUser.class, "lastLDAPSync");
+		final Long lastUpdate = thisUser.getProperty(lastUpdateKey);
 
-		if (ldapService != null) {
+		if ((lastUpdate == null || System.currentTimeMillis() > (lastUpdate + (Settings.LDAPUpdateInterval.getValue(600) * 1000)))) {
 
-			System.out.println(ldapService.fetchObjectInfo(dn));
+			try {
 
-		} else {
+				// update all LDAP groups..
+				logger.info("Updating LDAP information for {} ({})", thisUser.getName(), thisUser.getProperty(StructrApp.key(LDAPUser.class, "distinguishedName")));
 
-			logger.warn("Unable to reach LDAP server for user information of {}", dn);
+				final LDAPService service = Services.getInstance().getService(LDAPService.class);
+				if (service != null) {
+
+						for (final LDAPGroup group : StructrApp.getInstance().nodeQuery(LDAPGroup.class).getAsList()) {
+
+							service.synchronizeGroup(group);
+						}
+				}
+
+				thisUser.setProperty(lastUpdateKey, System.currentTimeMillis());
+
+			} catch (CursorException | LdapException | IOException | FrameworkException fex) {
+				logger.warn("Unable to update LDAP information for user {}: {}", thisUser.getName(), fex.getMessage());
+			}
 		}
 	}
 
-
-
-	// ----- private methods -----
-	private String getString(final Entry entry, final String key) throws LdapInvalidAttributeValueException {
+	static String getString(final Entry entry, final String key) throws LdapInvalidAttributeValueException {
 
 		final Attribute attribute = entry.get(key);
 		if (attribute != null) {

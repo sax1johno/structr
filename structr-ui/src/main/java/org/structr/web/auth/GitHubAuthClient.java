@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -42,11 +42,6 @@ public class GitHubAuthClient extends StructrOAuthClient {
 	@Override
 	public String getScope() {
 		return "user:email";
-	}
-
-	@Override
-	public ResponseFormat getResponseFormat() {
-		return ResponseFormat.json;
 	}
 
 	@Override

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -46,8 +46,6 @@ public class BulkSetNodePropertiesCommand extends NodeServiceCommand implements 
 
 	private static final Logger logger = LoggerFactory.getLogger(BulkSetNodePropertiesCommand.class.getName());
 
-	//~--- methods --------------------------------------------------------
-
 	@Override
 	public void execute(final Map<String, Object> properties) throws FrameworkException {
 
@@ -75,7 +73,7 @@ public class BulkSetNodePropertiesCommand extends NodeServiceCommand implements 
 
 				try (final Tx tx = app.tx()) {
 
-					nodeIterator = app.nodeQuery(cls).getResult().getResults().iterator();
+					nodeIterator = app.nodeQuery(cls).getResultStream().iterator();
 					properties.remove(AbstractNode.type.dbName());
 
 					tx.success();
@@ -92,7 +90,7 @@ public class BulkSetNodePropertiesCommand extends NodeServiceCommand implements 
 			final long count = bulkGraphOperation(securityContext, nodeIterator, 1000, "SetNodeProperties", new BulkGraphOperation<AbstractNode>() {
 
 				@Override
-				public void handleGraphObject(SecurityContext securityContext, AbstractNode node) {
+				public boolean handleGraphObject(SecurityContext securityContext, AbstractNode node) {
 
 					// Treat only "our" nodes
 					if (node.getProperty(GraphObject.id) != null) {
@@ -107,7 +105,7 @@ public class BulkSetNodePropertiesCommand extends NodeServiceCommand implements 
 								key = "type";
 							}
 
-							PropertyConverter inputConverter = StructrApp.getConfiguration().getPropertyKeyForJSONName(cls, key).inputConverter(securityContext);
+							PropertyConverter inputConverter = StructrApp.key(cls, key).inputConverter(securityContext);
 
 
 							if (inputConverter != null) {
@@ -134,10 +132,10 @@ public class BulkSetNodePropertiesCommand extends NodeServiceCommand implements 
 
 								}
 							}
-
 						}
-
 					}
+
+					return true;
 				}
 
 				@Override

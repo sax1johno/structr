@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -29,12 +29,8 @@ import org.structr.web.resource.LogoutResource;
 import org.structr.web.resource.RegistrationResource;
 import org.structr.web.resource.ResetPasswordResource;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
- * The default constraint provider for structr-ui
- *
- *
+ * The default resource provider for structr-ui.
  */
 public class UiResourceProvider implements ResourceProvider {
 
@@ -45,6 +41,7 @@ public class UiResourceProvider implements ResourceProvider {
 
 		resourceMap.put(Pattern.compile("[a-fA-F0-9]{32}"), UuidResource.class);        // matches a UUID without dashes
 		resourceMap.put(Pattern.compile("cypher"), CypherQueryResource.class);          // cypher query
+		resourceMap.put(Pattern.compile("graphQL"), GraphQLResource.class);             // graphQL query
 		resourceMap.put(Pattern.compile("login"), LoginResource.class);                 // login
 		resourceMap.put(Pattern.compile("logout"), LogoutResource.class);               // logout
 		resourceMap.put(Pattern.compile("registration"), RegistrationResource.class);   // self-registration
@@ -65,6 +62,7 @@ public class UiResourceProvider implements ResourceProvider {
 		resourceMap.put(Pattern.compile("ids"), ViewFilterResource.class);                    // "ids only" view
 		resourceMap.put(Pattern.compile(PropertyView.Ui), ViewFilterResource.class);          // ui view
 		resourceMap.put(Pattern.compile(PropertyView.Html), ViewFilterResource.class);        // html attributes view
+		resourceMap.put(Pattern.compile(PropertyView.Custom), ViewFilterResource.class);      // custom view
 
 		resourceMap.put(Pattern.compile("log"), LogResource.class);                           // log resource
 		resourceMap.put(Pattern.compile("resolver"), EntityResolverResource.class);		// resolves [] of UUIDs to complete result

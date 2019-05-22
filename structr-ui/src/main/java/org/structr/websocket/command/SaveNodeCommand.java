@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,7 +19,6 @@
 package org.structr.websocket.command;
 
 import java.util.List;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.SecurityContext;
@@ -37,8 +36,6 @@ import org.structr.websocket.message.WebSocketMessage;
 
 /**
  *
- *
- *
  */
 public class SaveNodeCommand extends AbstractCommand {
 
@@ -52,10 +49,13 @@ public class SaveNodeCommand extends AbstractCommand {
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
-		final String nodeId = webSocketData.getId();
-		final Map<String, Object> nodeData = webSocketData.getNodeData();
-		final String modifiedHtml = (String) nodeData.get("source");
+		setDoTransactionNotifications(true);
+
 		final SecurityContext securityContext = getWebSocket().getSecurityContext();
+
+		final String nodeId       = webSocketData.getId();
+		final String modifiedHtml = webSocketData.getNodeDataStringValue("source");
+		
 		final App app = StructrApp.getInstance(securityContext);
 
 		Page modifiedNode = null;
@@ -70,7 +70,12 @@ public class SaveNodeCommand extends AbstractCommand {
 
 				// parse page from modified source
 				modifiedNode = Importer.parsePageFromSource(securityContext, modifiedHtml, "__SaveNodeCommand_Temporary_Page__");
-
+				
+				if (modifiedNode == null) {
+					final String errorMessage = "Unable to parse " + modifiedHtml;
+					logger.warn(errorMessage);
+					getWebSocket().send(MessageBuilder.status().code(422).message(errorMessage).build(), true);
+				}
 
 				DOMNode targetNode = modifiedNode;
 

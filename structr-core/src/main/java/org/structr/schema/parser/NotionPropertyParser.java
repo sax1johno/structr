@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,14 +19,18 @@
 package org.structr.schema.parser;
 
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang.StringUtils;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.common.error.FrameworkException;
 import org.structr.common.error.InvalidPropertySchemaToken;
+import org.structr.core.app.StructrApp;
+import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.SchemaNode;
 import org.structr.core.property.CollectionNotionProperty;
 import org.structr.core.property.EntityNotionProperty;
+import org.structr.core.property.PropertyKey;
 import org.structr.schema.Schema;
 import org.structr.schema.SchemaHelper.Type;
 
@@ -75,12 +79,12 @@ public class NotionPropertyParser extends PropertySourceGenerator {
 	}
 
 	@Override
-	public void parseFormatString(final Schema entity, String expression) throws FrameworkException {
+	public void parseFormatString(final Map<String, SchemaNode> schemaNodes, final Schema entity, String expression) throws FrameworkException {
 
 		if (StringUtils.isBlank(expression)) {
 
 			//reportError(new InvalidPropertySchemaToken(SchemaNode.class.getSimpleName(), expression, "invalid_property_definition", "Empty notion property expression."));
-			throw new FrameworkException(422, "Empty notion property expression", new InvalidPropertySchemaToken(SchemaNode.class.getSimpleName(), expression, "invalid_property_definition", "Empty notion property expression."));
+			throw new FrameworkException(422, "Empty notion property expression for property " + source.getPropertyName() + ".", new InvalidPropertySchemaToken(entity.getClassName(), source.getPropertyName(), expression, "invalid_property_definition", "Empty notion property expression for property " + source.getPropertyName() + "."));
 		}
 
 		final StringBuilder buf = new StringBuilder();
@@ -90,12 +94,12 @@ public class NotionPropertyParser extends PropertySourceGenerator {
 
 			boolean isBuiltinProperty = false;
 			baseProperty              = parts[0];
-			multiplicity              = entity.getMultiplicity(baseProperty);
+			multiplicity              = entity.getMultiplicity(schemaNodes, baseProperty);
 
 			if (multiplicity != null) {
 
 				// determine related type from relationship
-				relatedType  = entity.getRelatedType(baseProperty);
+				relatedType  = entity.getRelatedType(schemaNodes, baseProperty);
 
 				switch (multiplicity) {
 
@@ -135,7 +139,7 @@ public class NotionPropertyParser extends PropertySourceGenerator {
 
 				buf.append(",");
 
-				final boolean isBoolean = (parts.length == 3 && ("true".equals(parts[2].toLowerCase())));
+				final boolean isBoolean = (parts.length == 3 && ("true".equals(parts[2].toLowerCase()) || "false".equals(parts[2].toLowerCase())));
 				isAutocreate            = isBoolean;
 
 				// use PropertyNotion when only a single element is given
@@ -155,24 +159,20 @@ public class NotionPropertyParser extends PropertySourceGenerator {
 					String propertyName     = parts[i];
 					String fullPropertyName = propertyName;
 
-					// remove prefix from full property name
-					if (fullPropertyName.startsWith("_")) {
-						fullPropertyName = fullPropertyName.substring(1) + "Property";
-					}
-
-					if (!"true".equals(propertyName.toLowerCase()) && !propertyName.contains(".")) {
+					if (!isBoolean && !propertyName.contains(".")) {
 
 						buf.append(relatedType);
 						buf.append(".");
 
 						fullPropertyName = relatedType + "." + fullPropertyName;
+						
 					}
+					
+					fullPropertyName = extendPropertyName(fullPropertyName, isBoolean);
 
 					properties.add(fullPropertyName);
 
-					if (propertyName.startsWith("_")) {
-						propertyName = propertyName.substring(1) + "Property";
-					}
+					propertyName = extendPropertyName(propertyName, isBoolean);
 
 					buf.append(propertyName);
 
@@ -184,8 +184,12 @@ public class NotionPropertyParser extends PropertySourceGenerator {
 				buf.append(")");
 
 			} else {
-				throw new FrameworkException(422, "Invalid notion property expression.", new InvalidPropertySchemaToken(SchemaNode.class.getSimpleName(), expression, "invalid_property_definition", "Invalid notion property expression."));
-				//reportError(new InvalidPropertySchemaToken(SchemaNode.class.getSimpleName(), expression, "invalid_property_definition", "Invalid notion property expression."));
+
+				throw new FrameworkException(422, "Invalid notion property expression for property " + source.getPropertyName() +  ".", new InvalidPropertySchemaToken(entity.getClassName(), source.getPropertyName(), expression, "invalid_property_definition", "Invalid notion property expression for property " + source.getPropertyName() + "."));
+			}
+
+			if (properties.isEmpty()) {
+				throw new FrameworkException(422, "Invalid notion property expression for property " + source.getPropertyName() +  ".", new InvalidPropertySchemaToken(entity.getClassName(), source.getPropertyName(), expression, "invalid_property_definition", "Invalid notion property expression for property " + source.getPropertyName() + ", notion must define at least one property."));
 			}
 		}
 
@@ -193,6 +197,39 @@ public class NotionPropertyParser extends PropertySourceGenerator {
 		parameters = buf.toString();
 	}
 
+	private String extendPropertyName(final String propertyName, final Boolean isBoolean) throws FrameworkException {
+
+		String extendedPropertyName = propertyName;
+		
+		// remove exactly one leading underscore if property name starts with one
+		if (StringUtils.contains(extendedPropertyName, ".")) {
+			
+			String[] parts = StringUtils.split(extendedPropertyName, ".");
+			
+			if (StringUtils.startsWith(parts[1], "_")) {
+			
+				extendedPropertyName = parts[0] + "." + parts[1].substring(1);
+			
+			}
+			
+		} else {
+			
+			if (StringUtils.startsWith(extendedPropertyName, "_")) {
+	
+				extendedPropertyName = extendedPropertyName.substring(1);
+			}
+			
+		}
+
+		final PropertyKey propertyKey = StructrApp.getConfiguration().getPropertyKeyForJSONName(AbstractNode.class, StringUtils.contains(extendedPropertyName, ".") ? StringUtils.substringAfterLast(extendedPropertyName, ".") : extendedPropertyName, false);
+		
+		if (propertyKey != null) {
+			return extendedPropertyName;
+		}
+		
+		return (isBoolean || StringUtils.endsWith(extendedPropertyName, "Property")) ? extendedPropertyName : extendedPropertyName + "Property";
+	}
+	
 	public boolean isPropertySet() {
 		return isPropertySet;
 	}

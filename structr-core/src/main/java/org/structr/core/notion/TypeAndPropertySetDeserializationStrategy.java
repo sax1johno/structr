@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -27,15 +27,12 @@ import org.structr.common.error.FrameworkException;
 import org.structr.common.error.PropertiesNotFoundToken;
 import org.structr.common.error.TypeToken;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.graph.NodeInterface;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.core.property.RelationProperty;
-
-//~--- classes ----------------------------------------------------------------
 
 /**
  * Deserializes a {@link GraphObject} using a type and a set of property values.
@@ -50,15 +47,18 @@ public class TypeAndPropertySetDeserializationStrategy<S, T extends NodeInterfac
 	protected PropertyKey[] propertyKeys        = null;
 	protected boolean createIfNotExisting       = false;
 
-	//~--- constructors ---------------------------------------------------
-
 	public TypeAndPropertySetDeserializationStrategy(PropertyKey... propertyKeys) {
 		this(false, propertyKeys);
 	}
 
 	public TypeAndPropertySetDeserializationStrategy(boolean createIfNotExisting, PropertyKey... propertyKeys) {
+
 		this.createIfNotExisting = createIfNotExisting;
 		this.propertyKeys = propertyKeys;
+
+		if (propertyKeys == null || propertyKeys.length == 0) {
+			throw new IllegalStateException("TypeAndPropertySetDeserializationStrategy must contain at least one property.");
+		}
 	}
 
 	@Override
@@ -81,7 +81,7 @@ public class TypeAndPropertySetDeserializationStrategy<S, T extends NodeInterfac
 
 		if (source != null && source instanceof String && Pattern.matches("[a-fA-F0-9]{32}", (String) source)) {
 
-			return (T) getTypedResult(new Result(StructrApp.getInstance(securityContext).getNodeById((String) source), false), type);
+			return getTypedResult((T)StructrApp.getInstance(securityContext).getNodeById((String) source), type);
 
 		}
 
@@ -94,12 +94,12 @@ public class TypeAndPropertySetDeserializationStrategy<S, T extends NodeInterfac
 
 		if (attributes != null) {
 
-			Result<T> result = Result.EMPTY_RESULT;
+			final List<T> result = new LinkedList<>();
 
 			// Check if properties contain the UUID attribute
 			if (attributes.containsKey(GraphObject.id)) {
 
-				result = new Result(app.getNodeById(attributes.get(GraphObject.id)), false);
+				result.add((T)app.getNodeById(attributes.get(GraphObject.id)));
 
 			} else {
 
@@ -124,7 +124,7 @@ public class TypeAndPropertySetDeserializationStrategy<S, T extends NodeInterfac
 						}
 					}
 
-					result = app.nodeQuery(type).and(searchAttributes).getResult();
+					result.addAll(app.nodeQuery(type).and(searchAttributes).getAsList());
 
 				}
 			}
@@ -152,7 +152,7 @@ public class TypeAndPropertySetDeserializationStrategy<S, T extends NodeInterfac
 
 				case 1:
 
-					final T relatedNode = getTypedResult(result, type);
+					final T relatedNode = getTypedResult(result.get(0), type);
 					if (!attributes.isEmpty()) {
 
 						// set properties on related node?
@@ -164,8 +164,8 @@ public class TypeAndPropertySetDeserializationStrategy<S, T extends NodeInterfac
 				default:
 
 					errorMessage = "Found " + size + " nodes for given type and properties, property set is ambiguous";
-					logger.error(""
-						+ "This is often due to wrong modeling, or you should consider creating a uniquness constraint for " + type.getName(), size);
+					logger.error(errorMessage +
+						". This is often due to wrong modeling, or you should consider creating a uniquness constraint for " + type.getName(), size);
 
 					break;
 			}
@@ -176,15 +176,13 @@ public class TypeAndPropertySetDeserializationStrategy<S, T extends NodeInterfac
 		return null;
 	}
 
-	private T getTypedResult(Result<T> result, Class<T> type) throws FrameworkException {
-
-		final GraphObject obj = result.get(0);
+	private T getTypedResult(final T obj, Class<T> type) throws FrameworkException {
 
 		if (!type.isAssignableFrom(obj.getClass())) {
 			throw new FrameworkException(422, "Node type mismatch", new TypeToken(type.getSimpleName(), null, type.getSimpleName()));
 		}
 
-		return result.get(0);
+		return obj;
 	}
 
 

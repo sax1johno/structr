@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -29,6 +29,7 @@ import org.structr.core.app.StructrApp;
 import org.structr.core.converter.PropertyConverter;
 import org.structr.core.graph.NodeAttribute;
 import org.structr.core.graph.NodeInterface;
+import org.structr.core.graph.Tx;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.web.entity.dom.DOMElement;
@@ -37,6 +38,7 @@ import org.structr.web.entity.dom.Page;
 import org.structr.web.entity.dom.Template;
 import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.command.AbstractCommand;
+import org.structr.websocket.command.CreateComponentCommand;
 import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
 import org.w3c.dom.DOMException;
@@ -58,6 +60,8 @@ public class CreateAndAppendDOMNodeCommand extends AbstractCommand {
 
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
+
+		setDoTransactionNotifications(true);
 
 		final Map<String, Object> nodeData   = webSocketData.getNodeData();
 		final String parentId                = (String) nodeData.get("parentId");
@@ -98,7 +102,20 @@ public class CreateAndAppendDOMNodeCommand extends AbstractCommand {
 
 				nodeData.remove("tagName");
 
-				try {
+				try (final Tx tx = StructrApp.getInstance(getWebSocket().getSecurityContext()).tx(true, true, true)) {
+
+					final boolean isShadowPage = document.equals(CreateComponentCommand.getOrCreateHiddenDocument());
+					final boolean isTemplate   = (parentNode instanceof Template);
+
+					if (isShadowPage && isTemplate && parentNode.getParent() == null) {
+						getWebSocket().send(MessageBuilder.status().code(422).message("Appending children to root-level shared component Templates is not allowed").build(), true);
+						return;
+					}
+
+					if (!isShadowPage && !isTemplate && parentNode.isSynced()) {
+						getWebSocket().send(MessageBuilder.status().code(422).message("Appending children to shared components (that are not Templates) in the pages tree is not allowed").build(), true);
+						return;
+					}
 
 					DOMNode newNode;
 
@@ -128,11 +145,13 @@ public class CreateAndAppendDOMNodeCommand extends AbstractCommand {
 
 							try {
 
+								final Class entityClass = StructrApp.getConfiguration().getNodeEntityClass("DOMElement");
+
 								// experimental: create DOM element with literal tag
-								newNode = (DOMElement) StructrApp.getInstance(webSocket.getSecurityContext()).create(DOMElement.class,
-									new NodeAttribute(DOMElement.tag, "custom"),
-									new NodeAttribute(DOMElement.hideOnDetail, false),
-									new NodeAttribute(DOMElement.hideOnIndex, false)
+								newNode = (DOMElement) StructrApp.getInstance(webSocket.getSecurityContext()).create(entityClass,
+									new NodeAttribute(StructrApp.key(DOMElement.class, "tag"),          "custom"),
+									new NodeAttribute(StructrApp.key(DOMElement.class, "hideOnDetail"), false),
+									new NodeAttribute(StructrApp.key(DOMElement.class, "hideOnIndex"),  false)
 								);
 
 								if (newNode != null && document != null) {
@@ -189,7 +208,6 @@ public class CreateAndAppendDOMNodeCommand extends AbstractCommand {
 
 								}
 							}
-
 						}
 
 						PropertyMap visibilityFlags = null;
@@ -206,7 +224,6 @@ public class CreateAndAppendDOMNodeCommand extends AbstractCommand {
 								logger.warn("Unable to inherit visibility flags for node {} from parent node {}", newNode, parentNode );
 
 							}
-
 						}
 
 						// create a child text node if content is given
@@ -225,12 +242,15 @@ public class CreateAndAppendDOMNodeCommand extends AbstractCommand {
 									logger.warn("Unable to inherit visibility flags for node {} from parent node {}", childNode, newNode );
 
 								}
-
 							}
-
 						}
-
 					}
+
+					tx.success();
+
+				} catch (FrameworkException fex) {
+
+					getWebSocket().send(MessageBuilder.status().code(fex.getStatus()).message(fex.toString()).jsonErrorObject(fex.toJSON()).callback(webSocketData.getCallback()).build(), true);
 
 				} catch (DOMException dex) {
 
@@ -255,4 +275,8 @@ public class CreateAndAppendDOMNodeCommand extends AbstractCommand {
 		return "CREATE_AND_APPEND_DOM_NODE";
 	}
 
+	@Override
+	public boolean requiresEnclosingTransaction() {
+		return false;
+	}
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,11 +20,12 @@ package org.structr.core;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.net.URI;
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -33,6 +34,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,10 +47,12 @@ import org.structr.api.service.InitializationCallback;
 import org.structr.api.service.LicenseManager;
 import org.structr.api.service.RunnableService;
 import org.structr.api.service.Service;
+import org.structr.api.service.ServiceDependency;
 import org.structr.api.service.StructrServices;
 import org.structr.common.Permission;
 import org.structr.common.Permissions;
 import org.structr.common.SecurityContext;
+import org.structr.common.VersionHelper;
 import org.structr.common.error.ErrorBuffer;
 import org.structr.core.app.StructrApp;
 import org.structr.core.graph.NodeService;
@@ -59,31 +64,28 @@ public class Services implements StructrServices {
 
 	private static final Logger logger                                   = LoggerFactory.getLogger(StructrApp.class.getName());
 
-	// Configuration constants
-	public static final String LOG_SERVICE_INTERVAL                      = "structr.logging.interval";
-	public static final String LOG_SERVICE_THRESHOLD                     = "structr.logging.threshold";
-	public static final String WS_INDENTATION                            = "ws.indentation";
-
 	// singleton instance
+	private static String jvmIdentifier                = ManagementFactory.getRuntimeMXBean().getName();
+	private static final long licenseCheckInterval     = TimeUnit.HOURS.toMillis(2);
 	private static Services singletonInstance          = null;
 	private static boolean testingModeDisabled         = false;
 	private static boolean calculateHierarchy          = false;
 	private static boolean updateIndexConfiguration    = false;
+	private static Boolean cachedTestingFlag           = null;
+	private static long lastLicenseCheck               = 0L;
 
 	// non-static members
 	private final List<InitializationCallback> callbacks       = new LinkedList<>();
 	private final Set<Permission> permissionsForOwnerlessNodes = new LinkedHashSet<>();
 	private final Map<String, Object> attributes               = new ConcurrentHashMap<>(10, 0.9f, 8);
 	private final Map<Class, Service> serviceCache             = new ConcurrentHashMap<>(10, 0.9f, 8);
-	private final Set<Class> registeredServiceClasses          = new LinkedHashSet<>();
-	private final Set<String> configuredServiceClasses         = new LinkedHashSet<>();
+	private final Map<String, Class> registeredServiceClasses  = new LinkedHashMap<>();
 	private LicenseManager licenseManager                      = null;
 	private ConfigurationProvider configuration                = null;
 	private boolean initializationDone                         = false;
 	private boolean overridingSchemaTypesAllowed               = true;
+	private boolean shuttingDown                               = false;
 	private boolean shutdownDone                               = false;
-	private String configuredServiceNames                      = null;
-	private String configurationClass                          = null;
 
 	private Services() { }
 
@@ -93,6 +95,16 @@ public class Services implements StructrServices {
 
 			singletonInstance = new Services();
 			singletonInstance.initialize();
+		}
+
+		if (System.currentTimeMillis() > lastLicenseCheck + licenseCheckInterval) {
+
+			lastLicenseCheck = System.currentTimeMillis();
+
+			synchronized (Services.class) {
+
+				singletonInstance.checkLicense();
+			}
 		}
 
 		return singletonInstance;
@@ -117,7 +129,7 @@ public class Services implements StructrServices {
 			// inject security context first
 			command.setArgument("securityContext", securityContext);
 
-			if ((serviceClass != null) && configuredServiceClasses.contains(serviceClass.getSimpleName())) {
+			if (serviceClass != null) {
 
 				// search for already running service..
 				Service service = serviceCache.get(serviceClass);
@@ -135,6 +147,7 @@ public class Services implements StructrServices {
 					}
 
 				}
+
 				if (service != null) {
 
 					logger.debug("Initializing command ", commandType.getName());
@@ -188,12 +201,6 @@ public class Services implements StructrServices {
 
 	private void doInitialize() {
 
-		configurationClass     = Settings.Configuration.getValue();
-		configuredServiceNames = Settings.Services.getValue();
-
-		// create set of configured services
-		configuredServiceClasses.addAll(Arrays.asList(configuredServiceNames.split("[ ,]+")));
-
 		if (!isTesting()) {
 
 			// read license
@@ -212,20 +219,19 @@ public class Services implements StructrServices {
 
 		logger.info("{} processors available, {} GB max heap memory", processors, max);
 		if (max < 8) {
+
 			logger.warn("Maximum heap size is smaller than recommended, this can lead to problems with large databases!");
 			logger.warn("Please configure AT LEAST 8 GBs of heap memory using -Xmx8g.");
 		}
 
-		logger.info("Starting services..");
+		final List<Class> configuredServiceClasses = getCongfiguredServiceClasses();
+
+		logger.info("Starting services: {}", configuredServiceClasses.stream().map(Class::getSimpleName).collect(Collectors.toList()));
 
 		// initialize other services
-		for (final String serviceClassName : configuredServiceClasses) {
+		for (final Class serviceClass : configuredServiceClasses) {
 
-				Class serviceClass = getServiceClassForName(serviceClassName);
-				if (serviceClass != null) {
-
-					startService(serviceClass);
-				}
+			startService(serviceClass);
 		}
 
 		logger.info("{} service(s) processed", serviceCache.size());
@@ -240,6 +246,12 @@ public class Services implements StructrServices {
 				shutdown();
 			}
 		});
+
+		final NodeService nodeService = getService(NodeService.class);
+		if (nodeService != null) {
+
+			nodeService.createAdminUser();
+		}
 
 		// read permissions for ownerless nodes
 		final String configForOwnerlessNodes = Settings.OwnerlessNodes.getValue();
@@ -274,17 +286,17 @@ public class Services implements StructrServices {
 			final ExecutorService service = Executors.newSingleThreadExecutor();
 			service.submit(new Runnable() {
 
-					@Override
-					public void run() {
+				@Override
+				public void run() {
 
-						// wait a second
-						try { Thread.sleep(100); } catch (Throwable ignore) {}
+					// wait a second
+					try { Thread.sleep(100); } catch (Throwable ignore) {}
 
-						// call initialization callbacks from a different thread
-						for (final InitializationCallback callback : singletonInstance.callbacks) {
-							callback.initializationDone();
-						}
+					// call initialization callbacks from a different thread
+					for (final InitializationCallback callback : singletonInstance.callbacks) {
+						callback.initializationDone();
 					}
+				}
 
 			}).get();
 
@@ -292,6 +304,7 @@ public class Services implements StructrServices {
 			logger.warn("Exception while executing post-initialization tasks", t);
 		}
 
+		logger.info("Started Structr {}", VersionHelper.getFullVersionInfo());
 
 		// Don't use logger here because start/stop scripts rely on this line.
 		System.out.println(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.ms").format(new Date()) + "  ---------------- Initialization complete ----------------");
@@ -315,6 +328,14 @@ public class Services implements StructrServices {
 		return licenseManager;
 	}
 
+	public boolean isShutdownDone() {
+		return shutdownDone;
+	}
+
+	public boolean isShuttingDown() {
+		return shuttingDown;
+	}
+
 	public boolean isInitialized() {
 		return initializationDone;
 	}
@@ -330,14 +351,23 @@ public class Services implements StructrServices {
 
 	public void shutdown() {
 
-		initializationDone = false;
+		if (shuttingDown || !initializationDone) {
+
+			return;
+		}
+
+		shuttingDown = true;
 
 		if (!shutdownDone) {
 
 			System.out.println("INFO: Shutting down...");
-			for (Service service : serviceCache.values()) {
 
-				shutdownService(service);
+			final List<Class> configuredServiceClasses = getCongfiguredServiceClasses();
+			final List<Class> reverseServiceClassNames = new LinkedList<>(configuredServiceClasses);
+			Collections.reverse(reverseServiceClassNames);
+
+			for (final Class serviceClass : reverseServiceClassNames) {
+				shutdownService(serviceClass);
 			}
 
 			serviceCache.clear();
@@ -363,25 +393,23 @@ public class Services implements StructrServices {
 	 * @param serviceClass the service class to register
 	 */
 	public void registerServiceClass(Class serviceClass) {
-		registeredServiceClasses.add(serviceClass);
+
+		registeredServiceClasses.put(serviceClass.getSimpleName(), serviceClass);
+
+		// make it possible to select options in configuration editor
+		Settings.Services.addAvailableOption(serviceClass.getSimpleName());
 	}
 
 	public Class getServiceClassForName(final String serviceClassName) {
-
-		for (Class serviceClass : registeredServiceClasses) {
-
-			if (serviceClass.getSimpleName().equals(serviceClassName)) {
-				return serviceClass;
-			}
-		}
-
-		return null;
+		return registeredServiceClasses.get(serviceClassName);
 	}
 
 	public ConfigurationProvider getConfigurationProvider() {
 
 		// instantiate configuration provider
 		if (configuration == null) {
+
+			final String configurationClass = Settings.Configuration.getValue();
 
 			// when executing tests, the configuration class may already exist,
 			// so we don't instantiate it again since all the entities are already
@@ -443,6 +471,17 @@ public class Services implements StructrServices {
 
 	public void startService(final Class serviceClass) {
 
+		int retryCount       = Settings.ServicesStartRetries.getValue(10);
+		int retryDelay       = Settings.ServicesStartTimeout.getValue(30);
+		boolean waitAndRetry = true;
+		boolean isVital      = false;
+
+		if (!getCongfiguredServiceClasses().contains(serviceClass)) {
+
+			logger.warn("Service {} is not listed in {}, will not be started.", serviceClass.getName(), "configured.services");
+			return;
+		}
+
 		logger.info("Creating {}..", serviceClass.getSimpleName());
 
 		try {
@@ -455,36 +494,76 @@ public class Services implements StructrServices {
 				return;
 			}
 
-			if (service.initialize(this)) {
+			isVital    = service.isVital();
+			retryCount = service.getRetryCount();
+			retryDelay = service.getRetryDelay();
 
-				if (service instanceof RunnableService) {
+			while (waitAndRetry && retryCount-- > 0) {
 
-					RunnableService runnableService = (RunnableService) service;
+				waitAndRetry = service.waitAndRetry();
 
-					if (runnableService.runOnStartup()) {
+				try {
 
-						// start RunnableService and cache it
-						runnableService.startService();
+					if (service.initialize(this)) {
+
+						if (service instanceof RunnableService) {
+
+							RunnableService runnableService = (RunnableService) service;
+
+							if (runnableService.runOnStartup()) {
+
+								// start RunnableService and cache it
+								runnableService.startService();
+							}
+						}
+
+						if (service.isRunning()) {
+
+							// cache service instance
+							serviceCache.put(serviceClass, service);
+						}
+
+						// initialization callback
+						service.initialized();
+
+						// abort wait and retry loop
+						waitAndRetry = false;
+
+					} else if (isVital && !waitAndRetry) {
+
+						checkVitalService(serviceClass, null);
+					}
+
+				} catch (Throwable t) {
+
+					logger.warn("Service {} failed to start: {}", serviceClass.getSimpleName(), t.getMessage());
+
+					if (isVital && !waitAndRetry) {
+						checkVitalService(serviceClass, t);
 					}
 				}
 
-				if (service.isRunning()) {
+				if (waitAndRetry) {
 
-					// cache service instance
-					serviceCache.put(serviceClass, service);
+					if (retryCount > 0) {
+
+						logger.warn("Retrying in {} seconds..", retryDelay);
+						Thread.sleep(retryDelay * 1000);
+
+					} else {
+
+						if (isVital) {
+							checkVitalService(serviceClass, null);
+						}
+					}
 				}
-
-				// initialization callback
-				service.initialized();
-
-			} else {
-
-				logger.error("Service {} failed to start", serviceClass.getSimpleName());
 			}
 
 		} catch (Throwable t) {
 
-			logger.error("Service {} failed to start", serviceClass.getSimpleName(), t);
+			if (isVital) {
+				checkVitalService(serviceClass, t);
+			}
 		}
 	}
 
@@ -535,26 +614,24 @@ public class Services implements StructrServices {
 	 *
 	 * @return list of services
 	 */
-	public List<String> getServices() {
-
-		List<String> services = new LinkedList<>();
-
-		for (Class serviceClass : registeredServiceClasses) {
-
-			final String serviceName = serviceClass.getSimpleName();
-
-			if (configuredServiceClasses.contains(serviceName)) {
-
-				services.add(serviceName);
-			}
-		}
-
-		return services;
+	public List<Class> getServices() {
+		return new LinkedList<>(registeredServiceClasses.values());
 	}
 
 	@Override
 	public <T extends Service> T getService(final Class<T> type) {
 		return (T) serviceCache.get(type);
+	}
+
+	public <T extends Service> T getServiceImplementation(final Class<T> type) {
+
+		for (final Service service : serviceCache.values()) {
+			if (type.isAssignableFrom(service.getClass())) {
+				return (T)service;
+			}
+		}
+
+		return null;
 	}
 
 	@Override
@@ -563,7 +640,7 @@ public class Services implements StructrServices {
 		final NodeService nodeService = getService(NodeService.class);
 		if (nodeService != null) {
 
-			return nodeService.getGraphDb();
+			return nodeService.getDatabaseService();
 		}
 
 		return null;
@@ -617,6 +694,58 @@ public class Services implements StructrServices {
 		}
 
 		return resources;
+	}
+
+	public List<Class> getCongfiguredServiceClasses() {
+
+		final String[] names                  = Settings.Services.getValue("").split("[ ,]+");
+		final Map<Class, Class> dependencyMap = new LinkedHashMap<>();
+		final List<Class> classes             = new LinkedList<>();
+
+		for (final String name : names) {
+
+			final String trimmed = name.trim();
+			if (StringUtils.isNotBlank(trimmed)) {
+
+				final Class serviceClass = getServiceClassForName(name);
+				if (serviceClass != null ) {
+
+					classes.add(serviceClass);
+				}
+			}
+		}
+
+		// extract annotation information for service dependency tree
+		for (final Class service : classes) {
+
+			final ServiceDependency annotation = (ServiceDependency)service.getAnnotation(ServiceDependency.class);
+			if (annotation != null) {
+
+				final Class dependency = annotation.value();
+				if (dependency != null) {
+
+					dependencyMap.put(service, dependency);
+				}
+
+			} else {
+
+				// warn user
+				if (!NodeService.class.equals(service)) {
+					logger.warn("Service {} does not have @ServiceDependency annotation, this is likely a bug.", service);
+				}
+			}
+		}
+
+		// sort classes according to dependency order..
+		classes.sort((s1, s2) -> {
+
+			final Integer level1 = recursiveGetHierarchyLevel(dependencyMap, new LinkedHashSet<>(), s1, 0);
+			final Integer level2 = recursiveGetHierarchyLevel(dependencyMap, new LinkedHashSet<>(), s2, 0);
+
+			return level1.compareTo(level2);
+		});
+
+		return classes;
 	}
 
 	// ----- static methods -----
@@ -700,16 +829,74 @@ public class Services implements StructrServices {
 			return false;
 		}
 
+		if (cachedTestingFlag != null) {
+			return cachedTestingFlag;
+		}
+
 		for (final StackTraceElement[] stackTraces : Thread.getAllStackTraces().values()) {
 
 			for (final StackTraceElement elem : stackTraces) {
 
 				if (elem.getClassName().startsWith("org.junit.")) {
+					cachedTestingFlag = true;
+					return true;
+				}
+
+				if (elem.getClassName().startsWith("org.testng.")) {
+					cachedTestingFlag = true;
 					return true;
 				}
 			}
 		}
 
+		cachedTestingFlag = false;
 		return false;
+	}
+
+	public static String getJVMIdentifier() {
+		return jvmIdentifier;
+	}
+
+	// ----- private methods -----
+	private void checkVitalService(final Class service, final Throwable t) {
+
+		if (t != null) {
+
+			logger.error("Vital service {} failed to start with {}, aborting.", service.getSimpleName(), t.getMessage() );
+			System.err.println("Vital service " + service.getSimpleName() + " failed to start with " + t.getMessage() + ", aborting.");
+
+		} else {
+
+			logger.error("Vital service {} failed to start, aborting.", service.getSimpleName() );
+			System.err.println("Vital service " + service.getSimpleName() + " failed to start, aborting.");
+
+		}
+		System.exit(1);
+	}
+
+	private int recursiveGetHierarchyLevel(final Map<Class, Class> dependencyMap, final Set<String> alreadyCalculated, final Class c, final int depth) {
+
+		// stop at level 20
+		if (depth > 20) {
+			return 20;
+		}
+
+		Class dependency = dependencyMap.get(c);
+		if (dependency == null) {
+
+			return 0;
+
+		} else  {
+
+			// recurse upwards
+			return recursiveGetHierarchyLevel(dependencyMap, alreadyCalculated, dependency, depth + 1) + 1;
+		}
+	}
+
+	private void checkLicense() {
+
+		if (licenseManager != null) {
+			licenseManager.refresh();
+		}
 	}
 }

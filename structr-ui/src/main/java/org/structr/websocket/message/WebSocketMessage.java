@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -24,50 +24,49 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.BooleanUtils;
+import org.structr.common.SecurityContext;
+import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.property.PropertyKey;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
- *
- *
  *
  */
 public class WebSocketMessage {
 
-	private String button                       = null;
-	private String callback                     = null;
-	private int chunkSize                       = 512;
-	private int code                            = 0;
-	private String command                      = null;
-	private GraphObject graphObject             = null;
-	private String id                           = null;
-	private String pageId                       = null;
-	private String message                      = null;
-	private Map<String, Object> nodeData        = new LinkedHashMap();
-	private int page                            = 0;
-	private int pageSize                        = 0;
-	private String parent                       = null;
-	private Map<String, Object> relData         = new LinkedHashMap();
-	private Set<PropertyKey> modifiedProperties = new LinkedHashSet();
-	private Set<PropertyKey> removedProperties  = new LinkedHashSet();
-	private List<? extends GraphObject> result  = null;
-	private int rawResultCount                  = 0;
-	private String sessionId                    = null;
-	private boolean sessionValid                = false;
-	private String sortKey                      = null;
-	private String sortOrder                    = null;
-	private String view                         = null;
-	private Set<String> nodesWithChildren       = null;
-	private JsonElement jsonErrorObject                   = null;
-
-	//~--- methods --------------------------------------------------------
+	private SecurityContext securityContext        = null;
+	private String button                          = null;
+	private String callback                        = null;
+	private int chunkSize                          = 512;
+	private int code                               = 0;
+	private String command                         = null;
+	private GraphObject graphObject                = null;
+	private String id                              = null;
+	private String pageId                          = null;
+	private String message                         = null;
+	private Map<String, Object> nodeData           = new LinkedHashMap();
+	private int page                               = 0;
+	private int pageSize                           = 0;
+	private String parent                          = null;
+	private Map<String, Object> relData            = new LinkedHashMap();
+	private Set<PropertyKey> modifiedProperties    = new LinkedHashSet();
+	private Set<PropertyKey> removedProperties     = new LinkedHashSet();
+	private Iterable<? extends GraphObject> result = null;
+	private int rawResultCount                     = 0;
+	private String sessionId                       = null;
+	private boolean sessionValid                   = false;
+	private String sortKey                         = null;
+	private String sortOrder                       = null;
+	private String view                            = null;
+	private Set<String> nodesWithChildren          = null;
+	private JsonElement jsonErrorObject            = null;
 
 	public WebSocketMessage copy() {
 
 		WebSocketMessage newCopy = new WebSocketMessage();
 
+		newCopy.securityContext    = this.securityContext;
 		newCopy.button             = this.button;
 		newCopy.callback           = this.callback;
 		newCopy.code               = this.code;
@@ -103,8 +102,6 @@ public class WebSocketMessage {
 		this.removedProperties = new LinkedHashSet();
 		this.result = null;
 	}
-
-	//~--- get methods ----------------------------------------------------
 
 	public String getCommand() {
 		return command;
@@ -142,7 +139,7 @@ public class WebSocketMessage {
 		return view;
 	}
 
-	public List<? extends GraphObject> getResult() {
+	public Iterable<? extends GraphObject> getResult() {
 		return result;
 	}
 
@@ -206,7 +203,79 @@ public class WebSocketMessage {
 		return jsonErrorObject;
 	}
 
-	//~--- set methods ----------------------------------------------------
+	public String getRelDataStringValue(final String key) {
+		return (String) getRelDataValue(key);
+	}
+
+	public Object getRelDataValue(final String key) {
+		return getRelData().get(key);
+	}
+
+	public Object getNodeDataValue(final String key) {
+		return getNodeData().get(key);
+	}
+
+	public boolean getNodeDataBooleanValue(final String key) throws FrameworkException {
+		final Object value = getNodeDataValue(key);
+		return BooleanUtils.isTrue((Boolean) value);
+	}
+
+	public String getNodeDataStringValue(final String key) {
+		return (String) getNodeDataValue(key);
+	}
+
+	public String getNodeDataStringValueTrimmedOrDefault(final String key, final String defaultValue) {
+		final String value = getNodeDataStringValueTrimmed(key);
+
+		if (value != null) {
+			return value;
+		}
+
+		return defaultValue;
+	}
+
+	public String getNodeDataStringValueTrimmed(final String key) {
+
+		final String value = getNodeDataStringValue(key);
+
+		if (value != null) {
+			return value.trim();
+		}
+
+		return "";
+	}
+
+	public Long getNodeDataLongValue(final String key) {
+		final Object value = getNodeDataValue(key);
+
+		if (value instanceof Number) {
+			return ((Number)value).longValue();
+		}
+
+		if (value instanceof String) {
+			try { return Long.parseLong(value.toString()); } catch (Throwable t) {}
+		}
+
+		return null;
+	}
+
+	public Integer getNodeDataIntegerValue(final String key) {
+		final Object value = getNodeDataValue(key);
+
+		if (value instanceof Number) {
+			return ((Number)value).intValue();
+		}
+
+		if (value instanceof String) {
+			try { return Integer.parseInt(value.toString()); } catch (Throwable t) {}
+		}
+
+		return -1;
+	}
+
+	public List<String> getNodeDataStringList(final String key) {
+		return (List<String>) getNodeDataValue(key);
+	}
 
 	public void setCommand(final String command) {
 		this.command = command;
@@ -252,7 +321,7 @@ public class WebSocketMessage {
 		this.view = view;
 	}
 
-	public void setResult(final List<? extends GraphObject> result) {
+	public void setResult(final Iterable<? extends GraphObject> result) {
 		this.result = result;
 	}
 
@@ -314,5 +383,13 @@ public class WebSocketMessage {
 
 	public void setJsonErrorObject(final JsonElement jsonErrorObject) {
 		this.jsonErrorObject = jsonErrorObject;
+	}
+
+	public void setSecurityContext(final SecurityContext securityContext) {
+		this.securityContext = securityContext;
+	}
+
+	public SecurityContext getSecurityContext() {
+		return securityContext;
 	}
 }

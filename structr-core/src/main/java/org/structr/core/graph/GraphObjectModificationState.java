@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -24,7 +24,10 @@ import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.structr.api.config.Settings;
@@ -46,7 +49,7 @@ import org.structr.core.property.PropertyMap;
  */
 public class GraphObjectModificationState implements ModificationEvent {
 
-	private static final Set<String> hiddenPropertiesInAuditLog = new HashSet<>(Arrays.asList(new String[] { "id", "type", "sessionIds", "localStorage", "salt", "password" } ));
+	private static final Set<String> hiddenPropertiesInAuditLog = new HashSet<>(Arrays.asList(new String[] { "id", "type", "sessionIds", "localStorage", "salt", "password", "twoFactorSecret" } ));
 
 	public static final int STATE_DELETED =                    1;
 	public static final int STATE_MODIFIED =                   2;
@@ -58,17 +61,24 @@ public class GraphObjectModificationState implements ModificationEvent {
 	public static final int STATE_PROPAGATING_MODIFICATION = 128;
 	public static final int STATE_PROPAGATED_MODIFICATION =  256;
 
-	private final PropertyMap modifiedProperties = new PropertyMap();
-	private final PropertyMap removedProperties  = new PropertyMap();
-	private final PropertyMap newProperties      = new PropertyMap();
-	private StringBuilder changeLog              = null;
-	private RelationshipType relType             = null;
-	private boolean isNode                       = false;
-	private boolean modified                     = false;
-	private GraphObject object                   = null;
-	private String uuid                          = null;
-	private int status                           = 0;
-	private String callbackId                    = null;
+	private final long timestamp                      = System.nanoTime();
+	private final Map<String, Object> addedRemoteProperties   = new HashMap<>();
+	private final Map<String, Object> removedRemoteProperties = new HashMap<>();
+	private final PropertyMap modifiedProperties      = new PropertyMap();
+	private final PropertyMap removedProperties       = new PropertyMap();
+	private final PropertyMap newProperties           = new PropertyMap();
+	private StringBuilder changeLog                   = null;
+	private Map<String, StringBuilder> userChangeLogs = null;
+	private RelationshipType relType                  = null;
+	private boolean isNode                            = false;
+	private boolean modified                          = false;
+	private GraphObject object                        = null;
+	private String uuid                               = null;
+	private int status                                = 0;
+	private String callbackId                         = null;
+
+	private long validationTime = 0;
+	private long indexingTime = 0;
 
 	@Override
 	public String getCallbackId() {
@@ -104,6 +114,12 @@ public class GraphObjectModificationState implements ModificationEvent {
 			// create on demand
 			changeLog = new StringBuilder();
 		}
+
+		if (Settings.UserChangelogEnabled.getValue()) {
+
+			// create on demand
+			userChangeLogs = new HashMap<>();
+		}
 	}
 
 	@Override
@@ -119,6 +135,13 @@ public class GraphObjectModificationState implements ModificationEvent {
 		}
 
 		return null;
+	}
+
+	@Override
+	public Map getUserChangeLogs() {
+
+		return userChangeLogs;
+
 	}
 
 	public void propagatedModification() {
@@ -214,6 +237,14 @@ public class GraphObjectModificationState implements ModificationEvent {
 		}
 	}
 
+	public void add(final PropertyKey key, final Object value) {
+		addToCollection(addedRemoteProperties, key, value);
+	}
+
+	public void remove(final PropertyKey key, final Object value) {
+		addToCollection(removedRemoteProperties, key, value);
+	}
+
 	public void delete(boolean passive) {
 
 		int statusBefore = status;
@@ -237,17 +268,6 @@ public class GraphObjectModificationState implements ModificationEvent {
 		updateCache();
 	}
 
-	private void updateCache() {
-
-		if (uuid != null) {
-			AccessPathCache.invalidateForId(uuid);
-		}
-
-		if (relType != null) {
-			AccessPathCache.invalidateForRelType(relType.name());
-		}
-	}
-
 	public boolean isPassivelyDeleted() {
 		return (status & STATE_DELETED_PASSIVELY) == STATE_DELETED_PASSIVELY;
 	}
@@ -262,8 +282,6 @@ public class GraphObjectModificationState implements ModificationEvent {
 	 * @throws FrameworkException
 	 */
 	public boolean doInnerCallback(ModificationQueue modificationQueue, SecurityContext securityContext, ErrorBuffer errorBuffer) throws FrameworkException {
-
-		boolean valid = true;
 
 		// check for modification propagation along the relationships
 		if ((status & STATE_PROPAGATING_MODIFICATION) == STATE_PROPAGATING_MODIFICATION && object instanceof AbstractNode) {
@@ -297,26 +315,26 @@ public class GraphObjectModificationState implements ModificationEvent {
 				break;
 
 			case 6: // created, modified => only creation callback will be called
-				valid &= object.onCreation(securityContext, errorBuffer);
+				object.onCreation(securityContext, errorBuffer);
 				break;
 
 			case 5: // created, deleted => no callback
 				break;
 
 			case 4: // created => creation callback
-				valid &= object.onCreation(securityContext, errorBuffer);
+				object.onCreation(securityContext, errorBuffer);
 				break;
 
 			case 3: // modified, deleted => deletion callback
-				valid &= object.onDeletion(securityContext, errorBuffer, removedProperties);
+				object.onDeletion(securityContext, errorBuffer, removedProperties);
 				break;
 
 			case 2: // modified => modification callback
-				valid &= object.onModification(securityContext, errorBuffer, modificationQueue);
+				object.onModification(securityContext, errorBuffer, modificationQueue);
 				break;
 
 			case 1: // deleted => deletion callback
-				valid &= object.onDeletion(securityContext, errorBuffer, removedProperties);
+				object.onDeletion(securityContext, errorBuffer, removedProperties);
 				break;
 
 			case 0:	// no action, no callback
@@ -329,7 +347,7 @@ public class GraphObjectModificationState implements ModificationEvent {
 		// mark as finished
 		modified = false;
 
-		return valid;
+		return !errorBuffer.hasError();
 	}
 
 	/**
@@ -352,14 +370,21 @@ public class GraphObjectModificationState implements ModificationEvent {
 			case 6: // created, modified => only creation callback will be called
 			case 4: // created => creation callback
 			case 2: // modified => modification callback
+
+				long t0 = System.currentTimeMillis();
+
 				if (doValidation) {
 					valid &= object.isValid(errorBuffer);
 				}
-				object.indexPassiveProperties();
-				break;
 
-			case 1: // deleted => deletion callback
-				object.removeFromIndex();
+				long t1 = System.currentTimeMillis();
+				validationTime += t1 - t0;
+
+				object.indexPassiveProperties();
+
+				long t2 = System.currentTimeMillis() - t1;
+				indexingTime += t2;
+
 				break;
 
 			default:
@@ -369,12 +394,20 @@ public class GraphObjectModificationState implements ModificationEvent {
 		return valid;
 	}
 
+	public long getValdationTime() {
+		return validationTime;
+	}
+
+	public long getIndexingTime() {
+		return indexingTime;
+	}
+
 	/**
 	 * Call afterModification/Creation/Deletion methods.
 	 *
 	 * @param securityContext
 	 */
-	public void doOuterCallback(SecurityContext securityContext) {
+	public void doOuterCallback(SecurityContext securityContext) throws FrameworkException {
 
 		if ((status & (STATE_DELETED | STATE_DELETED_PASSIVELY)) == 0) {
 
@@ -447,9 +480,10 @@ public class GraphObjectModificationState implements ModificationEvent {
 		return modified;
 	}
 
+	// Update changelog for Verb.change
 	public void updateChangeLog(final Principal user, final Verb verb, final PropertyKey key, final Object previousValue, final Object newValue) {
 
-		if (Settings.ChangelogEnabled.getValue() && changeLog != null && key != null) {
+		if ((Settings.ChangelogEnabled.getValue() || Settings.UserChangelogEnabled.getValue()) && key != null) {
 
 			final String name = key.jsonName();
 
@@ -457,64 +491,136 @@ public class GraphObjectModificationState implements ModificationEvent {
 
 				final JsonObject obj = new JsonObject();
 
-				obj.add("time", toElement(System.currentTimeMillis()));
-				obj.add("userId", toElement(user.getUuid()));
+				obj.add("time",     toElement(System.currentTimeMillis()));
+				obj.add("userId",   toElement(user.getUuid()));
 				obj.add("userName", toElement(user.getName()));
-				obj.add("verb", toElement(verb));
-				obj.add("key", toElement(key.jsonName()));
-				obj.add("prev", toElement(previousValue));
-				obj.add("val", toElement(newValue));
+				obj.add("verb",     toElement(verb));
+				obj.add("key",      toElement(key.jsonName()));
+				obj.add("prev",     toElement(previousValue));
+				obj.add("val",      toElement(newValue));
 
-				changeLog.append(obj.toString());
-				changeLog.append("\n");
+				if (Settings.ChangelogEnabled.getValue()) {
+					changeLog.append(obj.toString());
+					changeLog.append("\n");
+				}
+
+				if (Settings.UserChangelogEnabled.getValue()) {
+
+					// remove user for user-centric logging to reduce redundancy
+					obj.remove("userId");
+					obj.remove("userName");
+
+					// add target to identify change event
+					obj.add("target", toElement(getUuid()));
+
+					appendUserChangelog(user.getUuid(), obj.toString());
+				}
 			}
 		}
 	}
 
+	// Update *node* changelog for Verb.link
 	public void updateChangeLog(final Principal user, final Verb verb, final String linkType, final String linkId, final String object, final Direction direction) {
 
-		if (Settings.ChangelogEnabled.getValue() && changeLog != null) {
+		if (Settings.ChangelogEnabled.getValue()) {
 
 			final JsonObject obj = new JsonObject();
 
-			obj.add("time", toElement(System.currentTimeMillis()));
-			obj.add("userId", toElement(user.getUuid()));
+			obj.add("time",     toElement(System.currentTimeMillis()));
+			obj.add("userId",   toElement(user.getUuid()));
 			obj.add("userName", toElement(user.getName()));
-			obj.add("verb", toElement(verb));
-			obj.add("rel", toElement(linkType));
-			obj.add("relId", toElement(linkId));
-			obj.add("relDir", toElement(direction));
-			obj.add("target", toElement(object));
+			obj.add("verb",     toElement(verb));
+			obj.add("rel",      toElement(linkType));
+			obj.add("relId",    toElement(linkId));
+			obj.add("relDir",   toElement(direction));
+			obj.add("target",   toElement(object));
 
 			changeLog.append(obj.toString());
 			changeLog.append("\n");
 		}
 	}
 
+	// Update *relationship* changelog for Verb.create
+	public void updateChangeLog(final Principal user, final Verb verb, final String linkType, final String linkId, final String sourceUuid, final String targetUuid) {
+
+		if ((Settings.ChangelogEnabled.getValue() || Settings.UserChangelogEnabled.getValue())) {
+
+			final JsonObject obj = new JsonObject();
+
+			obj.add("time",     toElement(System.currentTimeMillis()));
+			obj.add("userId",   toElement(user.getUuid()));
+			obj.add("userName", toElement(user.getName()));
+			obj.add("verb",     toElement(verb));
+			obj.add("rel",      toElement(linkType));
+			obj.add("relId",    toElement(linkId));
+			obj.add("source",   toElement(sourceUuid));
+			obj.add("target",   toElement(targetUuid));
+
+			if (Settings.ChangelogEnabled.getValue()) {
+				changeLog.append(obj.toString());
+				changeLog.append("\n");
+			}
+
+			if (Settings.UserChangelogEnabled.getValue()) {
+
+				// remove user for user-centric logging to reduce redundancy
+				obj.remove("userId");
+				obj.remove("userName");
+
+				appendUserChangelog(user.getUuid(), obj.toString());
+			}
+		}
+	}
+
+	// Update changelog for Verb.create and Verb.delete
 	public void updateChangeLog(final Principal user, final Verb verb, final String object) {
 
-		if (Settings.ChangelogEnabled.getValue() && changeLog != null) {
+		if ((Settings.ChangelogEnabled.getValue() || Settings.UserChangelogEnabled.getValue())) {
 
 			final JsonObject obj = new JsonObject();
 
 			obj.add("time", toElement(System.currentTimeMillis()));
 
 			if (user != null) {
-				obj.add("userId", toElement(user.getUuid()));
+				obj.add("userId",   toElement(user.getUuid()));
 				obj.add("userName", toElement(user.getName()));
 			} else {
-				obj.add("userId", JsonNull.INSTANCE);
+				obj.add("userId",   JsonNull.INSTANCE);
 				obj.add("userName", JsonNull.INSTANCE);
 			}
 
-			obj.add("verb", toElement(verb));
+			obj.add("verb",   toElement(verb));
 			obj.add("target", toElement(object));
 
-			changeLog.append(obj.toString());
-			changeLog.append("\n");
+
+			if (Settings.ChangelogEnabled.getValue()) {
+
+				if (changeLog.length() > 0 && verb.equals(Verb.create)) {
+					// ensure that node creation appears first in the log
+					changeLog.insert(0, "\n");
+					changeLog.insert(0, obj.toString());
+				} else {
+					changeLog.append(obj.toString());
+					changeLog.append("\n");
+				}
+			}
+
+			if (Settings.UserChangelogEnabled.getValue() && user != null) {
+
+				// remove user for user-centric logging to reduce redundancy
+				obj.remove("userId");
+				obj.remove("userName");
+
+				appendUserChangelog(user.getUuid(), obj.toString());
+			}
 		}
 	}
 
+	public long getTimestamp() {
+		return timestamp;
+	}
+
+	// ----- private methods -----
 	private JsonElement toElement(final Object value) {
 
 		if (value != null) {
@@ -549,6 +655,67 @@ public class GraphObjectModificationState implements ModificationEvent {
 		}
 
 		return JsonNull.INSTANCE;
+	}
+
+	private StringBuilder getUserChangelogForUserId(final String uuid) {
+
+		if (Settings.UserChangelogEnabled.getValue()) {
+
+			if (!userChangeLogs.containsKey(uuid)) {
+				userChangeLogs.put(uuid, new StringBuilder());
+			}
+
+			return userChangeLogs.get(uuid);
+		}
+
+		return null;
+	}
+
+	private void appendUserChangelog(final String userUUID, final String changelog) {
+
+		if (Settings.UserChangelogEnabled.getValue()) {
+			// write user-centric changelog
+			getUserChangelogForUserId(userUUID).append(changelog).append("\n");
+		}
+	}
+
+	private void updateCache() {
+
+		if (uuid != null) {
+			AccessPathCache.invalidateForId(uuid);
+		}
+
+		if (relType != null) {
+			AccessPathCache.invalidateForRelType(relType.name());
+		}
+	}
+
+	private void addToCollection(final Map<String, Object> properties, final PropertyKey key, final Object value) {
+
+		if (key.isCollection()) {
+
+			List list = (List)properties.get(key.jsonName());
+			if (list == null) {
+
+				list = new LinkedList<>();
+				properties.put(key.jsonName(), list);
+			}
+
+			list.add(unwrap(value));
+
+		} else {
+
+			properties.put(key.jsonName(), unwrap(value));
+		}
+	}
+
+	private Object unwrap(final Object src) {
+
+		if (src instanceof GraphObject) {
+			return ((GraphObject)src).getUuid();
+		}
+
+		return src;
 	}
 
 	// ----- interface ModificationEvent -----
@@ -596,6 +763,14 @@ public class GraphObjectModificationState implements ModificationEvent {
 	@Override
 	public PropertyMap getRemovedProperties() {
 		return removedProperties;
+	}
+
+	public Map<String, Object> getRemovedRemoteProperties() {
+		return removedRemoteProperties;
+	}
+
+	public Map<String, Object> getAddedRemoteProperties() {
+		return addedRemoteProperties;
 	}
 
 	@Override

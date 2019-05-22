@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,14 +18,12 @@
  */
 package org.structr.core.property;
 
-import java.util.List;
-
 /**
  * Abstract base class for read-only collection properties.
- * 
+ *
  *
  */
-public abstract class AbstractReadOnlyCollectionProperty<T> extends AbstractReadOnlyProperty<List<T>> {
+public abstract class AbstractReadOnlyCollectionProperty<T> extends AbstractReadOnlyProperty<Iterable<T>> {
 
 	public AbstractReadOnlyCollectionProperty(String name) {
 		super(name);

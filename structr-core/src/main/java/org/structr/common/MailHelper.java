@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -30,13 +30,6 @@ import org.apache.commons.mail.SimpleEmail;
 import org.structr.api.config.Settings;
 
 
-//~--- classes ----------------------------------------------------------------
-
-/**
- * Helper class for sending simple or HTML e-mails.
- *
- *
- */
 public abstract class MailHelper {
 
 	private static final String charset      = "UTF-8";
@@ -46,23 +39,88 @@ public abstract class MailHelper {
 	public MailHelper() {}
 
 	//~--- methods --------------------------------------------------------
-	public static String sendHtmlMail(final String from, final String fromName, final String to, final String toName, final String cc, final String bcc, final String bounce, final String subject,
-					final String htmlContent, final String textContent)
-		throws EmailException {
+	public static String sendHtmlMail(final String from, final String fromName, final String to, final String toName, final String cc, final String bcc, final String bounce, final String subject, final String htmlContent, final String textContent) throws EmailException {
 
 		return _sendHtmlMail(from, fromName, to, toName, cc, bcc, bounce, subject, htmlContent, textContent, null);
 	}
 
-	public static String sendHtmlMail(final String from, final String fromName, final String to, final String toName, final String cc, final String bcc, final String bounce, final String subject,
-					final String htmlContent, final String textContent, final List<DynamicMailAttachment> attachments)
-		throws EmailException {
+	public static String sendHtmlMail(final String from, final String fromName, final String to, final String toName, final String cc, final String bcc, final String bounce, final String subject, final String htmlContent, final String textContent, final List<DynamicMailAttachment> attachments) throws EmailException {
 
 		return _sendHtmlMail(from, fromName, to, toName, cc, bcc, bounce, subject, htmlContent, textContent, attachments);
 	}
 
-	private static String _sendHtmlMail(final String from, final String fromName, final String to, final String toName, final String cc, final String bcc, final String bounce, final String subject,
-					final String htmlContent, final String textContent, final List<DynamicMailAttachment> attachments)
-			throws EmailException {
+	public static String sendAdvancedMail(final AdvancedMailContainer amc) throws EmailException {
+
+		if (Settings.SmtpTesting.getValue()) {
+			return "Testing";
+		}
+
+		HtmlEmail mail = new HtmlEmail();
+		configureMail(mail);
+
+		if (StringUtils.isNotBlank(amc.getFromName())) {
+			mail.setFrom(amc.getFromAddress(), amc.getFromName());
+		} else {
+			mail.setFrom(amc.getFromAddress());
+		}
+
+		for (Map.Entry<String, String> entry : amc.getTo().entrySet()) {
+			if (StringUtils.isNotBlank(entry.getValue())) {
+				mail.addTo(entry.getKey(), entry.getValue());
+			} else {
+				mail.addTo(entry.getKey());
+			}
+		}
+
+		for (Map.Entry<String, String> entry : amc.getCc().entrySet()) {
+			if (StringUtils.isNotBlank(entry.getValue())) {
+				mail.addCc(entry.getKey(), entry.getValue());
+			} else {
+				mail.addCc(entry.getKey());
+			}
+		}
+
+		for (Map.Entry<String, String> entry : amc.getBcc().entrySet()) {
+			if (StringUtils.isNotBlank(entry.getValue())) {
+				mail.addBcc(entry.getKey(), entry.getValue());
+			} else {
+				mail.addBcc(entry.getKey());
+			}
+		}
+
+		for (Map.Entry<String, String> entry : amc.getReplyTo().entrySet()) {
+			if (StringUtils.isNotBlank(entry.getValue())) {
+				mail.addReplyTo(entry.getKey(), entry.getValue());
+			} else {
+				mail.addReplyTo(entry.getKey());
+			}
+		}
+
+		for (Map.Entry<String, String> entry : amc.getCustomHeaders().entrySet()) {
+			mail.addHeader(entry.getKey(), entry.getValue());
+		}
+
+		if (StringUtils.isNotBlank(amc.getBounceAddress())) {
+			mail.setBounceAddress(amc.getBounceAddress());
+		}
+
+		mail.setSubject(amc.getSubject());
+
+
+		mail.setHtmlMsg(amc.getHtmlContent());
+
+		if (StringUtils.isNotBlank(amc.getTextContent())) {
+			mail.setTextMsg(amc.getTextContent());
+		}
+
+		for (final DynamicMailAttachment attachment : amc.getAttachments()) {
+			mail.attach(attachment.getDataSource(), attachment.getName(), attachment.getDescription(), attachment.getDisposition());
+		}
+
+		return mail.send();
+	}
+
+	private static String _sendHtmlMail(final String from, final String fromName, final String to, final String toName, final String cc, final String bcc, final String bounce, final String subject, final String htmlContent, final String textContent, final List<DynamicMailAttachment> attachments) throws EmailException {
 
 		if (Settings.SmtpTesting.getValue()) {
 			return "Testing";
@@ -77,22 +135,14 @@ public abstract class MailHelper {
 		if (attachments != null) {
 
 			for (final DynamicMailAttachment attachment : attachments) {
-				if(attachment.isDynamic()) {
-					mail.attach(attachment.getDataSource(), attachment.getName(), attachment.getDescription(), attachment.getDisposition());
-				} else {
-					mail.attach(attachment);
-				}
-
+				mail.attach(attachment.getDataSource(), attachment.getName(), attachment.getDescription(), attachment.getDisposition());
 			}
 		}
 
 		return mail.send();
-
 	}
 
-	public static String sendSimpleMail(final String from, final String fromName, final String to, final String toName, final String cc, final String bcc, final String bounce, final String subject,
-					  final String textContent)
-		throws EmailException {
+	public static String sendSimpleMail(final String from, final String fromName, final String to, final String toName, final String cc, final String bcc, final String bounce, final String subject, final String textContent) throws EmailException {
 
 		SimpleEmail mail = new SimpleEmail();
 
@@ -102,27 +152,9 @@ public abstract class MailHelper {
 		return mail.send();
 	}
 
-	private static void setup(final Email mail, final String to, final String toName, final String from, final String fromName, final String cc, final String bcc, final String bounce, final String subject)
-		throws EmailException {
+	private static void setup(final Email mail, final String to, final String toName, final String from, final String fromName, final String cc, final String bcc, final String bounce, final String subject) throws EmailException {
 
-		// FIXME: this might be slow if the config file is read each time
-		final String smtpHost        = Settings.SmtpHost.getValue();
-		final int smtpPort           = Settings.SmtpPort.getValue();
-		final String smtpUser        = Settings.SmtpUser.getValue();
-		final String smtpPassword    = Settings.SmtpPassword.getValue();
-		final boolean smtpUseTLS     = Settings.SmtpTlsEnabled.getValue();
-		final boolean smtpRequireTLS = Settings.SmtpTlsRequired.getValue();
-
-		mail.setCharset(charset);
-		mail.setHostName(smtpHost);
-		mail.setSmtpPort(smtpPort);
-		mail.setStartTLSEnabled(smtpUseTLS);
-		mail.setStartTLSRequired(smtpRequireTLS);
-		mail.setCharset(charset);
-
-		if (StringUtils.isNotBlank(smtpUser) && StringUtils.isNotBlank(smtpPassword)) {
-			mail.setAuthentication(smtpUser, smtpPassword);
-		}
+		configureMail(mail);
 
 		mail.addTo(to, toName);
 		mail.setFrom(from, fromName);
@@ -140,6 +172,28 @@ public abstract class MailHelper {
 		}
 
 		mail.setSubject(subject);
+
+	}
+
+	private static void configureMail(final Email mail) {
+
+		final String smtpHost        = Settings.SmtpHost.getValue();
+		final int smtpPort           = Settings.SmtpPort.getValue();
+		final String smtpUser        = Settings.SmtpUser.getValue();
+		final String smtpPassword    = Settings.SmtpPassword.getValue();
+		final boolean smtpUseTLS     = Settings.SmtpTlsEnabled.getValue();
+		final boolean smtpRequireTLS = Settings.SmtpTlsRequired.getValue();
+
+		mail.setCharset(charset);
+		mail.setHostName(smtpHost);
+		mail.setSmtpPort(smtpPort);
+		mail.setStartTLSEnabled(smtpUseTLS);
+		mail.setStartTLSRequired(smtpRequireTLS);
+		mail.setCharset(charset);
+
+		if (StringUtils.isNotBlank(smtpUser) && StringUtils.isNotBlank(smtpPassword)) {
+			mail.setAuthentication(smtpUser, smtpPassword);
+		}
 
 	}
 

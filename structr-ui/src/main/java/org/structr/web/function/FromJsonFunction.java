@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -28,17 +28,14 @@ import org.apache.commons.lang3.StringUtils;
 import org.structr.core.GraphObjectMap;
 import org.structr.schema.action.ActionContext;
 
-/**
- *
- */
-public class FromJsonFunction extends UiFunction {
+public class FromJsonFunction extends UiCommunityFunction {
 
 	public static final String ERROR_MESSAGE_FROM_JSON    = "Usage: ${from_json(src)}. Example: ${from_json('{name:test}')}";
 	public static final String ERROR_MESSAGE_FROM_JSON_JS = "Usage: ${{Structr.from_json(src)}}. Example: ${{Structr.from_json('{name:test}')}}";
 
 	@Override
 	public String getName() {
-		return "from_json()";
+		return "from_json";
 	}
 
 	@Override

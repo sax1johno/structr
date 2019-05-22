@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -29,22 +29,15 @@ import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.AbstractRelationship;
-import org.structr.core.property.TypeProperty;
 
-
-//~--- classes ----------------------------------------------------------------
 
 /**
  * Sets a new UUID on each graph object of the given type. For nodes, set type,
  * for relationships relType.
- *
- *
  */
 public class BulkSetUuidCommand extends NodeServiceCommand implements MaintenanceCommand {
 
 	private static final Logger logger = LoggerFactory.getLogger(BulkSetUuidCommand.class.getName());
-
-	//~--- methods --------------------------------------------------------
 
 	@Override
 	public void execute(Map<String, Object> attributes) throws FrameworkException {
@@ -79,7 +72,7 @@ public class BulkSetUuidCommand extends NodeServiceCommand implements Maintenanc
 			final long count = bulkGraphOperation(securityContext, nodeIterator, 1000, "SetNodeUuid", new BulkGraphOperation<AbstractNode>() {
 
 				@Override
-				public void handleGraphObject(final SecurityContext securityContext, final AbstractNode node) {
+				public boolean handleGraphObject(final SecurityContext securityContext, final AbstractNode node) {
 
 					try {
 
@@ -89,13 +82,12 @@ public class BulkSetUuidCommand extends NodeServiceCommand implements Maintenanc
 							node.setProperty(GraphObject.id, NodeServiceCommand.getNextUuid());
 						}
 
-						// update labels as well
-						TypeProperty.updateLabels(graphDb, node, node.getClass());
-
 					} catch (FrameworkException fex) {
 
 						logger.warn("Unable to set UUID of node {}", node, fex);
 					}
+
+					return true;
 				}
 
 				@Override
@@ -127,19 +119,19 @@ public class BulkSetUuidCommand extends NodeServiceCommand implements Maintenanc
 
 				relIterator = Iterables.map(relFactory, graphDb.getAllRelationships()).iterator();
 
-				info("Start setting UUID on all rels", new Object[] { relType });
+				info("Start setting UUID on all rels");
 
 			} else {
 
 				relIterator = Iterables.map(relFactory, graphDb.getRelationshipsByType(relType)).iterator();
 
-				info("Start setting UUID on rels of type {}", new Object[] { relType });
+				info("Start setting UUID on rels of type {}", relType);
 			}
 
 			final long count = bulkGraphOperation(securityContext, relIterator, 1000, "SetRelationshipUuid", new BulkGraphOperation<AbstractRelationship>() {
 
 				@Override
-				public void handleGraphObject(SecurityContext securityContext, AbstractRelationship rel) {
+				public boolean handleGraphObject(SecurityContext securityContext, AbstractRelationship rel) {
 
 					try {
 
@@ -153,6 +145,8 @@ public class BulkSetUuidCommand extends NodeServiceCommand implements Maintenanc
 
 						logger.warn("Unable to set UUID of relationship {}: {}", new Object[] { rel, fex.getMessage() });
 					}
+
+					return true;
 				}
 
 				@Override

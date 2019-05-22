@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -21,32 +21,31 @@ package org.structr.core.function;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import org.apache.commons.lang3.StringUtils;
 import org.structr.api.config.Setting;
 import org.structr.api.config.Settings;
 import org.structr.common.SecurityContext;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 import org.structr.util.AbstractProcess;
 
-/**
- *
- */
-public class ExecFunction extends Function<Object, Object> {
+public class ExecFunction extends AdvancedScriptingFunction {
 
 	public static final String ERROR_MESSAGE_EXEC    = "Usage: ${exec(fileName [, parameters...]}. Example ${exec('my-script')}";
 	public static final String ERROR_MESSAGE_EXEC_JS = "Usage: ${{Structr.exec(fileName [, parameters...]}}. Example ${{Structr.exec('my-script')}}";
 
 	@Override
 	public String getName() {
-		return "exec()";
+		return "exec";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
-		if (arrayHasMinLengthAndAllElementsNotNull(sources, 1)) {
+		try {
+
+			assertArrayHasMinLengthAndAllElementsNotNull(sources, 1);
 
 			final String scriptKey              = sources[0].toString();
 			final Setting<String> scriptSetting = Settings.getStringSetting(scriptKey);
@@ -85,15 +84,18 @@ public class ExecFunction extends Function<Object, Object> {
 				logger.warn("No script found for key \"{}\" in structr.conf, nothing executed.", scriptKey);
 			}
 
-		} else {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
+			return usage(ctx.isJavaScriptContext());
 		}
 
 		return "";
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {

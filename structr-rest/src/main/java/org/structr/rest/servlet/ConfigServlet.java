@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -24,16 +24,15 @@ import java.util.HashSet;
 import java.util.Map.Entry;
 import java.util.Set;
 import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.api.config.Setting;
 import org.structr.api.config.Settings;
 import org.structr.api.config.SettingsGroup;
-import org.structr.api.service.Service;
 import org.structr.api.util.html.Attr;
 import org.structr.api.util.html.Document;
 import org.structr.api.util.html.Tag;
@@ -44,17 +43,18 @@ import org.structr.core.Services;
 /**
  *
  */
-public class ConfigServlet extends HttpServlet {
+public class ConfigServlet extends AbstractServletBase {
 
 	private static final Logger logger                     = LoggerFactory.getLogger(ConfigServlet.class);
 	private static final Set<String> authenticatedSessions = new HashSet<>();
 	private static final String ConfigUrl                  = "/structr/config";
 	private static final String ConfigName                 = "structr.conf";
-
-	private static final String TITLE						= "Structr Configuration Editor";
+	private static final String TITLE                      =  "Structr Configuration Editor";
 
 	@Override
 	protected void doGet(final HttpServletRequest request, final HttpServletResponse response) throws ServletException, IOException {
+
+		setCustomResponseHeaders(response);
 
 		if (!isAuthenticated(request)) {
 
@@ -86,7 +86,11 @@ public class ConfigServlet extends HttpServlet {
 			} else if (request.getParameter("reset") != null) {
 
 				final String key      = request.getParameter("reset");
-				final Setting setting = Settings.getSetting(key);
+				Setting setting = Settings.getSetting(key);
+
+				if (setting == null) {
+					setting = Settings.getCaseSensitiveSetting(key);
+				}
 
 				if (setting != null) {
 
@@ -176,6 +180,8 @@ public class ConfigServlet extends HttpServlet {
 	@Override
 	protected void doPost(final HttpServletRequest request, final HttpServletResponse response) throws ServletException, IOException {
 
+		setCustomResponseHeaders(response);
+
 		final String action   = request.getParameter("action");
 		String redirectTarget = "";
 
@@ -184,7 +190,8 @@ public class ConfigServlet extends HttpServlet {
 			switch (action) {
 
 				case "login":
-					if (Settings.SuperUserPassword.getValue().equals(request.getParameter("password"))) {
+					
+					if (StringUtils.isNoneBlank(Settings.SuperUserPassword.getValue(), request.getParameter("password")) && Settings.SuperUserPassword.getValue().equals(request.getParameter("password"))) {
 						authenticateSession(request);
 					}
 					break;
@@ -211,28 +218,43 @@ public class ConfigServlet extends HttpServlet {
 
 				if ("active_section".equals(key)) {
 
-					redirectTarget = "#" + value;
+					redirectTarget = value;
 					continue;
 				}
 
 				Setting<?> setting = Settings.getSetting(key);
+
+				if (setting != null && setting.isDynamic()) {
+
+					// unregister dynamic settings so the type can change
+					setting.unregister();
+					setting = null;
+				}
+
 				if (setting == null) {
 
-					// group specified?
-					final String group = request.getParameter(key + "._settings_group");
-					if (group != null) {
+					if (key.contains(".cronExpression")) {
 
-						parent = Settings.getGroup(group);
-						if (parent == null) {
-
-							// default to misc group
-							parent = Settings.miscGroup;
-						}
+						parent = Settings.cronGroup;
 
 					} else {
 
-						// fallback to misc group
-						parent = Settings.miscGroup;
+						// group specified?
+						final String group = request.getParameter(key + "._settings_group");
+						if (group != null) {
+
+							parent = Settings.getGroup(group);
+							if (parent == null) {
+
+								// default to misc group
+								parent = Settings.miscGroup;
+							}
+
+						} else {
+
+							// fallback to misc group
+							parent = Settings.miscGroup;
+						}
 					}
 
 					setting = Settings.createSettingForValue(parent, key, value);
@@ -257,7 +279,7 @@ public class ConfigServlet extends HttpServlet {
 		final Tag form     = body.block("form").css("config-form");
 		final Tag main     = form.block("div").id("main");
 		final Tag tabs     = main.block("div").id("configTabs");
-		final Tag menu     = tabs.block("ul").id("configTabsMenu");
+		final Tag menu     = tabs.block("ul").css("tabs-menu");
 
 		// configure form
 		form.attr(new Attr("action", ConfigUrl), new Attr("method", "post"));
@@ -290,10 +312,10 @@ public class ConfigServlet extends HttpServlet {
 		header.block("th").attr(new Attr("colspan", "2"));
 
 
-		for (final String serviceClassName : services.getServices()) {
+		for (final Class serviceClass : services.getServices()) {
 
-			final Class<Service> serviceClass = services.getServiceClassForName(serviceClassName);
-			final boolean running             = serviceClass != null ? services.isReady(serviceClass) : false;
+			final boolean running         = serviceClass != null ? services.isReady(serviceClass) : false;
+			final String serviceClassName = serviceClass.getSimpleName();
 
 			final Tag row  = table.block("tr");
 
@@ -332,10 +354,8 @@ public class ConfigServlet extends HttpServlet {
 		final Tag buttons = form.block("div").css("buttons");
 
 		buttons.block("button").attr(new Type("button")).id("new-entry-button").text("Add entry");
-		buttons.block("button").attr(new Type("button"), new OnClick("window.location.href='" + ConfigUrl + "?reload';")).text("Reload configuration file");
+		buttons.block("button").attr(new Type("button")).id("reload-config-button").text("Reload configuration file");
 		buttons.empty("input").attr(new Type("submit"), new Value("Save to structr.conf"));
-
-		body.block("script").text("$('#new-entry-button').on('click', createNewEntry);");
 
 		return doc;
 	}
@@ -355,7 +375,7 @@ public class ConfigServlet extends HttpServlet {
 		final Tag row1     = table.block("tr");
 
 		row1.block("td").block("label").attr(new Attr("for", "passwordField")).text("Password:");
-		row1.block("td").empty("input").id("passwordField").attr(new Type("password"), new Name("password"));
+		row1.block("td").empty("input").attr(new Attr("autofocus", "tur")).id("passwordField").attr(new Type("password"), new Name("password"));
 
 		final Tag row2     = table.block("tr");
 		final Tag cell13   = row2.block("td").attr(new Attr("colspan", "2")).css("btn");
@@ -379,10 +399,10 @@ public class ConfigServlet extends HttpServlet {
 		head.empty("meta").attr(new Name("viewport"), new Attr("content", "width=1024, user-scalable=yes"));
 		head.empty("link").attr(new Rel("stylesheet"), new Href("/structr/css/lib/jquery-ui-1.10.3.custom.min.css"));
 		head.empty("link").attr(new Rel("stylesheet"), new Href("/structr/css/main.css"));
+		head.empty("link").attr(new Rel("stylesheet"), new Href("/structr/css/sprites.css"));
 		head.empty("link").attr(new Rel("stylesheet"), new Href("/structr/css/config.css"));
 		head.empty("link").attr(new Rel("icon"), new Href("favicon.ico"), new Type("image/x-icon"));
-		head.block("script").attr(new Src("/structr/js/lib/jquery-1.11.1.min.js"));
-		head.block("script").attr(new Src("/structr/js/lib/jquery-ui-1.11.0.custom.min.js"));
+		head.block("script").attr(new Src("/structr/js/lib/jquery-3.3.1.min.js"));
 		head.block("script").attr(new Src("/structr/js/icons.js"));
 		head.block("script").attr(new Src("/structr/js/config.js"));
 

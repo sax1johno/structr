@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,29 +19,31 @@
 package org.structr.core.function;
 
 import java.util.List;
+import org.structr.api.util.Iterables;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class FirstFunction extends Function<Object, Object> {
+public class FirstFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_FIRST = "Usage: ${first(collection)}. Example: ${first(this.children)}";
 
 	@Override
 	public String getName() {
-		return "first()";
+		return "first";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
 		try {
-			if (!arrayHasLengthAndAllElementsNotNull(sources, 1)) {
-				
-				return null;
+
+			assertArrayHasLengthAndAllElementsNotNull(sources, 1);
+
+			if (sources[0] instanceof Iterable) {
+
+				return Iterables.first((Iterable)sources[0]);
 			}
 
 			if (sources[0] instanceof List && !((List)sources[0]).isEmpty()) {
@@ -57,17 +59,18 @@ public class FirstFunction extends Function<Object, Object> {
 				}
 			}
 
-		} catch (final IllegalArgumentException e) {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			// silently ignore null arguments
 
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
 
 		return null;
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {

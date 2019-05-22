@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,6 +18,8 @@
  */
 package org.structr.bolt.index.factory;
 
+import org.structr.api.index.AbstractIndex;
+import org.structr.api.index.AbstractQueryFactory;
 import org.structr.api.search.QueryPredicate;
 import org.structr.api.search.RangeQuery;
 import org.structr.bolt.index.AdvancedCypherQuery;
@@ -25,10 +27,14 @@ import org.structr.bolt.index.AdvancedCypherQuery;
 /**
  *
  */
-public class RangeQueryFactory extends AbstractQueryFactory {
+public class RangeQueryFactory extends AbstractQueryFactory<AdvancedCypherQuery> {
+
+	public RangeQueryFactory(final AbstractIndex index) {
+		super(index);
+	}
 
 	@Override
-	public boolean createQuery(final QueryFactory parent, final QueryPredicate predicate, final AdvancedCypherQuery query, final boolean isFirst) {
+	public boolean createQuery(final QueryPredicate predicate, final AdvancedCypherQuery query, final boolean isFirst) {
 
 		if (predicate instanceof RangeQuery) {
 
@@ -43,11 +49,46 @@ public class RangeQueryFactory extends AbstractQueryFactory {
 				return false;
 			}
 
-			query.addParameters(name, ">=", rangeStart, "<=", rangeEnd);
+			// range start is not set => less than
+			if (rangeStart == null && rangeEnd != null) {
+
+				query.addSimpleParameter(name, getLessThanOperator(rangeQuery.getIncludeEnd()), rangeEnd);
+				return true;
+			}
+
+			// range end is not set => greater than
+			if (rangeStart != null && rangeEnd == null) {
+
+				query.addSimpleParameter(name, getGreaterThanOperator(rangeQuery.getIncludeStart()), rangeStart);
+				return true;
+			}
+
+			// both are set => range
+			query.addParameters(name, getGreaterThanOperator(rangeQuery.getIncludeStart()), rangeStart, getLessThanOperator(rangeQuery.getIncludeEnd()), rangeEnd);
 
 			return true;
 		}
 
 		return false;
+	}
+
+	private String getLessThanOperator(final boolean includeBounds) {
+
+		if (includeBounds) {
+
+			return "<=";
+		}
+
+		return "<";
+	}
+
+	private String getGreaterThanOperator(final boolean includeBounds) {
+
+		if (includeBounds) {
+
+			return ">=";
+		}
+
+		return ">";
 	}
 }

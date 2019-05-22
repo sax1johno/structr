@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,8 +20,8 @@ package org.structr.api.util;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -30,11 +30,12 @@ import org.structr.api.Predicate;
 
 public class Iterables {
 
-	public static <T, C extends Collection<T>> C addAll(C collection, Iterable<? extends T> iterable) {
+	public static <T, C extends Collection<T>> C addAll(final C collection, final Iterable<? extends T> iterable) {
 
 		final Iterator<? extends T> iterator = iterable.iterator();
 
 		try {
+
 			while (iterator.hasNext()) {
 
 				final T next = iterator.next();
@@ -65,11 +66,11 @@ public class Iterables {
 		return collection;
 	}
 
-	public static long count(Iterable<?> iterable) {
+	public static int count(final Iterable<?> iterable) {
 
-		long c = 0;
+		int c = 0;
 
-		for (Iterator<?> iterator = iterable.iterator(); iterator.hasNext(); iterator.next()) {
+		for (final Iterator<?> iterator = iterable.iterator(); iterator.hasNext(); iterator.next()) {
 			c++;
 		}
 
@@ -80,24 +81,71 @@ public class Iterables {
 		return !iterable.iterator().hasNext();
 	}
 
-	public static <X> Iterable<X> filter(Predicate<? super X> specification, Iterable<X> i) {
+	public static <T> T first(final Iterable<T> iterable) {
+
+		final Iterator<T> iterator = iterable.iterator();
+		if (iterator.hasNext()) {
+
+			return iterator.next();
+		}
+
+		return null;
+	}
+
+	public static <T> T last(final Iterable<T> iterable) {
+
+		final Iterator<T> iterator = iterable.iterator();
+		T tmp                      = null;
+
+		while (iterator.hasNext()) {
+
+			tmp = iterator.next();
+		}
+
+		return tmp;
+	}
+
+	public static <T> T nth(final Iterable<T> iterable, final int index) {
+
+		final Iterator<T> iterator = iterable.iterator();
+		int count                  = 0;
+		T tmp                      = null;
+
+		while (iterator.hasNext()) {
+
+			tmp = iterator.next();
+
+			if (count++ == index) {
+				return tmp;
+			}
+		}
+
+		return null;
+	}
+
+	public static <T> Iterable<T> filter(final Predicate<? super T> specification, Iterable<T> i) {
 		return new FilterIterable<>(i, specification);
 	}
 
-	public static <X> Iterator<X> filter(Predicate<? super X> specification, Iterator<X> i) {
+	public static <T> Iterator<T> filter(final Predicate<? super T> specification, final Iterator<T> i) {
 		return new FilterIterable.FilterIterator<>(i, specification);
 	}
 
-	public static <FROM, TO> Iterable<TO> map(Function<? super FROM, ? extends TO> function, Iterable<FROM> from) {
-		return new MapIterable<>(from, function);
+	public static <S, T> Iterable<T> map(final Function<? super S, ? extends T> function, final Iterable<S> from) {
+		return new FilterIterable<>(new MapIterable<>(from, function), e -> { return e != null; });
 	}
 
-	public static <FROM, TO> Iterator<TO> map(Function<? super FROM, ? extends TO> function, Iterator<FROM> from) {
-		return new MapIterable.MapIterator<>(from, function);
+	public static <T> Iterable<T> flatten(final Iterable<Iterable<T>> source) {
+		return new FlatteningIterable<>(source);
 	}
 
-	public static <T> List<T> toList(Iterable<T> iterable) {
-		return addAll(new ArrayList<T>(), iterable);
+	public static <T> List<T> toList(final Iterable<T> iterable) {
+
+		if (iterable instanceof List) {
+			return (List<T>)iterable;
+		}
+
+		return addAll(new ArrayList<>(), iterable);
 	}
 
 	public static <T> List<T> toList(Iterator<T> iterator) {
@@ -115,31 +163,52 @@ public class Iterables {
 		return list;
 	}
 
-	public static <T> Set<T> toSet(Iterable<T> iterable) {
-		return addAll(new HashSet<T>(), iterable);
+	public static <T> Set<T> toSet(final Iterable<T> iterable) {
+		return addAll(new LinkedHashSet<>(), iterable);
 	}
 
-	private static class MapIterable<FROM, TO> implements Iterable<TO> {
+	private static class MapIterable<S, T> implements Iterable<T>, AutoCloseable {
 
-		private final Iterable<FROM> from;
-		private final Function<? super FROM, ? extends TO> function;
+		private final Iterable<S> from;
+		private final Function<? super S, ? extends T> function;
+		private Iterator<T> iterator = null;
 
-		public MapIterable(final Iterable<FROM> from, Function<? super FROM, ? extends TO> function) {
+		public MapIterable(final Iterable<S> from, Function<? super S, ? extends T> function) {
 			this.from = from;
 			this.function = function;
 		}
 
 		@Override
-		public Iterator<TO> iterator() {
-			return new MapIterator<>(from.iterator(), function);
+		public Iterator<T> iterator() {
+
+			if (iterator == null) {
+				iterator = new MapIterator<>(from.iterator(), function);
+			}
+
+			return iterator;
 		}
 
-		static class MapIterator<FROM, TO> implements Iterator<TO> {
+		@Override
+		public void close() {
 
-			private final Function<? super FROM, ? extends TO> function;
-			private final Iterator<FROM> fromIterator;
+			if (iterator instanceof AutoCloseable) {
 
-			public MapIterator(Iterator<FROM> fromIterator, Function<? super FROM, ? extends TO> function) {
+				try {
+					((AutoCloseable)iterator).close();
+
+				} catch (Throwable t) {
+
+					t.printStackTrace();
+				}
+			}
+		}
+
+		static class MapIterator<S, T> implements Iterator<T>, AutoCloseable {
+
+			private final Function<? super S, ? extends T> function;
+			private final Iterator<S> fromIterator;
+
+			public MapIterator(Iterator<S> fromIterator, Function<? super S, ? extends T> function) {
 
 				this.fromIterator = fromIterator;
 				this.function     = function;
@@ -151,9 +220,9 @@ public class Iterables {
 			}
 
 			@Override
-			public TO next() {
+			public T next() {
 
-				final FROM from = fromIterator.next();
+				final S from = fromIterator.next();
 				return function.apply(from);
 			}
 
@@ -161,13 +230,29 @@ public class Iterables {
 			public void remove() {
 				fromIterator.remove();
 			}
+
+			@Override
+			public void close() {
+
+				if (fromIterator instanceof AutoCloseable) {
+
+					try {
+						((AutoCloseable)fromIterator).close();
+
+					} catch (Throwable t) {
+
+						t.printStackTrace();
+					}
+				}
+			}
 		}
 	}
 
-	private static class FilterIterable<T> implements Iterable<T> {
+	private static class FilterIterable<T> implements Iterable<T>, AutoCloseable {
 
 		private final Predicate<? super T> specification;
 		private final Iterable<T> iterable;
+		private Iterator<T> iterator = null;
 
 		public FilterIterable(Iterable<T> iterable, Predicate<? super T> specification) {
 
@@ -177,10 +262,30 @@ public class Iterables {
 
 		@Override
 		public Iterator<T> iterator() {
-			return new FilterIterator<>(iterable.iterator(), specification);
+
+			if (iterator == null) {
+				iterator = new FilterIterator<>(iterable.iterator(), specification);
+			}
+
+			return iterator;
 		}
 
-		static class FilterIterator<T> implements Iterator<T> {
+		@Override
+		public void close() {
+
+			if (iterator instanceof AutoCloseable) {
+
+				try {
+					((AutoCloseable)iterator).close();
+
+				} catch (Throwable t) {
+
+					t.printStackTrace();
+				}
+			}
+		}
+
+		static class FilterIterator<T> implements Iterator<T>, AutoCloseable {
 
 			private final Predicate<? super T> specification;
 			private final Iterator<T> iterator;
@@ -200,12 +305,12 @@ public class Iterables {
 
 				while (!found && iterator.hasNext()) {
 
-					final T currentValue = iterator.next();
+					final T nextValue = iterator.next();
 
-					if (currentValue != null && specification.accept(currentValue)) {
+					if (nextValue != null && specification.accept(nextValue)) {
 
 						found             = true;
-						this.currentValue = currentValue;
+						this.currentValue = nextValue;
 						nextConsumed      = false;
 					}
 				}
@@ -247,6 +352,86 @@ public class Iterables {
 
 			@Override
 			public void remove() {
+				throw new UnsupportedOperationException("This iterator does not support removal of elements");
+			}
+
+			@Override
+			public void close() {
+
+				if (iterator instanceof AutoCloseable) {
+
+					try {
+						((AutoCloseable)iterator).close();
+
+					} catch (Throwable t) {
+
+						t.printStackTrace();
+					}
+				}
+			}
+		}
+	}
+
+	private static class FlatteningIterable<T> implements Iterable<T>, AutoCloseable {
+
+		private Iterator<Iterable<T>> source = null;
+		private Iterator<T> current          = null;
+		private Iterator<T> iterator         = null;
+
+		public FlatteningIterable(final Iterable<Iterable<T>> source) {
+			this.source = source.iterator();
+		}
+
+		@Override
+		public Iterator<T> iterator() {
+
+			if (iterator == null) {
+
+				iterator = new Iterator<T>() {
+
+					@Override
+					public boolean hasNext() {
+
+						if (current == null || !current.hasNext()) {
+
+							// fetch more?
+							while (source.hasNext()) {
+
+								current = source.next().iterator();
+
+								// does the next result have elements?
+								if (current.hasNext()) {
+
+									break;
+								}
+							}
+						}
+
+						return current != null && current.hasNext();
+					}
+
+					@Override
+					public T next() {
+						return current.next();
+					}
+				};
+			}
+
+			return iterator;
+		}
+
+		@Override
+		public void close() {
+
+			if (source instanceof AutoCloseable) {
+
+				try {
+					((AutoCloseable)source).close();
+
+				} catch (Throwable t) {
+
+					t.printStackTrace();
+				}
 			}
 		}
 	}

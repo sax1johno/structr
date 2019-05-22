@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -23,7 +23,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,19 +47,16 @@ import org.structr.web.entity.User;
 import org.structr.web.resource.RegistrationResource;
 import org.structr.web.servlet.HtmlServlet;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
- *
  *
  */
 public class UiAuthenticator implements Authenticator {
 
-	private static final Logger logger       = LoggerFactory.getLogger(UiAuthenticator.class.getName());
+	private static final Logger logger = LoggerFactory.getLogger(UiAuthenticator.class.getName());
 
 	protected boolean examined = false;
 
-	private enum Method { GET, PUT, POST, DELETE, HEAD, OPTIONS }
+	private enum Method { GET, PUT, POST, DELETE, HEAD, OPTIONS, PATCH }
 	private static final Map<String, Method> methods = new LinkedHashMap();
 
 	// HTTP methods
@@ -70,6 +66,7 @@ public class UiAuthenticator implements Authenticator {
 		methods.put("PUT", Method.PUT);
 		methods.put("POST", Method.POST);
 		methods.put("HEAD", Method.HEAD);
+		methods.put("PATCH", Method.PATCH);
 		methods.put("DELETE", Method.DELETE);
 		methods.put("OPTIONS", Method.OPTIONS);
 
@@ -92,6 +89,9 @@ public class UiAuthenticator implements Authenticator {
 
 	public static final long AUTH_USER_HEAD		= 1024;
 	public static final long NON_AUTH_USER_HEAD	= 2048;
+
+	public static final long AUTH_USER_PATCH	= 4096;
+	public static final long NON_AUTH_USER_PATCH	= 8192;
 
 	/**
 	 * Examine request and try to find a user.
@@ -200,18 +200,18 @@ public class UiAuthenticator implements Authenticator {
 		final boolean validUser             = (user != null);
 
 		// super user is always authenticated
-		if (validUser && (user instanceof SuperUser || user.getProperty(Principal.isAdmin))) {
+		if (validUser && (user instanceof SuperUser || user.isAdmin())) {
 			return;
 		}
 
 		// no grants => no access rights
 		if (resourceAccess == null) {
 
-			logger.info("No resource access grant found for signature {}. (URI: {})", new Object[] { rawResourceSignature, securityContext.getCompoundRequestURI() } );
+			logger.info("No resource access grant found for signature {} (URI: {})", new Object[] { rawResourceSignature, securityContext.getCompoundRequestURI() } );
 
 			throw new UnauthorizedException("Forbidden");
 
-		} else {
+		} else if (method != null) {
 
 			switch (method) {
 
@@ -298,7 +298,25 @@ public class UiAuthenticator implements Authenticator {
 					}
 
 					break;
+
+				case PATCH :
+
+					if (!validUser && resourceAccess.hasFlag(NON_AUTH_USER_PATCH)) {
+
+						return;
+					}
+
+					if (validUser && resourceAccess.hasFlag(AUTH_USER_PATCH)) {
+
+						return;
+					}
+
+					break;
 			}
+
+		} else {
+
+			logger.warn("Unknown method {}, cannot determine resource access.", request.getMethod());
 		}
 
 		logger.info("Resource access grant found for signature {}, but method {} not allowed for {}.", new Object[] { rawResourceSignature, method, validUser ? "authenticated users" : "public users" } );
@@ -310,17 +328,19 @@ public class UiAuthenticator implements Authenticator {
 	@Override
 	public Principal doLogin(final HttpServletRequest request, final String emailOrUsername, final String password) throws AuthenticationException, FrameworkException {
 
-		final Principal user = AuthHelper.getPrincipalForPassword(Principal.eMail, emailOrUsername, password);
+		final PropertyKey<String> confKey  = StructrApp.key(User.class, "confirmationKey");
+		final PropertyKey<String> eMailKey = StructrApp.key(User.class, "eMail");
+		final Principal user               = AuthHelper.getPrincipalForPassword(eMailKey, emailOrUsername, password);
+
 		if  (user != null) {
 
 			final boolean allowLoginBeforeConfirmation = Settings.RegistrationAllowLoginBeforeConfirmation.getValue();
-			if (user.getProperty(User.confirmationKey) != null && !allowLoginBeforeConfirmation) {
+			if (user.getProperty(confKey) != null && !allowLoginBeforeConfirmation) {
 
-				logger.warn("Login as {} not allowed before confirmation.", user);
+				logger.warn("Login as {} not allowed before confirmation.", user.getName());
 				throw new AuthenticationException(AuthHelper.STANDARD_ERROR_MSG);
 			}
 
-			AuthHelper.doLogin(request, user);
 		}
 
 		return user;
@@ -336,10 +356,10 @@ public class UiAuthenticator implements Authenticator {
 				AuthHelper.doLogout(request, user);
 			}
 
-			final HttpSession session = request.getSession(false);
-			if (session != null) {
+			final String sessionId = request.getRequestedSessionId();
+			if (sessionId != null) {
 
-				session.invalidate();
+				SessionHelper.invalidateSession(sessionId);
 			}
 
 		} catch (IllegalStateException | FrameworkException ex) {
@@ -401,21 +421,21 @@ public class UiAuthenticator implements Authenticator {
 			if (accessToken != null) {
 
 				logger.debug("Got access token {}", accessToken);
-				//securityContext.setAttribute("OAuthAccessToken", accessToken);
 
 				String value = oauthServer.getCredential(request);
 				logger.debug("Got credential value: {}", new Object[] { value });
 
 				if (value != null) {
 
-					PropertyKey credentialKey = oauthServer.getCredentialKey();
-
-					Principal user = AuthHelper.getPrincipalForCredential(credentialKey, value);
+					final PropertyKey credentialKey = oauthServer.getCredentialKey();
+					Principal user                  = AuthHelper.getPrincipalForCredential(credentialKey, value);
 
 					if (user == null && Settings.RestUserAutocreate.getValue()) {
 
 						user = RegistrationResource.createUser(superUserContext, credentialKey, value, true, getUserClass(), null);
 
+						// let oauth implementation augment user info
+						oauthServer.initializeUser(user);
 					}
 
 					if (user != null) {
@@ -447,11 +467,9 @@ public class UiAuthenticator implements Authenticator {
 		} catch (IOException ex) {
 
 			logger.error("Could not redirect to {}: {}", new Object[]{ oauthServer.getReturnUri(), ex });
-
 		}
 
 		return null;
-
 	}
 
 	public static void writeUnauthorized(final HttpServletResponse response) throws IOException {
@@ -486,15 +504,12 @@ public class UiAuthenticator implements Authenticator {
 
 		Principal user = null;
 
-		if (request.getAttribute(SessionHelper.SESSION_IS_NEW) != null) {
+		if (request.getAttribute(SessionHelper.SESSION_IS_NEW) == null) {
 
 			// First, check session (JSESSIONID cookie)
-			final HttpSession session = request.getSession(false);
+			if (request.getSession(false) != null) {
 
-			if (session != null) {
-
-				user = AuthHelper.getPrincipalForSessionId(session.getId());
-
+				user = AuthHelper.getPrincipalForSessionId(request.getSession(false).getId());
 			}
 		}
 
@@ -521,7 +536,6 @@ public class UiAuthenticator implements Authenticator {
 		}
 
 		return user;
-
 	}
 
 	@Override

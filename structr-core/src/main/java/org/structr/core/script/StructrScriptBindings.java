@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,6 +18,7 @@
  */
 package org.structr.core.script;
 
+import java.lang.reflect.Proxy;
 import java.util.HashMap;
 import javax.script.Bindings;
 import org.structr.core.GraphObject;
@@ -32,6 +33,6 @@ public class StructrScriptBindings extends HashMap<String, Object> implements Bi
 
 	public StructrScriptBindings(final ActionContext actionContext, final GraphObject entity) {
 
-		put("Structr", new StructrScriptObject(actionContext, entity, null));
+		put("Structr", new StructrScriptObject(actionContext, entity));
 	}
 }

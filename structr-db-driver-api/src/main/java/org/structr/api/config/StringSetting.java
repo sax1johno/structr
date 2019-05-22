@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -72,18 +72,13 @@ public class StringSetting extends Setting<String> {
 	public StringSetting(final SettingsGroup group, final String categoryName, final String key, final String value, final String comment) {
 		super(group, categoryName, key, value, comment);
 	}
-	
+
 	@Override
 	public void render(final Tag parent) {
 
 		final Tag group = parent.block("div").css("form-group");
 
-		final Tag label = group.block("label").text(getKey());
-
-		if (getComment() != null) {
-			label.attr(new Attr("class", "has-comment"));
-			label.attr(new Attr("data-comment", getComment()));
-		}
+		renderLabel(group);
 
 		final Tag input    = group.empty("input").attr(new Attr("type", "text"), new Attr("name", getKey()));
 		final String value = getValue();
@@ -102,7 +97,7 @@ public class StringSetting extends Setting<String> {
 		if (source == null) {
 			return;
 		}
-		
+
 		setValue(source);
 	}
 

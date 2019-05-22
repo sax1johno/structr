@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -26,6 +26,7 @@ import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
 import org.structr.core.converter.PropertyConverter;
+import org.structr.core.graph.CreationContainer;
 import org.structr.core.graph.RelationshipInterface;
 
 /**
@@ -88,6 +89,10 @@ public class TargetId extends Property<String> {
 
 				logger.warn("", t);
 			}
+
+		} else if (obj instanceof CreationContainer) {
+
+			((CreationContainer)obj).setProperty(jsonName, value);
 		}
 
 		return null;

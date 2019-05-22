@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,6 +20,8 @@ package org.structr.core;
 
 import java.util.Date;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -27,6 +29,8 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.api.Predicate;
+import org.structr.api.UnknownClientException;
+import org.structr.api.UnknownDatabaseException;
 import org.structr.api.graph.PropertyContainer;
 import org.structr.cmis.CMISInfo;
 import org.structr.common.PropertyView;
@@ -43,6 +47,7 @@ import org.structr.core.graph.NodeInterface;
 import org.structr.core.graph.RelationshipInterface;
 import org.structr.core.graph.TransactionCommand;
 import org.structr.core.property.BooleanProperty;
+import org.structr.core.property.FunctionProperty;
 import org.structr.core.property.ISO8601DateProperty;
 import org.structr.core.property.Property;
 import org.structr.core.property.PropertyKey;
@@ -50,6 +55,7 @@ import org.structr.core.property.PropertyMap;
 import org.structr.core.property.StringProperty;
 import org.structr.core.property.TypeProperty;
 import org.structr.core.property.UuidProperty;
+import org.structr.schema.CodeSource;
 import org.structr.schema.action.ActionContext;
 
 
@@ -58,47 +64,27 @@ import org.structr.schema.action.ActionContext;
  *
  *
  */
-public interface GraphObject {
+public interface GraphObject extends CodeSource {
 
 	static final Logger logger = LoggerFactory.getLogger(GraphObject.class);
 
-	static final String EDIT_MODE_BINDING_CATEGORY = "Edit Mode Binding";
-	static final String QUERY_CATEGORY = "Query and Data Binding";
+	static final String SYSTEM_CATEGORY     = "System";
 	static final String VISIBILITY_CATEGORY = "Visibility";
-	static final String PAGE_CATEGORY = "Page Structure";
 
+	public static final Property<String>  base                        = new StringProperty("base").partOfBuiltInSchema();
+	public static final Property<String>  type                        = new TypeProperty().partOfBuiltInSchema().category(SYSTEM_CATEGORY);
+	public static final Property<String>  id                          = new UuidProperty().partOfBuiltInSchema().category(SYSTEM_CATEGORY);
 
-	public static final Property<String>  base                        = new StringProperty("base");
-	public static final Property<String>  type                        = new TypeProperty();
-	public static final Property<String>  id                          = new UuidProperty();
+	public static final Property<Date>    createdDate                 = new ISO8601DateProperty("createdDate").readOnly().systemInternal().indexed().unvalidated().writeOnce().partOfBuiltInSchema().category(SYSTEM_CATEGORY);
+	public static final Property<String>  createdBy                   = new StringProperty("createdBy").readOnly().writeOnce().unvalidated().partOfBuiltInSchema().category(SYSTEM_CATEGORY);
 
-	public static final Property<Date>    createdDate                 = new ISO8601DateProperty("createdDate").systemInternal().indexed().unvalidated().writeOnce();
-	public static final Property<String>  createdBy                   = new StringProperty("createdBy").readOnly().writeOnce().unvalidated();
+	public static final Property<Date>    lastModifiedDate            = new ISO8601DateProperty("lastModifiedDate").readOnly().systemInternal().passivelyIndexed().unvalidated().partOfBuiltInSchema().category(SYSTEM_CATEGORY);
+	public static final Property<String>  lastModifiedBy              = new StringProperty("lastModifiedBy").readOnly().systemInternal().unvalidated().partOfBuiltInSchema().category(SYSTEM_CATEGORY);
 
-	public static final Property<Date>    lastModifiedDate            = new ISO8601DateProperty("lastModifiedDate").systemInternal().passivelyIndexed().unvalidated();
-	public static final Property<String>  lastModifiedBy              = new StringProperty("lastModifiedBy").systemInternal().unvalidated();
-
-	public static final Property<Boolean> visibleToPublicUsers        = new BooleanProperty("visibleToPublicUsers").passivelyIndexed().category(VISIBILITY_CATEGORY);
-	public static final Property<Boolean> visibleToAuthenticatedUsers = new BooleanProperty("visibleToAuthenticatedUsers").passivelyIndexed().category(VISIBILITY_CATEGORY);
-	public static final Property<Date>    visibilityStartDate         = new ISO8601DateProperty("visibilityStartDate").category(VISIBILITY_CATEGORY);
-	public static final Property<Date>    visibilityEndDate           = new ISO8601DateProperty("visibilityEndDate").category(VISIBILITY_CATEGORY);
-	public static final Property<String>  structrChangeLog            = new StringProperty("structrChangeLog").unvalidated().readOnly();
+	public static final Property<Boolean> visibleToPublicUsers        = new BooleanProperty("visibleToPublicUsers").passivelyIndexed().category(VISIBILITY_CATEGORY).partOfBuiltInSchema().category(SYSTEM_CATEGORY);
+	public static final Property<Boolean> visibleToAuthenticatedUsers = new BooleanProperty("visibleToAuthenticatedUsers").passivelyIndexed().category(VISIBILITY_CATEGORY).partOfBuiltInSchema().category(SYSTEM_CATEGORY);
 
 	// ----- methods common to both types -----
-	/**
-	 * Returns the database ID of this graph object.
-	 *
-	 * @return the database ID
-	 */
-	public long getId();
-
-	/**
-	 * Returns the UUID of this graph object.
-	 *
-	 * @return the UUID
-	 */
-	public String getUuid();
-
 	/**
 	 * Returns the type of this graph object.
 	 *
@@ -136,6 +122,11 @@ public interface GraphObject {
 	public Set<PropertyKey> getPropertyKeys(String propertyView);
 
 	/**
+	 * Returns the ID of the transaction in which this object was instantiated.
+ 	 */
+	long getSourceTransactionId();
+
+	/**
 	 * Sets the property with the given key to the given value.
 	 *
 	 * @param <T>
@@ -145,15 +136,19 @@ public interface GraphObject {
 	 * @throws FrameworkException
 	 */
 	public <T> Object setProperty(final PropertyKey<T> key, T value) throws FrameworkException;
+	public <T> Object setProperty(final PropertyKey<T> key, T value, final boolean isCreation) throws FrameworkException;
+
+	public void setProperties(final SecurityContext securityContext, final PropertyMap properties) throws FrameworkException;
+	public void setProperties(final SecurityContext securityContext, final PropertyMap properties, final boolean isCreation) throws FrameworkException;
 
 	/**
 	 * Sets the given properties.
 	 *
 	 * @param securityContext
 	 * @param properties
-	 * @throws FrameworkException
+	 * @param isCreation
 	 */
-	default void setProperties(final SecurityContext securityContext, final PropertyMap properties) throws FrameworkException {
+	default void setPropertiesInternal(final SecurityContext securityContext, final PropertyMap properties, final boolean isCreation) throws FrameworkException {
 
 		final CreationContainer container = new CreationContainer(this);
 
@@ -164,10 +159,10 @@ public interface GraphObject {
 			final PropertyKey key = attr.getKey();
 			final Object value    = attr.getValue();
 
-			if (key.indexable(value)) {
+			if (value != null && key.isPropertyTypeIndexable() && key.relatedType() == null) {
 
 				final Object oldValue = getProperty(key);
-				if ( !value.equals(oldValue) ) {
+				if (!value.equals(oldValue)) {
 
 					atLeastOnePropertyChanged = true;
 
@@ -178,7 +173,7 @@ public interface GraphObject {
 
 						if (!key.isUnvalidated()) {
 
-							TransactionCommand.nodeModified(securityContext.getCachedUser(), (AbstractNode)this, key, getProperty(key), value);
+							TransactionCommand.nodeModified(securityContext.getCachedUser(), (AbstractNode)this, key, oldValue, value);
 						}
 
 						if (key instanceof TypeProperty) {
@@ -187,7 +182,7 @@ public interface GraphObject {
 
 								final Class type = StructrApp.getConfiguration().getNodeEntityClass((String)value);
 
-								TypeProperty.updateLabels(StructrApp.getInstance().getDatabaseService(), (NodeInterface)this, type);
+								TypeProperty.updateLabels(StructrApp.getInstance().getDatabaseService(), (NodeInterface)this, type, true);
 							}
 						}
 
@@ -195,7 +190,7 @@ public interface GraphObject {
 
 						if (!key.isUnvalidated()) {
 
-							TransactionCommand.relationshipModified(securityContext.getCachedUser(), (AbstractRelationship)this, key, getProperty(key), value);
+							TransactionCommand.relationshipModified(securityContext.getCachedUser(), (AbstractRelationship)this, key, oldValue, value);
 						}
 
 						if (key instanceof TypeProperty) {
@@ -204,7 +199,7 @@ public interface GraphObject {
 
 								final Class type = StructrApp.getConfiguration().getNodeEntityClass((String)value);
 
-								TypeProperty.updateLabels(StructrApp.getInstance().getDatabaseService(), (NodeInterface)this, type);
+								TypeProperty.updateLabels(StructrApp.getInstance().getDatabaseService(), (NodeInterface)this, type, true);
 							}
 						}
 					}
@@ -217,43 +212,98 @@ public interface GraphObject {
 					unlockSystemPropertiesOnce();
 				}
 
-				setProperty(key, value);
+				setProperty(key, value, isCreation);
 			}
 		}
 
 		if (atLeastOnePropertyChanged) {
 
-			// set primitive values directly for better performance
-			getPropertyContainer().setProperties(container.getData());
+			try {
+
+				// set primitive values directly for better performance
+				getPropertyContainer().setProperties(container.getData());
+
+			} catch (UnknownClientException | UnknownDatabaseException e) {
+
+				logger.warn("Unable to set properties of {} with UUID {}: {}", getType(), getUuid(), e.getMessage());
+				logger.warn("Properties: {}", container.getData());
+			}
 		}
 	}
 
+	default void indexPassiveProperties() {
+
+		final Set<PropertyKey> passiveIndexingKeys = new LinkedHashSet<>();
+
+		for (PropertyKey key : StructrApp.getConfiguration().getPropertySet(getEntityType(), PropertyView.All)) {
+
+			if (key.isIndexed() && (key.isPassivelyIndexed() || key.isIndexedWhenEmpty())) {
+
+				passiveIndexingKeys.add(key);
+			}
+		}
+
+		addToIndex(passiveIndexingKeys);
+	}
+
 	default void addToIndex() {
+
+		final Set<PropertyKey> indexKeys = new LinkedHashSet<>();
 
 		for (PropertyKey key : StructrApp.getConfiguration().getPropertySet(getEntityType(), PropertyView.All)) {
 
 			if (key.isIndexed()) {
 
-				final PropertyConverter converter = key.databaseConverter(getSecurityContext(), this);
-				if (converter != null) {
+				indexKeys.add(key);
+			}
+		}
 
-					try {
+		addToIndex(indexKeys);
+	}
 
-						// index converted value
-						key.index(this, converter.convert(this.getProperty(key)));
+	default void addToIndex(final Set<PropertyKey> indexKeys) {
 
-					} catch (FrameworkException ex) {
+		final Map<String, Object> values = new LinkedHashMap<>();
 
-						logger.warn("Unable to convert property {} of type {}: {}", key.dbName(), getClass().getSimpleName(), ex.getMessage());
-						logger.warn("Exception", ex);
+		for (PropertyKey key : indexKeys) {
+
+			final PropertyConverter converter = key.databaseConverter(getSecurityContext(), this);
+			if (converter != null) {
+
+				try {
+
+					final Object value = converter.convert(this.getProperty(key));
+					if (key.isPropertyValueIndexable(value)) {
+
+						values.put(key.dbName(), value);
 					}
 
-				} else {
+				} catch (FrameworkException ex) {
+
+					logger.warn("Unable to convert property {} of type {}: {}", key.dbName(), getClass().getSimpleName(), ex.getMessage());
+					logger.warn("Exception", ex);
+				}
+
+			} else {
+
+				final Object value = this.getProperty(key);
+				if (key.isPropertyValueIndexable(value)) {
 
 					// index unconverted value
-					key.index(this);
+					values.put(key.dbName(), value);
 				}
 			}
+		}
+
+		try {
+
+			// use "internal" setProperty for "indexing"
+			getPropertyContainer().setProperties(values);
+
+		} catch (UnknownClientException | UnknownDatabaseException e) {
+
+			logger.warn("Unable to index properties of {} with UUID {}: {}", getType(), getUuid(), e.getMessage());
+			logger.warn("Properties: {}", values);
 		}
 	}
 
@@ -265,7 +315,11 @@ public interface GraphObject {
 			final PropertyKey key                 = attr.getKey();
 			final Object value                    = attr.getValue();
 
-			if (key.indexable(value) && !key.isReadOnly() && !key.isSystemInternal() && !key.isUnvalidated()) {
+			if (key instanceof FunctionProperty) {
+				continue;
+			}
+
+			if (key.isPropertyTypeIndexable() && !key.isReadOnly() && !key.isSystemInternal() && !key.isUnvalidated()) {
 
 				// value can be set directly, move to creation container
 				key.setProperty(securityContext, indexable, value);
@@ -277,6 +331,24 @@ public interface GraphObject {
 		}
 	}
 
+	/**
+	 * Returns the (converted, validated, transformed, etc.) property for the given
+	 * property key.
+	 *
+	 * @param <T>
+	 * @param propertyName the property key to retrieve the value for
+	 * @return the converted, validated, transformed property value
+	 */
+	default public <T> T getProperty(final String propertyName) {
+
+		final PropertyKey<T> key = StructrApp.getConfiguration().getPropertyKeyForJSONName(getClass(), propertyName, false);
+		if (key != null) {
+
+			return getProperty(key);
+		}
+
+		throw new IllegalArgumentException("Invalid property key " + propertyName + " for type " + getClass().getSimpleName());
+	}
 
 	/**
 	 * Returns the (converted, validated, transformed, etc.) property for the given
@@ -317,20 +389,6 @@ public interface GraphObject {
 	public void removeProperty(final PropertyKey key) throws FrameworkException;
 
 	/**
-	 * Returns the default sort key for this entity.
-	 *
-	 * @return the default sort key
-	 */
-	public PropertyKey getDefaultSortKey();
-
-	/**
-	 * Returns the default sort order for this entity.
-	 *
-	 * @return the default sort order
-	 */
-	public String getDefaultSortOrder();
-
-	/**
 	 * Unlock all system properties in this entity for a single <code>setProperty</code>
 	 * call.
 	 */
@@ -353,10 +411,9 @@ public interface GraphObject {
 	 *
 	 * @param securityContext the context in which the creation takes place
 	 * @param errorBuffer the error buffer to put error tokens into
-	 * @return true if the transaction can go on, false if an error occurred
 	 * @throws FrameworkException
 	 */
-	public boolean onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException;
+	public void onCreation(final SecurityContext securityContext, final ErrorBuffer errorBuffer) throws FrameworkException;
 
 	/**
 	 * Called when an entity of this type is modified. This method can cause the underlying
@@ -366,10 +423,9 @@ public interface GraphObject {
 	 * @param securityContext the context in which the modification takes place
 	 * @param errorBuffer the error buffer to put error tokens into
 	 * @param modificationQueue the modification queue that triggered this call to onModification
-	 * @return true if the transaction can go on, false if an error occurred
 	 * @throws FrameworkException
 	 */
-	public boolean onModification(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException;
+	public void onModification(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final ModificationQueue modificationQueue) throws FrameworkException;
 
 	/**
 	 * Called when an entity of this type is deleted. This method can cause the underlying
@@ -379,10 +435,9 @@ public interface GraphObject {
 	 * @param securityContext the context in which the deletion takes place
 	 * @param errorBuffer the error buffer to put error tokens into
 	 * @param properties
-	 * @return true if the transaction can go on, false if an error occurred
 	 * @throws FrameworkException
 	 */
-	public boolean onDeletion(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final PropertyMap properties) throws FrameworkException;
+	public void onDeletion(final SecurityContext securityContext, final ErrorBuffer errorBuffer, final PropertyMap properties) throws FrameworkException;
 
 	/**
 	 * Called when an entity was successfully created. Please note that this method
@@ -391,7 +446,7 @@ public interface GraphObject {
 	 *
 	 * @param securityContext the context in which the creation took place
 	 */
-	public void afterCreation(final SecurityContext securityContext);
+	public void afterCreation(final SecurityContext securityContext) throws FrameworkException;
 
 	/**
 	 * Called when an entity was successfully modified. Please note that this method
@@ -445,10 +500,6 @@ public interface GraphObject {
 	 * @param securityContext
 	 */
 	public void propagatedModification(final SecurityContext securityContext);
-
-	public void updateInIndex();
-	public void removeFromIndex();
-	public void indexPassiveProperties();
 
 	public String getPropertyWithVariableReplacement(final ActionContext renderContext, final PropertyKey<String> key) throws FrameworkException;
 	public Object evaluate(final ActionContext actionContext, final String key, final String defaultValue) throws FrameworkException;

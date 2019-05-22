@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,13 +18,14 @@
  */
 package org.structr.core.function;
 
+import org.structr.common.SecurityContext;
+import org.structr.core.app.Query;
+import org.structr.core.property.PropertyKey;
+
 /**
  * Interface to identify functions that execute database queries. This interface
  * allows built-in function evaluation to identify database query functions and
- * set query parameters like paging etc. BEFORE execution the actual query.
+ * set query parameters like paging etc. BEFORE execution of the actual query.
  */
 public interface QueryFunction {
-
-	void setRangeStart(final int start);
-	void setRangeEnd(final int end);
 }

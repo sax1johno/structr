@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,10 +19,13 @@
 package org.structr.schema.export;
 
 import java.util.Map;
+import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
 import org.structr.core.entity.AbstractSchemaNode;
+import org.structr.core.entity.SchemaNode;
 import org.structr.core.entity.SchemaProperty;
+import org.structr.core.property.PropertyMap;
 import org.structr.schema.SchemaHelper.Type;
 import org.structr.schema.json.JsonFunctionProperty;
 import org.structr.schema.json.JsonSchema;
@@ -31,11 +34,12 @@ import org.structr.schema.json.JsonSchema;
  *
  *
  */
-public class StructrFunctionProperty extends StructrStringProperty implements JsonFunctionProperty {
+public class StructrFunctionProperty extends StructrDynamicProperty implements JsonFunctionProperty {
 
-	protected String readFunction  = null;
-	protected String writeFunction = null;
-	protected String contentType   = null;
+	protected Boolean cachingEnabled	= false;
+	protected String readFunction  		= null;
+	protected String writeFunction 		= null;
+	protected String contentType   		= null;
 
 	public StructrFunctionProperty(final StructrTypeDefinition parent, final String name) {
 
@@ -72,6 +76,18 @@ public class StructrFunctionProperty extends StructrStringProperty implements Js
 	}
 
 	@Override
+	public JsonFunctionProperty setIsCachingEnabled(boolean enabled) {
+
+		this.cachingEnabled = enabled;
+		return this;
+	}
+
+	@Override
+	public Boolean getIsCachingEnabled() {
+		return this.cachingEnabled;
+	}
+
+	@Override
 	public JsonFunctionProperty setContentType(String contentType) {
 
 		this.contentType = contentType;
@@ -87,6 +103,8 @@ public class StructrFunctionProperty extends StructrStringProperty implements Js
 	Map<String, Object> serialize() {
 
 		final Map<String, Object> map = super.serialize();
+
+		map.put(JsonSchema.KEY_IS_CACHING_ENABLED, cachingEnabled);
 
 		if (readFunction != null) {
 			map.put(JsonSchema.KEY_READ_FUNCTION, readFunction);
@@ -130,6 +148,19 @@ public class StructrFunctionProperty extends StructrStringProperty implements Js
 			}
 		}
 
+		final Object cachingEnabledValue = source.get(JsonSchema.KEY_IS_CACHING_ENABLED);
+		if (cachingEnabledValue != null) {
+
+			if (cachingEnabledValue instanceof String) {
+
+				this.cachingEnabled = Boolean.valueOf((String)cachingEnabledValue);
+			} else if (cachingEnabledValue instanceof Boolean) {
+
+				this.cachingEnabled = (Boolean)cachingEnabledValue;
+			}
+
+		}
+
 		final Object contentTypeValue = source.get(JsonSchema.KEY_CONTENT_TYPE);
 		if (contentTypeValue != null) {
 
@@ -142,16 +173,16 @@ public class StructrFunctionProperty extends StructrStringProperty implements Js
 				throw new IllegalStateException("Invalid contentType for property " + name + ", expected string.");
 			}
 		}
-
 	}
 
 	@Override
-	void deserialize(final SchemaProperty property) {
+	void deserialize(final Map<String, SchemaNode> schemaNodes, final SchemaProperty property) {
 
-		super.deserialize(property);
+		super.deserialize(schemaNodes, property);
 
 		setReadFunction(property.getReadFunction());
 		setWriteFunction(property.getWriteFunction());
+		setIsCachingEnabled(property.isCachingEnabled());
 		setContentType(property.getSourceContentType());
 	}
 
@@ -159,7 +190,20 @@ public class StructrFunctionProperty extends StructrStringProperty implements Js
 	SchemaProperty createDatabaseSchema(final App app, final AbstractSchemaNode schemaNode) throws FrameworkException {
 
 		final SchemaProperty property = super.createDatabaseSchema(app, schemaNode);
-		final String contentType      = getContentType();
+		final PropertyMap properties  = new PropertyMap();
+
+		properties.put(SchemaProperty.readFunction,  readFunction);
+		properties.put(SchemaProperty.writeFunction, writeFunction);
+		properties.put(SchemaProperty.isCachingEnabled, cachingEnabled);
+
+		property.setProperties(SecurityContext.getSuperUserInstance(), properties);
+
+		return property;
+	}
+
+	// ----- protected methods -----
+	@Override
+	protected Type getTypeToSerialize() {
 
 		if (contentType != null) {
 
@@ -167,23 +211,14 @@ public class StructrFunctionProperty extends StructrStringProperty implements Js
 
 				case "application/x-structr-javascript":
 				case "application/x-structr-script":
-					property.setProperty(SchemaProperty.propertyType, Type.Function.name());
-					break;
+					return Type.Function;
 
 				case "application/x-cypher":
-					property.setProperty(SchemaProperty.propertyType, Type.Cypher.name());
+					return Type.Cypher;
 
 			}
-
-		} else {
-
-			// default
-			property.setProperty(SchemaProperty.propertyType, Type.Function.name());
 		}
 
-		property.setProperty(SchemaProperty.readFunction,  readFunction);
-		property.setProperty(SchemaProperty.writeFunction, writeFunction);
-
-		return property;
+		return Type.Function;
 	}
 }

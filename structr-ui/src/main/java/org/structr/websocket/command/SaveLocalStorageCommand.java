@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,14 +18,11 @@
  */
 package org.structr.websocket.command;
 
-import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.SecurityContext;
-import org.structr.core.entity.Principal;
 import org.structr.core.graph.TransactionCommand;
-import org.structr.core.property.PropertyMap;
 import org.structr.web.entity.User;
 import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.message.MessageBuilder;
@@ -46,16 +43,18 @@ public class SaveLocalStorageCommand extends AbstractCommand {
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
-		final Map<String, Object> nodeData = webSocketData.getNodeData();
-		final String localStorageString = (String) nodeData.get("localStorageString");
+		setDoTransactionNotifications(false);
+
 		final SecurityContext securityContext = getWebSocket().getSecurityContext();
+
+		final String localStorageString = webSocketData.getNodeDataStringValue("localStorageString");
 
 		if (StringUtils.isNotBlank(localStorageString)) {
 
 			try {
 
-				final Principal me = securityContext.getUser(false);
-				me.setProperties(securityContext, new PropertyMap(User.localStorage, localStorageString));
+				final User me = (User) securityContext.getUser(false);
+				me.setLocalStorage(localStorageString);
 
 				TransactionCommand.registerNodeCallback(me, callback);
 

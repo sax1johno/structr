@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -26,11 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javax.script.Bindings;
-import javax.script.ScriptContext;
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
-import javax.script.ScriptException;
+import javax.script.*;
 import org.apache.commons.collections4.map.LRUMap;
 import org.apache.commons.lang3.StringUtils;
 import org.mozilla.javascript.Context;
@@ -38,11 +34,14 @@ import org.mozilla.javascript.ContextFactory;
 import org.mozilla.javascript.Script;
 import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.Undefined;
+import org.mozilla.javascript.WrappedException;
 import org.renjin.script.RenjinScriptEngine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.util.Iterables;
+import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.common.error.UnlicensedException;
+import org.structr.common.error.UnlicensedScriptException;
 import org.structr.core.GraphObject;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.function.Functions;
@@ -61,12 +60,23 @@ public class Scripting {
 	private static final Map<String, Script> compiledScripts = Collections.synchronizedMap(new LRUMap<>(10000));
 
 	public static String replaceVariables(final ActionContext actionContext, final GraphObject entity, final Object rawValue) throws FrameworkException {
+		return replaceVariables(actionContext, entity, rawValue, false);
+	}
+
+	public static String replaceVariables(final ActionContext actionContext, final GraphObject entity, final Object rawValue, final boolean returnNullValueForEmptyResult) throws FrameworkException {
 
 		if (rawValue == null) {
 
 			return null;
 		}
 
+		// don't parse empty values
+		if (StringUtils.isEmpty(rawValue.toString())) {
+
+			return "";
+		}
+
+		boolean valueWasNull = true;
 		String value;
 
 		if (rawValue instanceof String) {
@@ -84,22 +94,21 @@ public class Scripting {
 						final Object extractedValue = evaluate(actionContext, entity, expression, "script source");
 						String partValue            = extractedValue != null ? formatToDefaultDateOrString(extractedValue) : "";
 
+						// non-null value?
+						valueWasNull &= extractedValue == null;
+
 						if (partValue != null) {
 
 							replacements.add(new Tuple(expression, partValue));
 
 						} else {
 
-							// If the whole expression should be replaced, and partValue is null
-							// replace it by null to make it possible for HTML attributes to not be rendered
-							// and avoid something like ... selected="" ... which is interpreted as selected==true by
-							// all browsers
 							if (!value.equals(expression)) {
 								replacements.add(new Tuple(expression, ""));
 							}
 						}
 
-					} catch (UnlicensedException ex) {
+					} catch (UnlicensedScriptException ex) {
 						ex.log(logger);
 					}
 				}
@@ -119,18 +128,10 @@ public class Scripting {
 		} else {
 
 			value = rawValue.toString();
-
 		}
 
-		if (Functions.NULL_STRING.equals(value)) {
-
-			// return literal null for a single ___NULL___
+		if (returnNullValueForEmptyResult && valueWasNull && StringUtils.isBlank(value)) {
 			return null;
-
-		} else {
-
-			// Replace ___NULL___ by empty string
-			value = StringUtils.replaceAll(value, Functions.NULL_STRING, "");
 		}
 
 		return value;
@@ -147,14 +148,18 @@ public class Scripting {
 	 *
 	 * @return
 	 * @throws FrameworkException
-	 * @throws UnlicensedException
+	 * @throws UnlicensedScriptException
 	 */
-	public static Object evaluate(final ActionContext actionContext, final GraphObject entity, final String input, final String methodName) throws FrameworkException, UnlicensedException {
+	public static Object evaluate(final ActionContext actionContext, final GraphObject entity, final String input, final String methodName) throws FrameworkException, UnlicensedScriptException {
 
 		final String expression = input.trim();
 		boolean isJavascript    = expression.startsWith("${{") && expression.endsWith("}}");
 		final int prefixOffset  = isJavascript ? 1 : 0;
 		String source           = expression.substring(2 + prefixOffset, expression.length() - (1 + prefixOffset));
+
+		if (source.length() <= 0) {
+			return null;
+		}
 
 		String engine = "";
 		boolean isScriptEngine = false;
@@ -167,7 +172,7 @@ public class Scripting {
 				engine = matcher.group(1);
 				source = matcher.group(2);
 
-				logger.info("Scripting engine {} requested.", engine);
+				logger.debug("Scripting engine {} requested.", engine);
 
 				isJavascript   = StringUtils.isBlank(engine) || "JavaScript".equals(engine);
 				isScriptEngine = !isJavascript && StringUtils.isNotBlank(engine);
@@ -176,13 +181,31 @@ public class Scripting {
 
 		actionContext.setJavaScriptContext(isJavascript);
 
+		// temporarily disable notifications for scripted actions
+
+		boolean enableTransactionNotifactions = false;
+
+		final SecurityContext securityContext = actionContext.getSecurityContext();
+		if (securityContext != null) {
+
+			enableTransactionNotifactions = securityContext.doTransactionNotifications();
+
+			securityContext.setDoTransactionNotifications(false);
+		}
+
 		if (isScriptEngine) {
 
 			return evaluateScript(actionContext, entity, engine, source);
 
 		} else if (isJavascript) {
 
-			return evaluateJavascript(actionContext, entity, new Snippet(methodName, source));
+			final Object result = evaluateJavascript(actionContext, entity, new Snippet(methodName, source));
+
+			if (enableTransactionNotifactions && securityContext != null) {
+				securityContext.setDoTransactionNotifications(true);
+			}
+
+			return result;
 
 		} else {
 
@@ -194,27 +217,28 @@ public class Scripting {
 				extractedValue = output;
 			}
 
+			if (enableTransactionNotifactions && securityContext != null) {
+				securityContext.setDoTransactionNotifications(true);
+			}
+
 			return extractedValue;
 		}
 	}
 
 	public static Object evaluateJavascript(final ActionContext actionContext, final GraphObject entity, final Snippet snippet) throws FrameworkException {
 
+		final String entityType        = entity != null ? (entity.getClass().getSimpleName() + ".") : "";
 		final String entityName        = entity != null ? entity.getProperty(AbstractNode.name) : null;
 		final String entityDescription = entity != null ? ( StringUtils.isNotBlank(entityName) ? "\"" + entityName + "\":" : "" ) + entity.getUuid() : "anonymous";
 		final Context scriptingContext = Scripting.setupJavascriptContext();
 
 		try {
 
-			// enable some optimizations..
-			scriptingContext.setLanguageVersion(Context.VERSION_1_2);
-			scriptingContext.setOptimizationLevel(9);
-			scriptingContext.setInstructionObserverThreshold(0);
-			scriptingContext.setGenerateObserverCount(false);
-			scriptingContext.setGeneratingDebug(true);
-
 			final Scriptable scope = scriptingContext.initStandardObjects();
 			final StructrScriptable scriptable = new StructrScriptable(actionContext, entity, scriptingContext);
+
+			// don't wrap Java primitives
+			scriptingContext.getWrapFactory().setJavaPrimitiveWrap(false);
 
 			scriptable.setParentScope(scope);
 
@@ -228,7 +252,7 @@ public class Scripting {
 			Script compiledScript = snippet.getCompiledScript();
 			if (compiledScript == null) {
 
-				final String sourceLocation     = snippet.getName() + " [" + entityDescription + "], line ";
+				final String sourceLocation     = entityType + snippet.getName() + " [" + entityDescription + "]";
 				final String embeddedSourceCode = embedInFunction(actionContext, snippet.getSource());
 
 				compiledScript = compileOrGetCached(scriptingContext, embeddedSourceCode, sourceLocation, 1);
@@ -258,13 +282,43 @@ public class Scripting {
 
 		} catch (final FrameworkException fex) {
 
+			if (!actionContext.getDisableVerboseExceptionLogging()) {
+				logger.warn("Exception in Scripting context", fex);
+			}
+
 			// just throw the FrameworkException so we dont lose the information contained
 			throw fex;
 
-		} catch (final Throwable t) {
+		} catch (final WrappedException w) {
+
+			if (w.getWrappedException() instanceof FrameworkException) {
+				throw (FrameworkException)w.getWrappedException();
+			}
+
+			if (!actionContext.getDisableVerboseExceptionLogging()) {
+				logger.warn("Exception in Scripting context", w);
+			}
 
 			// if any other kind of Throwable is encountered throw a new FrameworkException and be done with it
-			logger.warn("", t);
+			throw new FrameworkException(422, w.getMessage());
+
+		} catch (final NullPointerException npe) {
+
+			if (!actionContext.getDisableVerboseExceptionLogging()) {
+				logger.warn("Exception in Scripting context", npe);
+			}
+
+			final String message = "NullPointerException in " + npe.getStackTrace()[0].toString();
+
+			throw new FrameworkException(422, message);
+
+		} catch (final Throwable t) {
+
+			if (!actionContext.getDisableVerboseExceptionLogging()) {
+				logger.warn("Exception in Scripting context", t);
+			}
+
+			// if any other kind of Throwable is encountered throw a new FrameworkException and be done with it
 			throw new FrameworkException(422, t.getMessage());
 
 		} finally {
@@ -277,7 +331,24 @@ public class Scripting {
 	private static Object evaluateScript(final ActionContext actionContext, final GraphObject entity, final String engineName, final String script) throws FrameworkException {
 
 		final ScriptEngineManager manager = new ScriptEngineManager();
-		final ScriptEngine engine = manager.getEngineByName(engineName);
+		ScriptEngine engine = manager.getEngineByName(engineName);
+
+		if (engine == null) {
+			List<ScriptEngineFactory> factories = manager.getEngineFactories();
+
+			for (ScriptEngineFactory factory : factories) {
+
+				if (factory.getNames().contains(engineName)) {
+
+					engine = factory.getScriptEngine();
+					break;
+
+				}
+
+			}
+
+		}
+
 
 		if (engine == null) {
 			throw new RuntimeException(engineName + " script engine could not be initialized. Check class path.");
@@ -288,6 +359,10 @@ public class Scripting {
 
 		if (!(engine instanceof RenjinScriptEngine)) {
 			scriptContext.setBindings(bindings, ScriptContext.GLOBAL_SCOPE);
+		} else if (engine instanceof  RenjinScriptEngine) {
+
+			engine.put("Structr", new StructrScriptObject(actionContext, entity));
+
 		}
 
 		StringWriter output = new StringWriter();
@@ -295,18 +370,22 @@ public class Scripting {
 
 		try {
 
-			engine.eval(script);
+			Object extractedValue = engine.eval(script);
 
-			Object extractedValue = output.toString();
+			if (output != null && output.toString() != null && output.toString().length() > 0) {
+				extractedValue = output.toString();
+			}
 
 			return extractedValue;
 
-		} catch (final ScriptException e) {
+		} catch (final Throwable e) {
 
-			logger.error("Error while processing {} script: {}", engineName, script, e);
+			if (!actionContext.getDisableVerboseExceptionLogging()) {
+				logger.error("Error while processing {} script: {}", engineName, script, e);
+			}
+
+			throw new FrameworkException(422, e.getMessage());
 		}
-
-		return null;
 
 	}
 
@@ -315,10 +394,10 @@ public class Scripting {
 		final Context scriptingContext = new ContextFactory().enterContext();
 
 		// enable some optimizations..
-		scriptingContext.setLanguageVersion(Context.VERSION_1_2);
-		scriptingContext.setOptimizationLevel(9);
+		scriptingContext.setLanguageVersion(Context.VERSION_ES6);
 		scriptingContext.setInstructionObserverThreshold(0);
 		scriptingContext.setGenerateObserverCount(false);
+		scriptingContext.setGeneratingDebug(true);
 
 		return scriptingContext;
 	}
@@ -339,7 +418,7 @@ public class Scripting {
 		return buf.toString();
 	}
 
-	private static Script compileOrGetCached(final Context context, final String source, final String sourceName, final int lineNo) {
+	public static Script compileOrGetCached(final Context context, final String source, final String sourceName, final int lineNo) {
 
 		synchronized (compiledScripts) {
 
@@ -469,11 +548,30 @@ public class Scripting {
 
 			return DatePropertyParser.format((Date) value, DateProperty.getDefaultFormat());
 
+		} else if (value instanceof Iterable) {
+
+			return Iterables.toList((Iterable)value).toString();
+
 		} else {
 
 			return value.toString();
 
 		}
+	}
+
+	// ----- private methods -----
+	private static String toString(final Object obj) {
+
+		if (obj instanceof Iterable) {
+
+			return Iterables.toList((Iterable)obj).toString();
+		}
+
+		if (obj != null) {
+			return obj.toString();
+		}
+
+		return "";
 	}
 
 	// ----- nested classes -----

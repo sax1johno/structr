@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -23,7 +23,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.lang.StringUtils;
+import java.util.concurrent.atomic.AtomicLong;
 import org.neo4j.driver.v1.Record;
 import org.neo4j.driver.v1.Session;
 import org.neo4j.driver.v1.StatementResult;
@@ -38,37 +38,47 @@ import org.neo4j.driver.v1.exceptions.TransientException;
 import org.neo4j.driver.v1.types.Entity;
 import org.neo4j.driver.v1.types.Node;
 import org.neo4j.driver.v1.types.Relationship;
-import org.structr.api.NativeResult;
-import org.structr.api.NotFoundException;
-import org.structr.api.QueryResult;
-import org.structr.api.RetryException;
 import org.structr.api.ConstraintViolationException;
 import org.structr.api.DataFormatException;
 import org.structr.api.NetworkException;
-import org.structr.api.util.QueryUtils;
-import org.structr.bolt.mapper.RecordLongMapper;
+import org.structr.api.NotFoundException;
+import org.structr.api.RetryException;
+import org.structr.api.UnknownClientException;
+import org.structr.api.UnknownDatabaseException;
+import org.structr.api.util.Iterables;
 import org.structr.bolt.mapper.RecordNodeMapper;
+import org.structr.bolt.mapper.RecordNodeIdMapper;
 import org.structr.bolt.mapper.RecordRelationshipMapper;
+import org.structr.bolt.mapper.NodeId;
+import org.structr.bolt.mapper.RecordMapMapper;
 import org.structr.bolt.wrapper.EntityWrapper;
-import org.structr.bolt.wrapper.StatementResultWrapper;
+import org.structr.bolt.wrapper.NodeWrapper;
+import org.structr.bolt.wrapper.RelationshipWrapper;
 
 /**
  *
  */
 public class SessionTransaction implements org.structr.api.Transaction {
 
+	private static final AtomicLong idSource          = new AtomicLong();
+	private final Set<EntityWrapper> accessedEntities = new HashSet<>();
 	private final Set<EntityWrapper> modifiedEntities = new HashSet<>();
+	private final Set<Long> deletedNodes              = new HashSet<>();
+	private final Set<Long> deletedRels               = new HashSet<>();
 	private BoltDatabaseService db                    = null;
 	private Session session                           = null;
 	private Transaction tx                            = null;
+	private long transactionId                        = 0L;
 	private boolean closed                            = false;
 	private boolean success                           = false;
+	private boolean isPing                            = false;
 
 	public SessionTransaction(final BoltDatabaseService db, final Session session) {
 
-		this.session = session;
-		this.tx      = session.beginTransaction();
-		this.db      = db;
+		this.transactionId = idSource.getAndIncrement();
+		this.session       = session;
+		this.tx            = session.beginTransaction();
+		this.db            = db;
 	}
 
 	@Override
@@ -81,7 +91,7 @@ public class SessionTransaction implements org.structr.api.Transaction {
 
 		tx.success();
 
-		// transaction must be marked successfull explicitely
+		// transaction must be marked successfull explicitly
 		success = true;
 	}
 
@@ -90,22 +100,25 @@ public class SessionTransaction implements org.structr.api.Transaction {
 
 		if (!success) {
 
-			// We need to invalidate all existing references because we cannot
-			// be sure that they contain the correct values after a rollback.
+			for (final EntityWrapper entity : accessedEntities) {
+
+				entity.rollback(transactionId);
+				entity.removeFromCache();
+			}
+
 			for (final EntityWrapper entity : modifiedEntities) {
 				entity.stale();
 			}
 
 		} else {
 
-			if (!modifiedEntities.isEmpty()) {
+			RelationshipWrapper.expunge(deletedRels);
+			NodeWrapper.expunge(deletedNodes);
 
-				// data was written, invalidate query cache
-				db.invalidateQueryCache();
+			for (final EntityWrapper entity : accessedEntities) {
+				entity.commit(transactionId);
 			}
 
-			// Notify all nodes that are modified in this transaction
-			// so that the relationship caches are rebuilt.
 			for (final EntityWrapper entity : modifiedEntities) {
 				entity.clearCaches();
 			}
@@ -127,6 +140,12 @@ public class SessionTransaction implements org.structr.api.Transaction {
 
 		} finally {
 
+			// Notify all nodes that are modified in this transaction
+			// so that the relationship caches are rebuilt.
+			for (final EntityWrapper entity : modifiedEntities) {
+				entity.onClose();
+			}
+
 			// make sure that the resources are freed
 			if (session.isOpen()) {
 				session.close();
@@ -142,12 +161,57 @@ public class SessionTransaction implements org.structr.api.Transaction {
 		this.closed = closed;
 	}
 
+	public boolean getBoolean(final String statement) {
+
+		try {
+
+			logQuery(statement);
+			return getBoolean(statement, Collections.EMPTY_MAP);
+
+		} catch (TransientException tex) {
+			closed = true;
+			throw new RetryException(tex);
+		} catch (NoSuchRecordException nex) {
+			throw new NotFoundException(nex);
+		} catch (ServiceUnavailableException ex) {
+			throw new NetworkException(ex.getMessage(), ex);
+		} catch (DatabaseException dex) {
+			throw SessionTransaction.translateDatabaseException(dex);
+		} catch (ClientException cex) {
+			throw SessionTransaction.translateClientException(cex);
+		}
+	}
+
+	public boolean getBoolean(final String statement, final Map<String, Object> map) {
+
+		final long t0 = System.currentTimeMillis();
+
+		try {
+
+			logQuery(statement, map);
+			return tx.run(statement, map).next().get(0).asBoolean();
+
+		} catch (TransientException tex) {
+			closed = true;
+			throw new RetryException(tex);
+		} catch (NoSuchRecordException nex) {
+			throw new NotFoundException(nex);
+		} catch (ServiceUnavailableException ex) {
+			throw new NetworkException(ex.getMessage(), ex);
+		} catch (DatabaseException dex) {
+			throw SessionTransaction.translateDatabaseException(dex);
+		} catch (ClientException cex) {
+			throw SessionTransaction.translateClientException(cex);
+		}
+	}
+
 	public long getLong(final String statement) {
 
 		final long t0 = System.currentTimeMillis();
 
 		try {
 
+			logQuery(statement);
 			return getLong(statement, Collections.EMPTY_MAP);
 
 		} catch (TransientException tex) {
@@ -157,8 +221,10 @@ public class SessionTransaction implements org.structr.api.Transaction {
 			throw new NotFoundException(nex);
 		} catch (ServiceUnavailableException ex) {
 			throw new NetworkException(ex.getMessage(), ex);
-		} finally {
-			logQuery(statement, t0);
+		} catch (DatabaseException dex) {
+			throw SessionTransaction.translateDatabaseException(dex);
+		} catch (ClientException cex) {
+			throw SessionTransaction.translateClientException(cex);
 		}
 	}
 
@@ -168,6 +234,7 @@ public class SessionTransaction implements org.structr.api.Transaction {
 
 		try {
 
+			logQuery(statement, map);
 			return tx.run(statement, map).next().get(0).asLong();
 
 		} catch (TransientException tex) {
@@ -177,8 +244,10 @@ public class SessionTransaction implements org.structr.api.Transaction {
 			throw new NotFoundException(nex);
 		} catch (ServiceUnavailableException ex) {
 			throw new NetworkException(ex.getMessage(), ex);
-		} finally {
-			logQuery(statement, map, t0);
+		} catch (DatabaseException dex) {
+			throw SessionTransaction.translateDatabaseException(dex);
+		} catch (ClientException cex) {
+			throw SessionTransaction.translateClientException(cex);
 		}
 	}
 
@@ -188,6 +257,7 @@ public class SessionTransaction implements org.structr.api.Transaction {
 
 		try {
 
+			logQuery(statement, map);
 			final StatementResult result = tx.run(statement, map);
 			if (result.hasNext()) {
 
@@ -201,8 +271,10 @@ public class SessionTransaction implements org.structr.api.Transaction {
 			throw new NotFoundException(nex);
 		} catch (ServiceUnavailableException ex) {
 			throw new NetworkException(ex.getMessage(), ex);
-		} finally {
-			logQuery(statement, map, t0);
+		} catch (DatabaseException dex) {
+			throw SessionTransaction.translateDatabaseException(dex);
+		} catch (ClientException cex) {
+			throw SessionTransaction.translateClientException(cex);
 		}
 
 		return null;
@@ -214,162 +286,8 @@ public class SessionTransaction implements org.structr.api.Transaction {
 
 		try {
 
+			logQuery(statement, map);
 			return tx.run(statement, map).next().get(0).asEntity();
-
-		} catch (TransientException tex) {
-			closed = true;
-			throw new RetryException(tex);
-		} catch (NoSuchRecordException nex) {
-			throw new NotFoundException(nex);
-		} catch (ServiceUnavailableException ex) {
-			throw new NetworkException(ex.getMessage(), ex);
-		} finally {
-			logQuery(statement, map, t0);
-		}
-	}
-
-	public Node getNode(final String statement, final Map<String, Object> map) {
-
-		final long t0 = System.currentTimeMillis();
-
-		try {
-
-			return tx.run(statement, map).next().get(0).asNode();
-
-		} catch (TransientException tex) {
-			closed = true;
-			throw new RetryException(tex);
-		} catch (NoSuchRecordException nex) {
-			throw new NotFoundException(nex);
-		} catch (ServiceUnavailableException ex) {
-			throw new NetworkException(ex.getMessage(), ex);
-		} finally {
-			logQuery(statement, map, t0);
-		}
-	}
-
-	public Relationship getRelationship(final String statement, final Map<String, Object> map) {
-
-		final long t0 = System.currentTimeMillis();
-
-		try {
-
-			return tx.run(statement, map).next().get(0).asRelationship();
-
-		} catch (TransientException tex) {
-			closed = true;
-			throw new RetryException(tex);
-		} catch (NoSuchRecordException nex) {
-			throw new NotFoundException(nex);
-		} catch (ServiceUnavailableException ex) {
-			throw new NetworkException(ex.getMessage(), ex);
-		} finally {
-			logQuery(statement, map, t0);
-		}
-	}
-
-	public QueryResult<Node> getNodes(final String statement, final Map<String, Object> map) {
-
-		final long t0 = System.currentTimeMillis();
-
-		try {
-
-			return QueryUtils.map(new RecordNodeMapper(), new StatementIterable(tx.run(statement, map)));
-
-		} catch (TransientException tex) {
-			closed = true;
-			throw new RetryException(tex);
-		} catch (NoSuchRecordException nex) {
-			throw new NotFoundException(nex);
-		} catch (ServiceUnavailableException ex) {
-			throw new NetworkException(ex.getMessage(), ex);
-		} finally {
-			logQuery(statement, t0);
-		}
-	}
-
-	public QueryResult<Relationship> getRelationships(final String statement, final Map<String, Object> map) {
-
-		final long t0 = System.currentTimeMillis();
-
-		try {
-
-			return QueryUtils.map(new RecordRelationshipMapper(), new StatementIterable(tx.run(statement, map)));
-
-		} catch (TransientException tex) {
-			closed = true;
-			throw new RetryException(tex);
-		} catch (NoSuchRecordException nex) {
-			throw new NotFoundException(nex);
-		} catch (ServiceUnavailableException ex) {
-			throw new NetworkException(ex.getMessage(), ex);
-		} finally {
-			logQuery(statement, map, t0);
-		}
-	}
-
-	public QueryResult<Long> getIds(final String statement, final Map<String, Object> map) {
-
-		final long t0 = System.currentTimeMillis();
-
-		try {
-
-			return QueryUtils.map(new RecordLongMapper(), new StatementIterable(tx.run(statement, map)));
-
-		} catch (TransientException tex) {
-			closed = true;
-			throw new RetryException(tex);
-		} catch (NoSuchRecordException nex) {
-			throw new NotFoundException(nex);
-		} catch (ServiceUnavailableException ex) {
-			throw new NetworkException(ex.getMessage(), ex);
-		} finally {
-			logQuery(statement, map, t0);
-		}
-	}
-
-	public QueryResult<String> getStrings(final String statement, final Map<String, Object> map) {
-
-		final long t0 = System.currentTimeMillis();
-
-		try {
-
-			final StatementResult result = tx.run(statement, map);
-			final Record record = result.next();
-			final Value value = record.get(0);
-
-			return new QueryResult<String>() {
-
-				@Override
-				public void close() {
-					result.consume();
-				}
-
-				@Override
-				public Iterator<String> iterator() {
-					return value.asList(Values.ofString()).iterator();
-				}
-			};
-
-		} catch (TransientException tex) {
-			closed = true;
-			throw new RetryException(tex);
-		} catch (NoSuchRecordException nex) {
-			throw new NotFoundException(nex);
-		} catch (ServiceUnavailableException ex) {
-			throw new NetworkException(ex.getMessage(), ex);
-		} finally {
-			logQuery(statement, map, t0);
-		}
-	}
-
-	public NativeResult run(final String statement, final Map<String, Object> map) {
-
-		final long t0 = System.currentTimeMillis();
-
-		try {
-
-			return new StatementResultWrapper(db, tx.run(statement, map));
 
 		} catch (TransientException tex) {
 			closed = true;
@@ -382,8 +300,171 @@ public class SessionTransaction implements org.structr.api.Transaction {
 			throw SessionTransaction.translateDatabaseException(dex);
 		} catch (ClientException cex) {
 			throw SessionTransaction.translateClientException(cex);
-		} finally {
-			logQuery(statement, map, t0);
+		}
+	}
+
+	public Node getNode(final String statement, final Map<String, Object> map) {
+
+		final long t0 = System.currentTimeMillis();
+
+		try {
+
+			logQuery(statement, map);
+			return tx.run(statement, map).next().get(0).asNode();
+
+		} catch (TransientException tex) {
+			closed = true;
+			throw new RetryException(tex);
+		} catch (NoSuchRecordException nex) {
+			throw new NotFoundException(nex);
+		} catch (ServiceUnavailableException ex) {
+			throw new NetworkException(ex.getMessage(), ex);
+		} catch (DatabaseException dex) {
+			throw SessionTransaction.translateDatabaseException(dex);
+		} catch (ClientException cex) {
+			throw SessionTransaction.translateClientException(cex);
+		}
+	}
+
+	public Relationship getRelationship(final String statement, final Map<String, Object> map) {
+
+		final long t0 = System.currentTimeMillis();
+
+		try {
+
+			logQuery(statement, map);
+			return tx.run(statement, map).next().get(0).asRelationship();
+
+		} catch (TransientException tex) {
+			closed = true;
+			throw new RetryException(tex);
+		} catch (NoSuchRecordException nex) {
+			throw new NotFoundException(nex);
+		} catch (ServiceUnavailableException ex) {
+			throw new NetworkException(ex.getMessage(), ex);
+		} catch (DatabaseException dex) {
+			throw SessionTransaction.translateDatabaseException(dex);
+		} catch (ClientException cex) {
+			throw SessionTransaction.translateClientException(cex);
+		}
+	}
+
+	public Iterable<Node> getNodes(final String statement, final Map<String, Object> map) {
+
+		final long t0 = System.currentTimeMillis();
+
+		try {
+
+			logQuery(statement, map);
+			return Iterables.map(new RecordNodeMapper(), new IteratorWrapper<>(tx.run(statement, map)));
+
+		} catch (TransientException tex) {
+			closed = true;
+			throw new RetryException(tex);
+		} catch (NoSuchRecordException nex) {
+			throw new NotFoundException(nex);
+		} catch (ServiceUnavailableException ex) {
+			throw new NetworkException(ex.getMessage(), ex);
+		} catch (DatabaseException dex) {
+			throw SessionTransaction.translateDatabaseException(dex);
+		} catch (ClientException cex) {
+			throw SessionTransaction.translateClientException(cex);
+		}
+	}
+
+	public Iterable<Relationship> getRelationships(final String statement, final Map<String, Object> map) {
+
+		final long t0 = System.currentTimeMillis();
+
+		try {
+
+			logQuery(statement, map);
+			return Iterables.map(new RecordRelationshipMapper(db), new IteratorWrapper<>(tx.run(statement, map)));
+
+		} catch (TransientException tex) {
+			closed = true;
+			throw new RetryException(tex);
+		} catch (NoSuchRecordException nex) {
+			throw new NotFoundException(nex);
+		} catch (ServiceUnavailableException ex) {
+			throw new NetworkException(ex.getMessage(), ex);
+		} catch (DatabaseException dex) {
+			throw SessionTransaction.translateDatabaseException(dex);
+		} catch (ClientException cex) {
+			throw SessionTransaction.translateClientException(cex);
+		}
+	}
+
+	public Iterable<NodeId> getNodeIds(final String statement, final Map<String, Object> map) {
+
+		final long t0 = System.currentTimeMillis();
+
+		try {
+
+			logQuery(statement, map);
+			return Iterables.map(new RecordNodeIdMapper(), new IteratorWrapper<>(tx.run(statement, map)));
+
+		} catch (TransientException tex) {
+			closed = true;
+			throw new RetryException(tex);
+		} catch (NoSuchRecordException nex) {
+			throw new NotFoundException(nex);
+		} catch (ServiceUnavailableException ex) {
+			throw new NetworkException(ex.getMessage(), ex);
+		} catch (DatabaseException dex) {
+			throw SessionTransaction.translateDatabaseException(dex);
+		} catch (ClientException cex) {
+			throw SessionTransaction.translateClientException(cex);
+		}
+	}
+
+	public Iterable<String> getStrings(final String statement, final Map<String, Object> map) {
+
+		final long t0 = System.currentTimeMillis();
+
+		try {
+
+			logQuery(statement, map);
+			final StatementResult result = tx.run(statement, map);
+			final Record record          = result.next();
+			final Value value            = record.get(0);
+
+			return new IteratorWrapper<>(value.asList(Values.ofString()).iterator());
+
+		} catch (TransientException tex) {
+			closed = true;
+			throw new RetryException(tex);
+		} catch (NoSuchRecordException nex) {
+			throw new NotFoundException(nex);
+		} catch (ServiceUnavailableException ex) {
+			throw new NetworkException(ex.getMessage(), ex);
+		} catch (DatabaseException dex) {
+			throw SessionTransaction.translateDatabaseException(dex);
+		} catch (ClientException cex) {
+			throw SessionTransaction.translateClientException(cex);
+		}
+	}
+
+	public Iterable<Map<String, Object>> run(final String statement, final Map<String, Object> map) {
+
+		final long t0 = System.currentTimeMillis();
+
+		try {
+
+			logQuery(statement, map);
+			return Iterables.map(new RecordMapMapper(db), new IteratorWrapper<>(tx.run(statement, map)));
+
+		} catch (TransientException tex) {
+			closed = true;
+			throw new RetryException(tex);
+		} catch (NoSuchRecordException nex) {
+			throw new NotFoundException(nex);
+		} catch (ServiceUnavailableException ex) {
+			throw new NetworkException(ex.getMessage(), ex);
+		} catch (DatabaseException dex) {
+			throw SessionTransaction.translateDatabaseException(dex);
+		} catch (ClientException cex) {
+			throw SessionTransaction.translateClientException(cex);
 		}
 	}
 
@@ -393,6 +474,7 @@ public class SessionTransaction implements org.structr.api.Transaction {
 
 		try {
 
+			logQuery(statement, map);
 			tx.run(statement, map).consume();
 
 		} catch (TransientException tex) {
@@ -406,41 +488,71 @@ public class SessionTransaction implements org.structr.api.Transaction {
 			throw SessionTransaction.translateDatabaseException(dex);
 		} catch (ClientException cex) {
 			throw SessionTransaction.translateClientException(cex);
-		} finally {
-			logQuery(statement, map, t0);
 		}
 	}
 
-	public void logQuery(final String statement, final long t0) {
-		logQuery(statement, null, t0);
+	public void logQuery(final String statement) {
+		logQuery(statement, null);
 	}
 
-	public void logQuery(final String statement, final Map<String, Object> map, final long t0) {
+	public void logQuery(final String statement, final Map<String, Object> map) {
 
 		if (db.logQueries()) {
 
-			final long time  = System.currentTimeMillis() - t0;
-			final String log = time + "ms";
+			if (!isPing || db.logPingQueries()) {
 
-			if (map != null && map.size() > 0) {
+				if (map != null && map.size() > 0) {
 
-				System.out.print(StringUtils.leftPad(log, 5) + " ");
-				System.out.println(statement + "\t\t Parameters: " + map.toString());
+					if (statement.contains("extractedContent")) {
+						System.out.println(Thread.currentThread().getId() + ": " + statement + "\t\t SET on extractedContent - value suppressed");
+					} else {
+						System.out.println(Thread.currentThread().getId() + ": " + statement + "\t\t Parameters: " + map.toString());
+					}
 
-			} else {
+				} else {
 
-				System.out.print(StringUtils.leftPad(log, 5) + " ");
-				System.out.println(statement);
+					System.out.println(Thread.currentThread().getId() + ": " + statement);
+				}
 			}
 		}
 	}
 
+	public void deleted(final NodeWrapper wrapper) {
+		deletedNodes.add(wrapper.getDatabaseId());
+	}
+
+	public void deleted(final RelationshipWrapper wrapper) {
+		deletedRels.add(wrapper.getDatabaseId());
+	}
+
+	public boolean isDeleted(final EntityWrapper wrapper) {
+
+		if (wrapper instanceof NodeWrapper) {
+			return deletedNodes.contains(wrapper.getDatabaseId());
+		}
+
+		if (wrapper instanceof RelationshipWrapper) {
+			return deletedRels.contains(wrapper.getDatabaseId());
+		}
+
+		return false;
+	}
+
 	public void modified(final EntityWrapper wrapper) {
-
-		// data was written, invalidate query cache
-		db.invalidateQueryCache();
-
 		modifiedEntities.add(wrapper);
+	}
+
+	public void accessed(final EntityWrapper wrapper) {
+		accessedEntities.add(wrapper);
+	}
+
+	public void setIsPing(final boolean isPing) {
+		this.isPing = isPing;
+	}
+
+	@Override
+	public long getTransactionId() {
+		return this.transactionId;
 	}
 
 	// ----- public static methods -----
@@ -454,8 +566,8 @@ public class SessionTransaction implements org.structr.api.Transaction {
 			// add handlers / translated exceptions for ClientExceptions here..
 		}
 
-		// re-throw existing exception if no other cause could be found
-		throw cex;
+		// wrap exception if no other cause could be found
+		throw new UnknownClientException(cex, cex.code(), cex.getMessage());
 	}
 
 	public static RuntimeException translateDatabaseException(final DatabaseException dex) {
@@ -468,63 +580,51 @@ public class SessionTransaction implements org.structr.api.Transaction {
 			// add handlers / translated exceptions for DatabaseExceptions here..
 		}
 
-		// re-throw existing exception if no other cause could be found
-		throw dex;
+		// wrap exception if no other cause could be found
+		throw new UnknownDatabaseException(dex, dex.code(), dex.getMessage());
 	}
 
 	// ----- nested classes -----
-	private class StatementIterable implements QueryResult<Record> {
+	public class IteratorWrapper<T> implements Iterable<T> {
 
-		private StatementResult result = null;
+		private Iterator<T> iterator = null;
 
-		public StatementIterable(final StatementResult result) {
-			this.result = result;
+		public IteratorWrapper(final Iterator<T> iterator) {
+			this.iterator = iterator;
 		}
 
 		@Override
-		public void close() {
-			result.consume();
-		}
+		public Iterator<T> iterator() {
 
-		@Override
-		public Iterator<Record> iterator() {
-
-			return new Iterator<Record>() {
+			return new Iterator<T>() {
 
 				@Override
 				public boolean hasNext() {
 
 					try {
-						return result.hasNext();
+						return iterator.hasNext();
 
-					} catch (ServiceUnavailableException ex) {
-						closed = true;
-						throw new NetworkException(ex.getMessage(), ex);
+					} catch (ClientException dex) {
+						throw SessionTransaction.translateClientException(dex);
+					} catch (DatabaseException dex) {
+						throw SessionTransaction.translateDatabaseException(dex);
 					}
 				}
 
 				@Override
-				public Record next() {
+				public T next() {
 
 					try {
 
-						return result.next();
+						return iterator.next();
 
-					} catch (TransientException tex) {
-						closed = true;
-						throw new RetryException(tex);
-					} catch (ServiceUnavailableException ex) {
-						closed = true;
-						throw new NetworkException(ex.getMessage(), ex);
+					} catch (ClientException dex) {
+						throw SessionTransaction.translateClientException(dex);
+					} catch (DatabaseException dex) {
+						throw SessionTransaction.translateDatabaseException(dex);
 					}
-				}
-
-				@Override
-				public void remove() {
-					throw new UnsupportedOperationException("Removal not supported");
 				}
 			};
 		}
-
 	}
 }

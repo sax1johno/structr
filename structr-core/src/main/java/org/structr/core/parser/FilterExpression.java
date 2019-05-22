@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -21,7 +21,7 @@ package org.structr.core.parser;
 import java.util.LinkedList;
 import java.util.List;
 import org.structr.common.error.FrameworkException;
-import org.structr.common.error.UnlicensedException;
+import org.structr.common.error.UnlicensedScriptException;
 import org.structr.core.GraphObject;
 import org.structr.schema.action.ActionContext;
 
@@ -63,7 +63,7 @@ public class FilterExpression extends Expression {
 	}
 
 	@Override
-	public Object evaluate(final ActionContext ctx, final GraphObject entity) throws FrameworkException, UnlicensedException {
+	public Object evaluate(final ActionContext ctx, final GraphObject entity) throws FrameworkException, UnlicensedScriptException {
 
 		if (listExpression == null || filterExpression == null) {
 			return ERROR_MESSAGE_FILTER;
@@ -72,9 +72,9 @@ public class FilterExpression extends Expression {
 		final Object listSource = listExpression.evaluate(ctx, entity);
 		final List target       = new LinkedList<>();
 
-		if (listSource != null && listSource instanceof List) {
+		if (listSource != null && listSource instanceof Iterable) {
 
-			final List source         = (List)listSource;
+			final Iterable source     = (Iterable)listSource;
 			final Object oldDataValue = ctx.getConstant("data");
 
 			for (Object obj : source) {
@@ -97,7 +97,7 @@ public class FilterExpression extends Expression {
 	}
 
 	@Override
-	public Object transform(final ActionContext ctx, final GraphObject entity, final Object source) throws FrameworkException, UnlicensedException {
+	public Object transform(final ActionContext ctx, final GraphObject entity, final Object source) throws FrameworkException, UnlicensedScriptException {
 		return source;
 	}
 }

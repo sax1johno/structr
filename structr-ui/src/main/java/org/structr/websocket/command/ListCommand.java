@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,32 +18,29 @@
  */
 package org.structr.websocket.command;
 
-import java.util.Map;
+import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.Result;
 import org.structr.core.app.Query;
 import org.structr.core.app.StructrApp;
+import org.structr.core.entity.AbstractNode;
 import org.structr.core.property.PropertyKey;
 import org.structr.schema.SchemaHelper;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Folder;
 import org.structr.web.entity.Image;
 import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
 
-//~--- classes ----------------------------------------------------------------
 /**
  * Websocket command to retrieve nodes of a given type which are on root level,
  * i.e. not children of another node.
  *
  * To get all nodes of a certain type, see the {@link GetCommand}.
- *
- *
  *
  */
 public class ListCommand extends AbstractCommand {
@@ -53,18 +50,19 @@ public class ListCommand extends AbstractCommand {
 	static {
 
 		StructrWebSocket.addCommand(ListCommand.class);
-
 	}
 
 	@Override
-	public void processMessage(final WebSocketMessage webSocketData) {
+	public void processMessage(final WebSocketMessage webSocketData) throws FrameworkException {
+
+		setDoTransactionNotifications(false);
 
 		final SecurityContext securityContext = getWebSocket().getSecurityContext();
-		final Map<String, Object> nodeData    = webSocketData.getNodeData();
-		final String rawType                  = (String) nodeData.get("type");
-		final String properties               = (String) webSocketData.getNodeData().get("properties");
 
-		final boolean rootOnly = Boolean.TRUE.equals((Boolean) nodeData.get("rootOnly"));
+		final String rawType                  = webSocketData.getNodeDataStringValue("type");
+		final String properties               = webSocketData.getNodeDataStringValue("properties");
+		final boolean rootOnly                = webSocketData.getNodeDataBooleanValue("rootOnly");
+
 		Class type = SchemaHelper.getEntityClassForRawType(rawType);
 
 		if (type == null) {
@@ -80,37 +78,33 @@ public class ListCommand extends AbstractCommand {
 		final String sortKey           = webSocketData.getSortKey();
 		final int pageSize             = webSocketData.getPageSize();
 		final int page                 = webSocketData.getPage();
-		final PropertyKey sortProperty = StructrApp.getConfiguration().getPropertyKeyForJSONName(type, sortKey);
-		final Query query              = StructrApp.getInstance(securityContext).nodeQuery(type)/*.includeDeletedAndHidden()*/.sort(sortProperty).order("desc".equals(sortOrder)).page(page).pageSize(pageSize);
+		final PropertyKey sortProperty = StructrApp.key(type, sortKey);
+		final Query query              = StructrApp.getInstance(securityContext).nodeQuery(type)/*.includeHidden()*/.sort(sortProperty).order("desc".equals(sortOrder)).page(page).pageSize(pageSize);
 
-		if (FileBase.class.isAssignableFrom(type)) {
+		if (File.class.isAssignableFrom(type)) {
 
 			if (rootOnly) {
-				query.and(FileBase.hasParent, false);
+				query.and(StructrApp.key(File.class, "hasParent"), false);
 			}
 
 			// inverted as isThumbnail is not necessarily present in all objects inheriting from FileBase
-			query.not().and(Image.isThumbnail, true);
+			query.not().and(StructrApp.key(Image.class, "isThumbnail"), true);
 
 		}
 
 		// important
 		if (Folder.class.isAssignableFrom(type) && rootOnly) {
 
-			query.and(Folder.hasParent, false);
+			query.and(StructrApp.key(Folder.class, "hasParent"), false);
 		}
 
 		try {
 
 			// do search
-			final Result result = query.getResult();
-
-			// save raw result count
-			int resultCountBeforePaging = result.getRawResultCount(); // filteredResults.size();
+			final List<AbstractNode> result = query.getAsList();
 
 			// set full result list
-			webSocketData.setResult(result.getResults());
-			webSocketData.setRawResultCount(resultCountBeforePaging);
+			webSocketData.setResult(result);
 
 			// send only over local connection
 			getWebSocket().send(webSocketData, true);
@@ -121,15 +115,10 @@ public class ListCommand extends AbstractCommand {
 			getWebSocket().send(MessageBuilder.status().code(fex.getStatus()).message(fex.getMessage()).build(), true);
 
 		}
-
 	}
 
-	//~--- get methods ----------------------------------------------------
 	@Override
 	public String getCommand() {
-
 		return "LIST";
-
 	}
-
 }

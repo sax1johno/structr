@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -22,17 +22,14 @@ import java.util.Locale;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
 
-/**
- *
- */
-public class IsLocaleFunction extends UiFunction {
+public class IsLocaleFunction extends UiAdvancedFunction {
 
 	public static final String ERROR_MESSAGE_IS_LOCALE    = "Usage: ${is_locale(locales...)}";
 	public static final String ERROR_MESSAGE_IS_LOCALE_JS = "Usage: ${{Structr.isLocale(locales...}}. Example ${{Structr.isLocale('de_DE', 'de_AT', 'de_CH')}}";
 
 	@Override
 	public String getName() {
-		return "is_locale()";
+		return "is_locale";
 	}
 
 	@Override
@@ -55,9 +52,7 @@ public class IsLocaleFunction extends UiFunction {
 			} else {
 
 				logParameterError(caller, sources, ctx.isJavaScriptContext());
-
 			}
-
 		}
 
 		return false;
@@ -72,5 +67,4 @@ public class IsLocaleFunction extends UiFunction {
 	public String shortDescription() {
 		return "Returns true if the current user locale is equal to the given argument";
 	}
-
 }

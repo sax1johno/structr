@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -21,12 +21,11 @@ package org.structr.websocket.command;
 import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.util.Iterables;
 import org.structr.common.PagingHelper;
 import org.structr.common.error.FrameworkException;
 import org.structr.web.entity.dom.DOMNode;
-import org.structr.web.entity.dom.Page;
 import org.structr.web.entity.dom.ShadowDocument;
-import org.structr.web.entity.dom.relationship.DOMChildren;
 import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
@@ -52,6 +51,8 @@ public class ListComponentsCommand extends AbstractCommand {
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
+		setDoTransactionNotifications(false);
+
 		final int pageSize       = webSocketData.getPageSize();
 		final int page           = webSocketData.getPage();
 
@@ -59,17 +60,15 @@ public class ListComponentsCommand extends AbstractCommand {
 
 			final ShadowDocument hiddenDoc     = CreateComponentCommand.getOrCreateHiddenDocument();
 			List<DOMNode> filteredResults      = new LinkedList();
-			List<DOMNode> resultList           = hiddenDoc.getProperty(Page.elements);
+			List<DOMNode> resultList           = Iterables.toList(hiddenDoc.getElements());
 
 			// Filter list and return only top level nodes
 			for (DOMNode node : resultList) {
 
-				if (Boolean.FALSE.equals(node.hasIncomingRelationships(DOMChildren.class))) {
+				if (Boolean.FALSE.equals(node.hasIncomingRelationships(node.getChildLinkType()))) {
 
 					filteredResults.add(node);
-
 				}
-
 			}
 
 			// Sort the components by name

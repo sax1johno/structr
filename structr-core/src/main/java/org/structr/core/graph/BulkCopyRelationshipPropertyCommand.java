@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -31,13 +31,9 @@ import org.structr.core.app.StructrApp;
 import org.structr.core.entity.AbstractRelationship;
 import org.structr.core.property.PropertyKey;
 
-
-//~--- classes ----------------------------------------------------------------
 /**
  * Sets the properties found in the property set on all nodes matching the type.
  * If no type property is found, set the properties on all nodes.
- *
- *
  */
 public class BulkCopyRelationshipPropertyCommand extends NodeServiceCommand implements MaintenanceCommand {
 
@@ -55,7 +51,6 @@ public class BulkCopyRelationshipPropertyCommand extends NodeServiceCommand impl
 		if(sourceKey == null || destKey == null) {
 
 			throw new IllegalArgumentException("This command requires one argument of type Map. Map must contain values for 'sourceKey' and 'destKey'.");
-
 		}
 
 		if(graphDb != null) {
@@ -64,7 +59,7 @@ public class BulkCopyRelationshipPropertyCommand extends NodeServiceCommand impl
 			final long count = bulkGraphOperation(securityContext, relIterator, 1000, "CopyRelationshipProperties", new BulkGraphOperation<AbstractRelationship>() {
 
 				@Override
-				public void handleGraphObject(SecurityContext securityContext, AbstractRelationship rel) {
+				public boolean handleGraphObject(SecurityContext securityContext, AbstractRelationship rel) {
 
 					// Treat only "our" rels
 					if(rel.getProperty(GraphObject.id) != null) {
@@ -82,6 +77,8 @@ public class BulkCopyRelationshipPropertyCommand extends NodeServiceCommand impl
 							logger.warn("Unable to copy relationship property {} of relationship {} to {}: {}", new Object[] { sourcePropertyKey, rel.getUuid(), destPropertyKey, fex.getMessage() } );
 						}
 					}
+
+					return true;
 				}
 
 				@Override

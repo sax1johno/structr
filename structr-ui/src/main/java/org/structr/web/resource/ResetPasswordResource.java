@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -21,17 +21,15 @@ package org.structr.web.resource;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.UUID;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.structr.api.config.Settings;
+import org.structr.api.util.ResultStream;
 import org.structr.common.MailHelper;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.Result;
 import org.structr.core.app.Query;
 import org.structr.core.app.StructrApp;
 import org.structr.core.entity.MailTemplate;
@@ -39,12 +37,13 @@ import org.structr.core.entity.Principal;
 import org.structr.core.property.PropertyKey;
 import org.structr.core.property.PropertyMap;
 import org.structr.rest.RestMethodResult;
+import org.structr.rest.auth.AuthHelper;
 import org.structr.rest.exception.NotAllowedException;
 import org.structr.rest.resource.Resource;
+import org.structr.schema.ConfigurationProvider;
+import org.structr.schema.action.ActionContext;
 import org.structr.web.entity.User;
 import org.structr.web.servlet.HtmlServlet;
-
-//~--- classes ----------------------------------------------------------------
 
 /**
  * A resource to reset a user's password
@@ -80,7 +79,7 @@ public class ResetPasswordResource extends Resource {
 	}
 
 	@Override
-	public Result doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
+	public ResultStream doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
 		throw new NotAllowedException("GET not allowed on " + getResourceSignature());
 	}
 
@@ -92,22 +91,25 @@ public class ResetPasswordResource extends Resource {
 	@Override
 	public RestMethodResult doPost(Map<String, Object> propertySet) throws FrameworkException {
 
-		if (propertySet.containsKey(User.eMail.jsonName())) {
+		if (propertySet.containsKey("eMail")) {
 
-			final String emailString  = (String) propertySet.get(User.eMail.jsonName());
+			final String emailString  = (String) propertySet.get("eMail");
 
 			if (StringUtils.isEmpty(emailString)) {
 				return new RestMethodResult(HttpServletResponse.SC_BAD_REQUEST);
 			}
 
-			final String localeString = (String) propertySet.get(MailTemplate.locale.jsonName());
-			final String confKey      = UUID.randomUUID().toString();
-			final Principal user      = StructrApp.getInstance().nodeQuery(User.class).and(User.eMail, emailString).getFirst();
+			final ConfigurationProvider config        = StructrApp.getConfiguration();
+			final PropertyKey<String> confirmationKey = StructrApp.key(User.class, "confirmationKey");
+			final PropertyKey<String> eMail           = StructrApp.key(User.class, "eMail");
+			final String localeString                 = (String) propertySet.get("locale");
+			final String confKey                      = AuthHelper.getConfirmationKey();
+			final Principal user                      = StructrApp.getInstance().nodeQuery(User.class).and(eMail, emailString).getFirst();
 
 			if (user != null) {
 
 				// update confirmation key
-				user.setProperties(SecurityContext.getSuperUserInstance(), new PropertyMap(User.confirmationKey, confKey));
+				user.setProperties(SecurityContext.getSuperUserInstance(), new PropertyMap(confirmationKey, confKey));
 
 				if (!sendResetPasswordLink(user, propertySet, localeString, confKey)) {
 
@@ -155,13 +157,11 @@ public class ResetPasswordResource extends Resource {
 		// WARNING! This is unchecked user input!!
 		populateReplacementMap(replacementMap, propertySetFromUserPOST);
 
-		final String userEmail = user.getProperty(User.eMail);
-		final String appHost   = Settings.ApplicationHost.getValue();
-		final Integer httpPort = Settings.HttpPort.getValue();
+		final String userEmail = user.getProperty("eMail");
 
-		replacementMap.put(toPlaceholder(User.eMail.jsonName()), userEmail);
+		replacementMap.put(toPlaceholder("eMail"), userEmail);
 		replacementMap.put(toPlaceholder("link"),
-			getTemplateText(TemplateKey.RESET_PASSWORD_BASE_URL, "http://" + appHost + ":" + httpPort, localeString, confKey)
+			getTemplateText(TemplateKey.RESET_PASSWORD_BASE_URL, ActionContext.getBaseUrl(securityContext.getRequest()), localeString, confKey)
 			      + getTemplateText(TemplateKey.RESET_PASSWORD_PAGE, HtmlServlet.RESET_PASSWORD_PAGE, localeString, confKey)
 			+ "?" + getTemplateText(TemplateKey.RESET_PASSWORD_CONFIRM_KEY_KEY, HtmlServlet.CONFIRM_KEY_KEY, localeString, confKey) + "=" + confKey
 			+ "&" + getTemplateText(TemplateKey.RESET_PASSWORD_TARGET_PAGE_KEY, HtmlServlet.TARGET_PAGE_KEY, localeString, confKey) + "=" + getTemplateText(TemplateKey.RESET_PASSWORD_TARGET_PAGE, HtmlServlet.RESET_PASSWORD_PAGE, localeString, confKey)
@@ -198,13 +198,13 @@ public class ResetPasswordResource extends Resource {
 			final Query<MailTemplate> query = StructrApp.getInstance().nodeQuery(MailTemplate.class).andName(key.name());
 
 			if (localeString != null) {
-				query.and(MailTemplate.locale, localeString);
+				query.and("locale", localeString);
 			}
 
 			MailTemplate template = query.getFirst();
 			if (template != null) {
 
-				final String text = template.getProperty(MailTemplate.text);
+				final String text = template.getProperty("text");
 				return text != null ? text : defaultValue;
 
 			} else {

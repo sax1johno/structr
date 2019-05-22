@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -75,7 +75,7 @@ public class FrameGrabberProcess extends AbstractProcess<Image> {
 		try (final Tx tx = StructrApp.getInstance(securityContext).tx()) {
 
 			// create an empty file to store the converted video
-			newFile = FileHelper.createFile(securityContext, new byte[0], null, Image.class, imageName);
+			newFile = FileHelper.createFile(securityContext, new byte[0], null, Image.class, imageName, false);
 
 			// obtain destination path of new file
 			outputFileName = newFile.getFileOnDisk().getAbsolutePath();
@@ -132,7 +132,7 @@ public class FrameGrabberProcess extends AbstractProcess<Image> {
 					FileHelper.updateMetadata(newFile);
 
 					// create link between the two videos
-					inputFile.setProperty(VideoFile.posterImage, newFile);
+					inputFile.setProperty(StructrApp.key(VideoFile.class, "posterImage"), newFile);
 				}
 
 				tx.success();

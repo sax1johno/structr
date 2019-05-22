@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -53,8 +53,6 @@ public class DefaultFactoryDefinition implements FactoryDefinition {
 	public static final Class GENERIC_NODE_TYPE          = GenericNode.class;
 	public static final Class GENERIC_REL_TYPE           = GenericRelationship.class;
 
-	private String externalNodeTypeName = null;
-
 	@Override
 	public AbstractRelationship createGenericRelationship() {
 		return new GenericRelationship();
@@ -105,49 +103,6 @@ public class DefaultFactoryDefinition implements FactoryDefinition {
 				}
 			}
 
-		} else {
-
- 			if (externalNodeTypeName == null) {
-
-				// try to determine external node
-				// type name from configuration
-				externalNodeTypeName = Settings.ForeignTypeName.getValue();
-			}
-
-			if (externalNodeTypeName != null && node.hasProperty(externalNodeTypeName)) {
-
-				Object typeObj = node.getProperty(externalNodeTypeName);
-				if (typeObj != null) {
-
-					// String externalNodeType = typeObj.toString();
-
-					// initialize dynamic type
-					// genericNodeExtender.getType(externalNodeType);
-
-					// return dynamic type
-					final Class dynamicType = StructrApp.getConfiguration().getNodeEntityClass(typeObj.toString());
-					if (dynamicType != null) {
-
-						return dynamicType;
-					}
-				}
-			}
-
-			final Iterable<Label> labels = node.getLabels();
-			if (labels != null) {
-
-				final List<String> sortedLabels = Iterables.toList(Iterables.map(new LabelExtractor(), labels));
-				Collections.sort(sortedLabels);
-
-				final String typeName = StringUtils.join(sortedLabels, "");
-
-				// return dynamic type
-				final Class dynamicType = StructrApp.getConfiguration().getNodeEntityClass(typeName);
-				if (dynamicType != null) {
-
-					return dynamicType;
-				}
-			}
 		}
 
 		return getGenericNodeType();
@@ -161,14 +116,22 @@ public class DefaultFactoryDefinition implements FactoryDefinition {
 		}
 
 		final String type = GraphObject.type.dbName();
+		
+		final Node startNode = relationship.getStartNode();
+		final Node endNode   = relationship.getEndNode();
 
+		if (startNode == null || endNode == null) {
+			return null;
+		}
+		
 		// first try: duck-typing
-		final String sourceType = relationship.getStartNode().hasProperty(type) ? relationship.getStartNode().getProperty(type).toString() : "";
-		final String targetType = relationship.getEndNode().hasProperty(type) ? relationship.getEndNode().getProperty(type).toString() : "";
+		final String sourceType = startNode.hasProperty(type) ? startNode.getProperty(type).toString() : "";
+		final String targetType = endNode.hasProperty(type) ? endNode.getProperty(type).toString() : "";
 		final String relType    = relationship.getType().name();
 		final Class entityType  = getClassForCombinedType(sourceType, relType, targetType);
 
 		if (entityType != null) {
+			
 			logger.debug("Class for assembled combined {}", entityType.getName());
 			return entityType;
 		}
@@ -177,13 +140,11 @@ public class DefaultFactoryDefinition implements FactoryDefinition {
 		if (relationship.hasProperty(type)) {
 
 			Object obj =  relationship.getProperty(type);
-
-			logger.debug("Type property: {}", obj);
-
 			if (obj != null) {
 
 				Class relationClass = StructrApp.getConfiguration().getRelationshipEntityClass(obj.toString());
 				if (relationClass != null) {
+
 					StructrApp.getConfiguration().setRelationClassForCombinedType(sourceType, relType, targetType, relationClass);
 					return relationClass;
 				}
@@ -195,13 +156,11 @@ public class DefaultFactoryDefinition implements FactoryDefinition {
 		if (relationship.hasProperty(combinedTypeName)) {
 
 			Object obj =  relationship.getProperty(combinedTypeName);
-
-			logger.debug("Combined type property: {}", obj);
-
 			if (obj != null) {
 
 				Class classForCombinedType = getClassForCombinedType(obj.toString());
 				if (classForCombinedType != null) {
+
 					return classForCombinedType;
 				}
 			}

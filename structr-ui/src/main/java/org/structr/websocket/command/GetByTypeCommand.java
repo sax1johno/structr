@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,13 +18,15 @@
  */
 package org.structr.websocket.command;
 
+import com.drew.lang.Iterables;
+import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.structr.common.PagingHelper;
+import org.structr.api.util.ResultStream;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.Result;
+import org.structr.core.GraphObject;
 import org.structr.core.app.Query;
 import org.structr.core.app.StructrApp;
 import org.structr.core.property.PropertyKey;
@@ -34,69 +36,78 @@ import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
  * Websocket command to a list of nodes by type.
- * 
+ *
  * Supports paging and ignores thumbnails.
- *
- *
- *
  */
 public class GetByTypeCommand extends AbstractCommand {
-	
+
 	private static final Logger logger = LoggerFactory.getLogger(GetByTypeCommand.class.getName());
-	
+
+	private static final String INCLUDE_HIDDEN_KEY       = "includeHidden";
+	private static final String PROPERTIES_KEY           = "properties";
+	private static final String TYPE_KEY                 = "type";
+
 	static {
-		
+
 		StructrWebSocket.addCommand(GetByTypeCommand.class);
-		
+
 	}
 
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
-		final SecurityContext securityContext  = getWebSocket().getSecurityContext();
-		final String rawType                   = (String) webSocketData.getNodeData().get("type");
-		final String properties                = (String) webSocketData.getNodeData().get("properties");
-		final boolean includeDeletedAndHidden  = (Boolean) webSocketData.getNodeData().get("includeDeletedAndHidden");
-		final Class type                       = SchemaHelper.getEntityClassForRawType(rawType);
-
-		if (type == null) {
-			getWebSocket().send(MessageBuilder.status().code(404).message("Type " + rawType + " not found").build(), true);
-			return;
-		}
-
-		if (properties != null) {
-			securityContext.setCustomView(StringUtils.split(properties, ","));
-		}
-		
-		final String sortOrder   = webSocketData.getSortOrder();
-		final String sortKey     = webSocketData.getSortKey();
-		final int pageSize       = webSocketData.getPageSize();
-		final int page           = webSocketData.getPage();
-		PropertyKey sortProperty = StructrApp.getConfiguration().getPropertyKeyForJSONName(type, sortKey);
-
-		
-		final Query query = StructrApp.getInstance(securityContext).nodeQuery(type).includeDeletedAndHidden(includeDeletedAndHidden).sort(sortProperty).order("desc".equals(sortOrder));
-
-		// for image lists, suppress thumbnails
-		if (type.equals(Image.class)) {
-			query.and(Image.isThumbnail, false);
-		}
-
+		setDoTransactionNotifications(false);
 
 		try {
 
+			final SecurityContext securityContext  = getWebSocket().getSecurityContext();
+			final String rawType                   = webSocketData.getNodeDataStringValue(TYPE_KEY);
+			final String properties                = webSocketData.getNodeDataStringValue(PROPERTIES_KEY);
+			final boolean includeHidden            = webSocketData.getNodeDataBooleanValue(INCLUDE_HIDDEN_KEY);
+			final Class type                       = SchemaHelper.getEntityClassForRawType(rawType);
+
+			if (type == null) {
+				getWebSocket().send(MessageBuilder.status().code(404).message("Type " + rawType + " not found").build(), true);
+				return;
+			}
+
+			if (properties != null) {
+				securityContext.setCustomView(StringUtils.split(properties, ","));
+			}
+
+			final String sortOrder   = webSocketData.getSortOrder();
+			final String sortKey     = webSocketData.getSortKey();
+			final int pageSize       = webSocketData.getPageSize();
+			final int page           = webSocketData.getPage();
+
+
+			final Query query = StructrApp.getInstance(securityContext).nodeQuery(type).includeHidden(includeHidden);
+
+			if (sortKey != null) {
+
+				final PropertyKey sortProperty = StructrApp.key(type, sortKey);
+				if (sortProperty != null) {
+
+					query.sort(sortProperty).order("desc".equals(sortOrder));
+				}
+			}
+
+			// for image lists, suppress thumbnails
+			if (type.equals(Image.class)) {
+				query.and(StructrApp.key(Image.class, "isThumbnail"), false);
+			}
+
 			// do search
-			Result result = query.getResult();
+			final ResultStream result    = query.getResultStream();
+			final List<GraphObject> list = Iterables.toList(result);
 
 			// save raw result count
-			int resultCountBeforePaging = result.size();
+			int resultCountBeforePaging = result.calculateTotalResultCount();
 
 			// set full result list
-			webSocketData.setResult(PagingHelper.subList(result.getResults(), pageSize, page));
+			webSocketData.setResult(list);
 			webSocketData.setRawResultCount(resultCountBeforePaging);
 
 			// send only over local connection

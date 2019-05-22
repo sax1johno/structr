@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,41 +18,40 @@
  */
 package org.structr.core.function;
 
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class QuotFunction extends Function<Object, Object> {
+public class QuotFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_QUOT = "Usage: ${quot(value1, value2)}. Example: ${quot(5, 2)}";
 
 	@Override
 	public String getName() {
-		return "quot()";
+		return "quot";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
 		try {
-		
-			if (arrayHasLengthAndAllElementsNotNull(sources, 2)) {
-			
-				try {
 
-					return Double.parseDouble(sources[0].toString()) / Double.parseDouble(sources[1].toString());
+			assertArrayHasLengthAndAllElementsNotNull(sources, 2);
 
-				} catch (NumberFormatException nfe) {
+			try {
 
-					logException(nfe, "{}: NumberFormatException in element \"{}\" for parameters: {}", new Object[] { getName(), caller, getParametersAsString(sources) });
-					return nfe.getMessage();
+				return Double.parseDouble(sources[0].toString()) / Double.parseDouble(sources[1].toString());
 
-				}
+			} catch (NumberFormatException nfe) {
 
-			} else if (sources.length > 0 && sources[0] != null) {
+				logException(nfe, "{}: NumberFormatException in element \"{}\" for parameters: {}", new Object[] { getReplacement(), caller, getParametersAsString(sources) });
+				return nfe.getMessage();
+			}
+
+		} catch (ArgumentNullException pe) {
+
+			if (sources.length > 0 && sources[0] != null) {
 
 				try {
 
@@ -60,22 +59,18 @@ public class QuotFunction extends Function<Object, Object> {
 
 				} catch (NumberFormatException nfe) {
 
-					logException(nfe, "{}: NumberFormatException in element \"{}\" for parameters: {}", new Object[] { getName(), caller, getParametersAsString(sources) });
+					logException(nfe, "{}: NumberFormatException in element \"{}\" for parameters: {}", new Object[] { getReplacement(), caller, getParametersAsString(sources) });
 					return nfe.getMessage();
 				}
-				
 			}
 
-		} catch (final IllegalArgumentException e) {
+		} catch (ArgumentCountException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
-
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
-		
-		return null;
 
+		return null;
 	}
 
 	@Override
@@ -87,5 +82,4 @@ public class QuotFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Divides the first argument by the second argument";
 	}
-
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -27,14 +27,14 @@ import java.util.List;
 import org.apache.ftpserver.ftplet.FtpFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.structr.api.util.ResultStream;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.core.Result;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
+import org.structr.core.entity.AbstractNode;
 import org.structr.core.graph.Tx;
-import org.structr.web.entity.AbstractFile;
-import org.structr.web.entity.FileBase;
+import org.structr.web.entity.File;
 import org.structr.web.entity.Folder;
 import org.structr.web.entity.dom.Page;
 
@@ -47,7 +47,7 @@ public class StructrFtpFolder extends AbstractStructrFtpFile implements FtpFile 
 	private static final Logger logger = LoggerFactory.getLogger(StructrFtpFolder.class.getName());
 
 	public StructrFtpFolder(final SecurityContext securityContext, final Folder folder) {
-		super(securityContext, folder);		
+		super(securityContext, folder);
 	}
 
 	@Override
@@ -73,18 +73,18 @@ public class StructrFtpFolder extends AbstractStructrFtpFile implements FtpFile 
 
 	@Override
 	public long getLastModified() {
-		
+
 		try (Tx tx = StructrApp.getInstance(securityContext).tx()) {
-		
+
 			final Date date = structrFile.getProperty(Folder.lastModifiedDate);
-			
+
 			tx.success();
-			
+
 			return date.getTime();
-		
+
 		} catch (Exception ex) {
 		}
-		
+
 		return 0L;
 	}
 
@@ -107,12 +107,11 @@ public class StructrFtpFolder extends AbstractStructrFtpFile implements FtpFile 
 
 			if ("/".equals(requestedPath)) {
 				try {
-					Result<Folder> folders = app.nodeQuery(Folder.class).getResult();
-					logger.debug("{} folders found", folders.size());
+					ResultStream<Folder> folders = app.nodeQuery(Folder.class).sort(AbstractNode.name).getResultStream();
 
-					for (Folder f : folders.getResults()) {
+					for (Folder f : folders) {
 
-						if (f.getProperty(AbstractFile.hasParent)) {
+						if (f.getHasParent()) {
 							continue;
 						}
 
@@ -123,12 +122,10 @@ public class StructrFtpFolder extends AbstractStructrFtpFile implements FtpFile 
 
 					}
 
-					Result<FileBase> files = app.nodeQuery(FileBase.class).getResult();
-					logger.debug("{} files found", files.size());
+					ResultStream<File> files = app.nodeQuery(File.class).sort(AbstractNode.name).getResultStream();
+					for (File f : files) {
 
-					for (FileBase f : files.getResults()) {
-
-						if (f.getProperty(AbstractFile.hasParent)) {
+						if (f.getHasParent()) {
 							continue;
 						}
 
@@ -141,10 +138,8 @@ public class StructrFtpFolder extends AbstractStructrFtpFile implements FtpFile 
 
 					}
 
-					Result<Page> pages = app.nodeQuery(Page.class).getResult();
-					logger.debug("{} pages found", pages.size());
-
-					for (Page p : pages.getResults()) {
+					ResultStream<Page> pages = app.nodeQuery(Page.class).sort(AbstractNode.name).getResultStream();
+					for (Page p : pages) {
 
 						logger.debug("Structr page found: {}", p);
 
@@ -160,7 +155,7 @@ public class StructrFtpFolder extends AbstractStructrFtpFile implements FtpFile 
 
 			}
 
-			List<Folder> folders = ((Folder) structrFile).getProperty(Folder.folders);
+			Iterable<Folder> folders = ((Folder) structrFile).getFolders();
 
 			for (Folder f : folders) {
 
@@ -170,9 +165,9 @@ public class StructrFtpFolder extends AbstractStructrFtpFile implements FtpFile 
 				ftpFiles.add(ftpFile);
 			}
 
-			List<FileBase> files = ((Folder) structrFile).getProperty(Folder.files);
+			Iterable<File> files = ((Folder) structrFile).getFiles();
 
-			for (FileBase f : files) {
+			for (File f : files) {
 
 				FtpFile ftpFile = new StructrFtpFile(securityContext, f);
 				logger.debug("File found: {}", ftpFile.getAbsolutePath());
@@ -212,7 +207,7 @@ public class StructrFtpFolder extends AbstractStructrFtpFile implements FtpFile 
 
 	@Override
 	public Object getPhysicalFile() {
-		throw new UnsupportedOperationException("Not supported yet."); 
+		throw new UnsupportedOperationException("Not supported yet.");
 	}
 
 }

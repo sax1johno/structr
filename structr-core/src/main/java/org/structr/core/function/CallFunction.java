@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -23,21 +23,20 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
-import org.structr.common.error.UnlicensedException;
+import org.structr.common.error.UnlicensedScriptException;
 import org.structr.core.GraphObjectMap;
 import org.structr.schema.action.ActionContext;
 import org.structr.schema.action.Actions;
-import org.structr.schema.action.Function;
 
 
-public class CallFunction extends Function<Object, Object> {
+public class CallFunction extends AdvancedScriptingFunction {
 
 	public static final String ERROR_MESSAGE_CALL    = "Usage: ${call(key [, key, value]}. Example ${call('myEvent', 'key1', 'value1', 'key2', 'value2')}";
 	public static final String ERROR_MESSAGE_CALL_JS = "Usage: ${{Structr.call(key [, parameterMap]}}. Example ${{Structr.call('myEvent', {key1: 'value1', key2: 'value2'})}}";
 
 	@Override
 	public String getName() {
-		return "call()";
+		return "call";
 	}
 
 	@Override
@@ -79,7 +78,7 @@ public class CallFunction extends Function<Object, Object> {
 
 				}
 
-			} catch (UnlicensedException ex) {
+			} catch (UnlicensedScriptException ex) {
 
 				ex.printStackTrace();
 			}

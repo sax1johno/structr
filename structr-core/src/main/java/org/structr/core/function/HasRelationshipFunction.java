@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,30 +18,30 @@
  */
 package org.structr.core.function;
 
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.entity.AbstractRelationship;
 import org.structr.core.graph.NodeInterface;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class HasRelationshipFunction extends Function<Object, Object> {
+public class HasRelationshipFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_HAS_RELATIONSHIP    = "Usage: ${has_relationship(entity1, entity2 [, relType])}. Example: ${has_relationship(me, user, 'FOLLOWS')} (ignores direction of the relationship)";
 	public static final String ERROR_MESSAGE_HAS_RELATIONSHIP_JS = "Usage: ${{Structr.has_relationship(entity1, entity2 [, relType])}}. Example: ${{Structr.has_relationship(Structr.get('me'), user, 'FOLLOWS')}} (ignores direction of the relationship)";
 
 	@Override
 	public String getName() {
-		return "has_relationship()";
+		return "has_relationship";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
-		if (arrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 2, 3)) {
+		try {
+
+			assertArrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 2, 3);
 
 			final Object source = sources[0];
 			final Object target = sources[1];
@@ -91,18 +91,20 @@ public class HasRelationshipFunction extends Function<Object, Object> {
 						return true;
 					}
 				}
-
 			}
 
-		} else {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
+			return usage(ctx.isJavaScriptContext());
 		}
 
 		return false;
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {
@@ -113,5 +115,4 @@ public class HasRelationshipFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Returns true if the given entity has relationships of the given type";
 	}
-
 }

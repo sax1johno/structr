@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -23,10 +23,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import org.apache.commons.lang3.StringUtils;
+import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
 import org.structr.core.entity.AbstractSchemaNode;
+import org.structr.core.entity.SchemaNode;
 import org.structr.core.entity.SchemaProperty;
+import org.structr.core.property.PropertyMap;
 import org.structr.schema.SchemaHelper.Type;
 import org.structr.schema.json.JsonEnumProperty;
 import org.structr.schema.json.JsonSchema;
@@ -38,10 +41,19 @@ import org.structr.schema.json.JsonSchema;
 public class StructrEnumProperty extends StructrStringProperty implements JsonEnumProperty {
 
 	protected Set<String> enums = new TreeSet<>();
+	protected String fqcn       = null;
 
 	public StructrEnumProperty(final StructrTypeDefinition parent, final String name) {
 
 		super(parent, name);
+	}
+
+	@Override
+	public JsonEnumProperty setEnumType(final Class type) {
+
+		this.fqcn = type.getName().replace("$", ".");
+
+		return this;
 	}
 
 	@Override
@@ -64,7 +76,15 @@ public class StructrEnumProperty extends StructrStringProperty implements JsonEn
 
 		final Map<String, Object> map = super.serialize();
 
-		map.put(JsonSchema.KEY_ENUM, enums);
+		if (fqcn != null) {
+
+			map.put(JsonSchema.KEY_FQCN, fqcn);
+
+		} else {
+
+			map.put(JsonSchema.KEY_ENUM, enums);
+		}
+
 		map.remove(JsonSchema.KEY_FORMAT);
 
 		return map;
@@ -76,6 +96,8 @@ public class StructrEnumProperty extends StructrStringProperty implements JsonEn
 		super.deserialize(source);
 
 		final Object enumValues = source.get(JsonSchema.KEY_ENUM);
+		final Object typeValue  = source.get(JsonSchema.KEY_FQCN);
+
 		if (enumValues != null) {
 
 			if (enumValues instanceof List) {
@@ -87,6 +109,10 @@ public class StructrEnumProperty extends StructrStringProperty implements JsonEn
 				throw new IllegalStateException("Invalid enum values for property " + name + ", expected array.");
 			}
 
+		} else if (typeValue != null && typeValue instanceof String) {
+
+			this.fqcn = typeValue.toString();
+
 		} else {
 
 			throw new IllegalStateException("Missing enum values for property " + name);
@@ -94,9 +120,9 @@ public class StructrEnumProperty extends StructrStringProperty implements JsonEn
 	}
 
 	@Override
-	void deserialize(final SchemaProperty schemaProperty) {
+	void deserialize(final Map<String, SchemaNode> schemaNodes, final SchemaProperty schemaProperty) {
 
-		super.deserialize(schemaProperty);
+		super.deserialize(schemaNodes, schemaProperty);
 
 		setEnums(schemaProperty.getEnumDefinitions().toArray(new String[0]));
 	}
@@ -105,10 +131,23 @@ public class StructrEnumProperty extends StructrStringProperty implements JsonEn
 	SchemaProperty createDatabaseSchema(final App app, final AbstractSchemaNode schemaNode) throws FrameworkException {
 
 		final SchemaProperty property = super.createDatabaseSchema(app, schemaNode);
+		final PropertyMap properties  = new PropertyMap();
 
-		property.setProperty(SchemaProperty.propertyType, Type.Enum.name());
-		property.setProperty(SchemaProperty.format, StringUtils.join(getEnums(), ", "));
+		properties.put(SchemaProperty.fqcn, this.fqcn);
+
+		property.setProperties(SecurityContext.getSuperUserInstance(), properties);
 
 		return property;
+	}
+
+	@Override
+	public String getFormat() {
+		return StringUtils.join(getEnums(), ", ");
+	}
+
+	// ----- protected methods -----
+	@Override
+	protected Type getTypeToSerialize() {
+		return Type.Enum;
 	}
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,30 +20,26 @@ package org.structr.core.function;
 
 import java.util.Arrays;
 import org.apache.commons.lang3.StringUtils;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class SplitFunction extends Function<Object, Object> {
+public class SplitFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_SPLIT = "Usage: ${split(value)}. Example: ${split(this.commaSeparatedItems)}";
 
 	@Override
 	public String getName() {
-		return "split()";
+		return "split";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
 		try {
-			if (!arrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 1, 2)) {
-				
-				return null;
-			}
+
+			assertArrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 1, 2);
 
 			final String toSplit = sources[0].toString();
 			String splitExpr = "[,;\\s]+";
@@ -52,19 +48,21 @@ public class SplitFunction extends Function<Object, Object> {
 				splitExpr = sources[1].toString();
 				return Arrays.asList(StringUtils.split(toSplit, splitExpr));
 			} else {
-				
+
 				return Arrays.asList(toSplit.split(splitExpr));
 			}
 
-		} catch (final IllegalArgumentException e) {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			// silently ignore null arguments
+			return null;
 
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {
@@ -75,6 +73,4 @@ public class SplitFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Splits the given string";
 	}
-
-
 }

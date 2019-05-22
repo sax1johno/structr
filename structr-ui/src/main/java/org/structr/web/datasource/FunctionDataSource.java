@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,30 +20,34 @@ package org.structr.web.datasource;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.LoggerFactory;
 import org.structr.api.util.Iterables;
 import org.structr.common.error.FrameworkException;
-import org.structr.common.error.UnlicensedException;
+import org.structr.common.error.UnlicensedScriptException;
 import org.structr.core.GraphObject;
-import org.structr.core.entity.AbstractNode;
 import org.structr.core.script.Scripting;
 import org.structr.schema.action.Function;
-import org.structr.web.common.GraphDataSource;
+import org.structr.core.datasources.GraphDataSource;
+import org.structr.core.graph.NodeInterface;
+import org.structr.schema.action.ActionContext;
 import org.structr.web.common.RenderContext;
 import org.structr.web.entity.dom.DOMNode;
 import org.structr.web.function.UiFunction;
 
 /**
- *
- *
+ * Data source that evaluates a function query.
  */
 public class FunctionDataSource implements GraphDataSource<Iterable<GraphObject>> {
 
 	@Override
-	public Iterable<GraphObject> getData(final RenderContext renderContext, final AbstractNode referenceNode) throws FrameworkException {
+	public Iterable<GraphObject> getData(final ActionContext actionContext, final NodeInterface referenceNode) throws FrameworkException {
 
-		final String functionQuery = referenceNode.getProperty(DOMNode.functionQuery);
-		if (functionQuery == null || functionQuery.isEmpty()) {
+		final RenderContext renderContext = (RenderContext) actionContext;
+		
+		final String functionQuery = ((DOMNode) referenceNode).getFunctionQuery();
+		if (StringUtils.isBlank(functionQuery)) {
+
 			return null;
 		}
 
@@ -59,7 +63,7 @@ public class FunctionDataSource implements GraphDataSource<Iterable<GraphObject>
 				return (List<GraphObject>) UiFunction.toGraphObject(result, 1);
 			}
 
-		} catch (UnlicensedException ex) {
+		} catch (UnlicensedScriptException ex) {
 			ex.log(LoggerFactory.getLogger(FunctionDataSource.class));
 		}
 

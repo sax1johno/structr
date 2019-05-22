@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,6 +18,7 @@
  */
 package org.structr.web.auth;
 
+import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import org.apache.oltu.oauth2.client.OAuthClient;
 import org.apache.oltu.oauth2.client.URLConnectionClient;
@@ -36,15 +37,18 @@ import org.apache.oltu.oauth2.common.utils.JSONUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.api.config.Settings;
-import org.structr.core.entity.Person;
+import org.structr.common.error.FrameworkException;
+import org.structr.core.app.StructrApp;
+import org.structr.core.entity.Principal;
 import org.structr.core.property.PropertyKey;
+import org.structr.web.entity.User;
 
 /**
  * Central class for OAuth client implementations.
  *
  *
  */
-public class StructrOAuthClient {
+public abstract class StructrOAuthClient {
 
 	private static final Logger logger = LoggerFactory.getLogger(StructrOAuthClient.class.getName());
 
@@ -52,19 +56,28 @@ public class StructrOAuthClient {
 		json, urlEncoded
 	}
 
-	private static final String CONFIGURED_OAUTH_SERVERS = "oauth.servers";
+	protected enum ResponseType {
+		code
+	}
 
-	protected String authorizationLocation;
-	protected String tokenLocation;
-	protected String clientId;
-	protected String clientSecret;
-	protected String redirectUri;
-	protected String state;
+	// protected attributes
+	protected Map<String, Object> userInfo = null;
+	protected String authorizationLocation = null;
+	protected String tokenLocation         = null;
+	protected String clientId              = null;
+	protected String clientSecret          = null;
+	protected String redirectUri           = null;
+	protected String state                 = null;
+	protected Class tokenResponseClass     = null;
 
-	protected Class tokenResponseClass;
-
+	// private properties
 	private OAuthAccessTokenResponse tokenResponse;
 	private OAuthResourceResponse userResponse;
+
+	public abstract String getUserResourceUri();
+	public abstract String getReturnUri();
+	public abstract String getErrorUri();
+	protected abstract String getScope();
 
 	public StructrOAuthClient() {};
 
@@ -148,11 +161,11 @@ public class StructrOAuthClient {
 
 			if (authServer.equals(name)) {
 
-				String authLocation  = Settings.getOrCreateStringSetting("oauth", authServer, "authorization_location").getValue();
-				String tokenLocation = Settings.getOrCreateStringSetting("oauth", authServer, "token_location").getValue();
-				String clientId      = Settings.getOrCreateStringSetting("oauth", authServer, "client_id").getValue();
-				String clientSecret  = Settings.getOrCreateStringSetting("oauth", authServer, "client_secret").getValue();
-				String redirectUri   = Settings.getOrCreateStringSetting("oauth", authServer, "redirect_uri").getValue();
+				String authLocation  = Settings.getOrCreateStringSetting("oauth", authServer, "authorization_location").getValue("");
+				String tokenLocation = Settings.getOrCreateStringSetting("oauth", authServer, "token_location").getValue("");
+				String clientId      = Settings.getOrCreateStringSetting("oauth", authServer, "client_id").getValue("");
+				String clientSecret  = Settings.getOrCreateStringSetting("oauth", authServer, "client_secret").getValue("");
+				String redirectUri   = Settings.getOrCreateStringSetting("oauth", authServer, "redirect_uri").getValue("");
 
 				// Minumum required fields
 				if (clientId != null && clientSecret != null && redirectUri != null) {
@@ -160,27 +173,30 @@ public class StructrOAuthClient {
 					Class serverClass		= getServerClassForName(name);
 					Class tokenResponseClass	= getTokenResponseClassForName(name);
 
-					StructrOAuthClient oauthServer;
-					try {
+					if (serverClass != null) {
 
-						oauthServer = (StructrOAuthClient) serverClass.newInstance();
-						oauthServer.init(authLocation, tokenLocation, clientId, clientSecret, redirectUri, tokenResponseClass);
+						StructrOAuthClient oauthServer;
+						try {
 
-						logger.info("Using OAuth server {}", oauthServer);
+							oauthServer = (StructrOAuthClient) serverClass.newInstance();
+							oauthServer.init(authLocation, tokenLocation, clientId, clientSecret, redirectUri, tokenResponseClass);
 
-						return oauthServer;
+							logger.info("Using OAuth server {}", oauthServer);
 
-					} catch (Throwable t) {
+							return oauthServer;
 
-						logger.error("Could not instantiate auth server", t);
+						} catch (Throwable t) {
 
+							logger.error("Could not instantiate auth server", t);
+
+						}
+						
+					} else {
+					
+						logger.warn("No OAuth provider found for name {}, ignoring.", name);
 					}
-
-
 				}
-
 			}
-
 		}
 
 		return null;
@@ -211,36 +227,31 @@ public class StructrOAuthClient {
 
 		switch (name) {
 
-			case "github" :
+			case "github":
 				return GitHubAuthClient.class;
-			case "twitter" :
+				
+			case "twitter":
 				return TwitterAuthClient.class;
-			case "facebook" :
+				
+			case "facebook":
 				return FacebookAuthClient.class;
-			case "linkedin" :
+				
+			case "linkedin":
 				return LinkedInAuthClient.class;
-			case "google" :
+				
+			case "google":
 				return GoogleAuthClient.class;
-			default :
-				return StructrOAuthClient.class;
+				
+			case "auth0":
+				return Auth0AuthClient.class;
 		}
 
+		// no provider found, ignore?
+		return null;
 	}
 
 	protected GrantType getGrantType() {
 		return GrantType.AUTHORIZATION_CODE;
-	}
-
-	protected String getScope() {
-		return "";
-	}
-
-	protected String getResponseType() {
-		return "code";
-	}
-
-	protected String getState() {
-		return "";
 	}
 
 	protected String getAccessTokenParameterKey() {
@@ -270,20 +281,26 @@ public class StructrOAuthClient {
 		}
 
 		return null;
-
-
+	}
+	
+	public void initializeUser(final Principal user) throws FrameworkException {
+		// override me
 	}
 
 	public PropertyKey getCredentialKey() {
-
-		return Person.eMail;
-
+		return StructrApp.key(User.class, "eMail");
 	}
 
 	public String getCredential(final HttpServletRequest request) {
-
 		return getValue(request, "email");
+	}
 
+	protected String getResponseType() {
+		return ResponseType.code.name();
+	}
+
+	protected String getState() {
+		return "";
 	}
 
 	public String getValue(final HttpServletRequest request, final String key) {
@@ -298,15 +315,19 @@ public class StructrOAuthClient {
 
 			}
 
-			String body = userResponse.getBody();
+			final String body = userResponse.getBody();
 
 			logger.info("User response body: {}", body);
-			return (String) JSONUtils.parseJSON(body).get(key);
+
+			// make full user info available to implementing classes
+			this.userInfo = JSONUtils.parseJSON(body);
+
+			// return desired value
+			return (String)this.userInfo.get(key);
 
 		} catch (Exception ex) {
 
 			logger.warn("Could not extract {} from JSON response", ex);
-
 		}
 
 		return null;
@@ -334,7 +355,6 @@ public class StructrOAuthClient {
 		}
 
 		return resp.getExpiresIn();
-
 	}
 
 	private OAuthAccessTokenResponse getAccessTokenResponse(final HttpServletRequest request) {
@@ -342,7 +362,6 @@ public class StructrOAuthClient {
 		if (tokenResponse != null) {
 
 			return tokenResponse;
-
 		}
 
 		try {
@@ -362,6 +381,7 @@ public class StructrOAuthClient {
 				.setClientId(clientId)
 				.setClientSecret(clientSecret)
 				.setRedirectURI(getAbsoluteUrl(request, redirectUri))
+				.setScope(getScope())
 				.setCode(getCode(request))
 			.buildBodyMessage();
 
@@ -378,43 +398,9 @@ public class StructrOAuthClient {
 		} catch (Throwable t) {
 
 			logger.error("Could not get access token response", t);
-
 		}
 
 		return null;
-
-	}
-
-	/**
-	 * Where to fetch user information from the auth server
-	 *
-	 * @return resource URI
-	 */
-	public String getUserResourceUri() {
-
-		return "";
-
-	}
-
-	/**
-	 * Path to redirect to on success
-	 * @return return URI
-	 */
-	public String getReturnUri() {
-
-		return "/";
-
-	}
-
-	/**
-	 * Path to redirect to on error
-	 *
-	 * @return error URI
-	 */
-	public String getErrorUri() {
-
-		return "/";
-
 	}
 
 	protected OAuthResourceResponse getUserResponse(final HttpServletRequest request) {
@@ -422,7 +408,6 @@ public class StructrOAuthClient {
 		if (userResponse != null) {
 
 			return userResponse;
-
 		}
 
 		try {
@@ -440,13 +425,9 @@ public class StructrOAuthClient {
 					    this.parameters.put(accessTokenParameterKey, accessToken);
 					    return this;
 					}
-
 				}
 					.setAccessToken(accessToken)
 					.buildQueryMessage();
-
-				// needed for LinkedIn
-				clientReq.setHeader("x-li-format", "json");
 
 				logger.info("User info request: {}", clientReq.getLocationUri());
 
@@ -456,29 +437,21 @@ public class StructrOAuthClient {
 				logger.info("User info response: {}", userResponse);
 
 				return userResponse;
-
 			}
 
 		} catch (Throwable t) {
 
 			logger.error("Could not get user response", t);
-
 		}
 
 		return null;
-
 	}
 
 	protected String getAbsoluteUrl(final HttpServletRequest request, final String redirectUri) {
-
 		return !(redirectUri.startsWith("http")) ? "http" + (request.isSecure() ? "s" : "") + "://" + request.getServerName() + ":" + request.getServerPort() + redirectUri : redirectUri;
-
 	}
 
 	public ResponseFormat getResponseFormat() {
-
 		return ResponseFormat.json;
-
 	}
-
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -25,19 +25,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-public class ServerLogFunction extends Function<Object, Object> {
+public class ServerLogFunction extends AdvancedScriptingFunction {
 
 	public static final String ERROR_MESSAGE_SERVERLOG = "Usage: ${serverlog([lines=50])}. Example: ${serverlog(200)}";
 	public static final String ERROR_MESSAGE_SERVERLOG_JS = "Usage: ${{Structr.serverlog([n=50])}}. Example: ${{Structr.serverlog(200)}}";
 
 	private static final Logger logger = LoggerFactory.getLogger(ServerLogFunction.class.getName());
 
-
 	@Override
 	public String getName() {
-		return "serverlog()";
+		return "serverlog";
 	}
 
 	@Override
@@ -50,6 +48,22 @@ public class ServerLogFunction extends Function<Object, Object> {
 			lines = ((Number)sources[0]).intValue();
 
 		}
+
+		return getServerLog(lines);
+	}
+
+	@Override
+	public String usage(boolean inJavaScriptContext) {
+		return (inJavaScriptContext ? ERROR_MESSAGE_SERVERLOG_JS : ERROR_MESSAGE_SERVERLOG);
+	}
+
+	@Override
+	public String shortDescription() {
+		return "Returns the last n lines from the server log file";
+	}
+
+	public static String getServerLog(final int numberOfLines) {
+		int lines = numberOfLines;
 
 		try (final ReversedLinesFileReader reader = new ReversedLinesFileReader(getServerlogFile(), Charset.forName("utf-8"))) {
 
@@ -77,13 +91,4 @@ public class ServerLogFunction extends Function<Object, Object> {
 
 	}
 
-	@Override
-	public String usage(boolean inJavaScriptContext) {
-		return (inJavaScriptContext ? ERROR_MESSAGE_SERVERLOG_JS : ERROR_MESSAGE_SERVERLOG);
-	}
-
-	@Override
-	public String shortDescription() {
-		return "Returns the last n lines from the server log file";
-	}
 }

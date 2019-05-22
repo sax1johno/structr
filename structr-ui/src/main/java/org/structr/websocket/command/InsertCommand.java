@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -27,32 +27,26 @@ import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
 import org.structr.core.property.PropertyMap;
 import org.structr.web.entity.dom.DOMNode;
-import org.structr.web.entity.dom.relationship.DOMChildren;
 import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
- * Insert a node as child of the given node
- *
- *
+ * Insert a node as child of the given node.
  */
 public class InsertCommand extends AbstractCommand {
 
 	private static final Logger logger = LoggerFactory.getLogger(InsertCommand.class.getName());
 
-	//~--- methods --------------------------------------------------------
-
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
+
+		setDoTransactionNotifications(true);
 
 		final SecurityContext securityContext = getWebSocket().getSecurityContext();
 		final App app                         = StructrApp.getInstance(securityContext);
 
 		// new node properties
-		final Map<String, Object> properties = webSocketData.getNodeData();
-		String parentId                      = (String) properties.get("id");
+		String parentId                      = webSocketData.getNodeDataStringValue("id");
 		final Map<String, Object> relData    = webSocketData.getRelData();
 
 		if (parentId != null) {
@@ -62,10 +56,10 @@ public class InsertCommand extends AbstractCommand {
 
 			try {
 
-				PropertyMap nodeProperties = PropertyMap.inputTypeToJavaType(securityContext, properties);
+				PropertyMap nodeProperties = PropertyMap.inputTypeToJavaType(securityContext, webSocketData.getNodeData() );
 
 				nodeToInsert = app.create(DOMNode.class, nodeProperties);
-				
+
 			} catch (FrameworkException fex) {
 
 				logger.warn("Could not create node.", fex);
@@ -78,8 +72,8 @@ public class InsertCommand extends AbstractCommand {
 				try {
 
 					PropertyMap relProperties = PropertyMap.inputTypeToJavaType(securityContext, relData);
-					app.create(parentNode, nodeToInsert, DOMChildren.class, relProperties);
-					
+					app.create(parentNode, nodeToInsert, parentNode.getChildLinkType(), relProperties);
+
 				} catch (FrameworkException t) {
 
 					getWebSocket().send(MessageBuilder.status().code(400).message(t.getMessage()).build(), true);
@@ -98,13 +92,8 @@ public class InsertCommand extends AbstractCommand {
 
 	}
 
-	//~--- get methods ----------------------------------------------------
-
 	@Override
 	public String getCommand() {
-
 		return "INSERT";
-
 	}
-
 }

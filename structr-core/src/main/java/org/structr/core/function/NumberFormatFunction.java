@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -21,21 +21,19 @@ package org.structr.core.function;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.Locale;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class NumberFormatFunction extends Function<Object, Object> {
+public class NumberFormatFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_NUMBER_FORMAT    = "Usage: ${number_format(value, ISO639LangCode, pattern)}. Example: ${number_format(12345.6789, 'en', '#,##0.00')}";
 	public static final String ERROR_MESSAGE_NUMBER_FORMAT_JS = "Usage: ${{Structr.numberFormat(value, ISO639LangCode, pattern)}}. Example: ${{Structr.numberFormat(12345.6789, 'en', '#,##0.00')}}";
 
 	@Override
 	public String getName() {
-		return "number_format()";
+		return "number_format";
 	}
 
 	@Override
@@ -46,26 +44,32 @@ public class NumberFormatFunction extends Function<Object, Object> {
 			return usage(ctx.isJavaScriptContext());
 		}
 
-		if (arrayHasLengthAndAllElementsNotNull(sources, 3)) {
+		try {
 
-			try {
+			assertArrayHasLengthAndAllElementsNotNull(sources, 3);
 
-				final Double val = Double.parseDouble(sources[0].toString());
-				final String langCode = sources[1].toString();
-				final String pattern = sources[2].toString();
+			final Double val = Double.parseDouble(sources[0].toString());
+			final String langCode = sources[1].toString();
+			final String pattern = sources[2].toString();
 
-				return new DecimalFormat(pattern, DecimalFormatSymbols.getInstance(Locale.forLanguageTag(langCode))).format(val);
+			return new DecimalFormat(pattern, DecimalFormatSymbols.getInstance(Locale.forLanguageTag(langCode))).format(val);
 
-			} catch (Throwable t) {
+		} catch (ArgumentNullException pe) {
 
-				logException(caller, t, sources);
+			// silently ignore null arguments
+			return "";
 
-			}
+		} catch (ArgumentCountException pe) {
 
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
+			return usage(ctx.isJavaScriptContext());
+
+		} catch (Throwable t) {
+
+			logException(caller, t, sources);
 			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			return "";
 		}
-
-		return "";
 	}
 
 	@Override
@@ -77,5 +81,4 @@ public class NumberFormatFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Formats the given value using the given number format string";
 	}
-
 }

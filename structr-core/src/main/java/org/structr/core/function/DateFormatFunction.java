@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -21,22 +21,20 @@ package org.structr.core.function;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import org.mozilla.javascript.ScriptableObject;
+import org.mozilla.javascript.ScriptRuntime;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class DateFormatFunction extends Function<Object, Object> {
+public class DateFormatFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_DATE_FORMAT    = "Usage: ${date_format(value, pattern)}. Example: ${date_format(this.creationDate, \"yyyy-MM-dd'T'HH:mm:ssZ\")}";
 	public static final String ERROR_MESSAGE_DATE_FORMAT_JS = "Usage: ${{Structr.date_format(value, pattern)}}. Example: ${{Structr.date_format(Structr.get('this').creationDate, \"yyyy-MM-dd'T'HH:mm:ssZ\")}}";
 
 	@Override
 	public String getName() {
-		return "date_format()";
+		return "date_format";
 	}
 
 	@Override
@@ -46,12 +44,10 @@ public class DateFormatFunction extends Function<Object, Object> {
 			logParameterError(caller, sources, ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
 		}
-		
+
 		try {
-			if (!arrayHasLengthAndAllElementsNotNull(sources, 2)) {
-				
-				return "";
-			}
+
+			assertArrayHasLengthAndAllElementsNotNull(sources, 2);
 
 			Date date = null;
 
@@ -63,8 +59,11 @@ public class DateFormatFunction extends Function<Object, Object> {
 
 				date = new Date(((Number)sources[0]).longValue());
 
-			} else if (sources[0] instanceof ScriptableObject) {
-				// FIXME: This was empty - what is it here for?
+			} else if (sources[0].getClass().getName().equals("org.mozilla.javascript.NativeDate")) {
+
+				final Double value = ScriptRuntime.toNumber(sources[0]);
+				date = new Date(value.longValue());
+
 			} else {
 
 				try {
@@ -74,23 +73,23 @@ public class DateFormatFunction extends Function<Object, Object> {
 
 				} catch (ParseException ex) {
 
-					logger.warn("{}: Could not parse string \"{}\" with pattern {} in element \"{}\". Parameters: {}", new Object[] { getName(), sources[0].toString(), "yyyy-MM-dd'T'HH:mm:ssZ", caller, getParametersAsString(sources) });
-					//logException(caller, ex, sources);
+					logger.warn("{}: Could not parse string \"{}\" with pattern {} in element \"{}\". Parameters: {}", new Object[] { getReplacement(), sources[0].toString(), "yyyy-MM-dd'T'HH:mm:ssZ", caller, getParametersAsString(sources) });
 					return sources[0];
-
 				}
-
 			}
 
 			// format with given pattern
 			return new SimpleDateFormat(sources[1].toString(), ctx.getLocale()).format(date);
-			
-		} catch (final IllegalArgumentException e) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+		} catch (ArgumentNullException pe) {
 
+			// silently ignore null arguments
+			return "";
+
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
 			return usage(ctx.isJavaScriptContext());
-
 		}
 	}
 
@@ -103,5 +102,4 @@ public class DateFormatFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Formats the given value as a date string with the given format string";
 	}
-
 }

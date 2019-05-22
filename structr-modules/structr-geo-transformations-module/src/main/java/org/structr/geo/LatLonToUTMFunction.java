@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -27,21 +27,24 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class LatLonToUTMFunction extends Function<Object, Object> {
+public class LatLonToUTMFunction extends GeoFunction {
 
-	private static final String ERROR_MESSAGE = "Usage: ${latLonToUTM(latitude, longitude)}. Example: ${latLonToUTM(41.3445, 7.35)}";
+	private static final String ERROR_MESSAGE = "Usage: ${lat_lon_to_utm(latitude, longitude)}. Example: ${lat_lon_to_utm(41.3445, 7.35)}";
 	private static final Logger logger        = LoggerFactory.getLogger(LatLonToUTMFunction.class.getName());
 	private static final String UTMzdlChars   = "CDEFGHJKLMNPQRSTUVWXX";
 
 	@Override
+	public String getName() {
+		return "lat_lon_to_utm";
+	}
+
+	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
-		if (arrayHasLengthAndAllElementsNotNull(sources, 2)) {
+		try {
+
+			assertArrayHasLengthAndAllElementsNotNull(sources, 2);
 
 			final Double lat = getDoubleOrNull(sources[0]);
 			final Double lon = getDoubleOrNull(sources[1]);
@@ -101,6 +104,12 @@ public class LatLonToUTMFunction extends Function<Object, Object> {
 
 				logger.warn("Invalid argument(s), cannot convert to double: {}, {}", new Object[] { sources[0], sources[1] });
 			}
+
+		} catch (IllegalArgumentException e) {
+
+			boolean isJs = ctx != null ? ctx.isJavaScriptContext() : false;
+			logParameterError(caller, sources, e.getMessage(), isJs);
+			return usage(isJs);
 		}
 
 		return usage(ctx != null ? ctx.isJavaScriptContext() : false);
@@ -114,11 +123,6 @@ public class LatLonToUTMFunction extends Function<Object, Object> {
 	@Override
 	public String shortDescription() {
 		return "Converts the given latitude/longitude coordinates into an UTM string.";
-	}
-
-	@Override
-	public String getName() {
-		return "lat_lon_to_utm";
 	}
 
 	// ----- private methods -----

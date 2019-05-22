@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,7 +19,6 @@
 package org.structr.websocket.command;
 
 import java.io.IOException;
-import java.util.Map;
 import org.structr.common.error.FrameworkException;
 import org.structr.web.common.ImageHelper;
 import org.structr.web.common.ImageHelper.Thumbnail;
@@ -28,12 +27,8 @@ import org.structr.websocket.StructrWebSocket;
 import org.structr.websocket.message.MessageBuilder;
 import org.structr.websocket.message.WebSocketMessage;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
- * Websocket command for image conversion tasks
- *
- *
+ * Websocket command for image conversion tasks.
  */
 public class ImageConverterCommand extends AbstractCommand {
 
@@ -45,20 +40,21 @@ public class ImageConverterCommand extends AbstractCommand {
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
 
+		setDoTransactionNotifications(true);
+
 		final String originalImageId          = webSocketData.getId();
-		final Map<String, Object> properties  = webSocketData.getNodeData();
 		final Image originalImage             = (Image) getNode(originalImageId);
-		
-		final String format = (String) properties.get("format");
-		final int width     = (int) (long) properties.get("width");
-		final int height    = (int) (long) properties.get("height");
-		final int offsetX   = (int) (long) properties.get("offsetX");
-		final int offsetY   = (int) (long) properties.get("offsetY");
+
+		final String format = webSocketData.getNodeDataStringValue("format");
+		final int width     = webSocketData.getNodeDataIntegerValue("width");
+		final int height    = webSocketData.getNodeDataIntegerValue("height");
+		final int offsetX   = webSocketData.getNodeDataIntegerValue("offsetX");
+		final int offsetY   = webSocketData.getNodeDataIntegerValue("offsetY");
 
 		if (originalImage != null) {
 
 			final Thumbnail thumbnailData = ImageHelper.createCroppedImage(originalImage, width, height, offsetX, offsetY, format);
-			
+
 			if (thumbnailData != null) {
 
 				final Integer tnWidth  = thumbnailData.getWidth();
@@ -72,9 +68,9 @@ public class ImageConverterCommand extends AbstractCommand {
 
 					// create image variant
 					final Image imageVariant = ImageHelper.createImageNode(originalImage.getSecurityContext(), data, "image/" + Thumbnail.Format.png, Image.class, thumbnailName, false);
-					
+
 					// store in same parent folder
-					imageVariant.setProperty(Image.parent, originalImage.getProperty(Image.parent));
+					imageVariant.setParent(originalImage.getParent());
 
 				} catch (IOException | FrameworkException ex) {
 
@@ -87,7 +83,7 @@ public class ImageConverterCommand extends AbstractCommand {
 				getWebSocket().send(MessageBuilder.status().code(400).message("Could not create converted image for " + originalImageId).build(), true);
 
 			}
-			
+
 		} else {
 
 			getWebSocket().send(MessageBuilder.status().code(400).message("No id of the original image given").build(), true);

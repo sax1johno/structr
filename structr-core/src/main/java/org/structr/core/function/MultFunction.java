@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,18 +20,14 @@ package org.structr.core.function;
 
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class MultFunction extends Function<Object, Object> {
+public class MultFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_MULT = "Usage: ${mult(value1, value2)}. Example: ${mult(5, 2)}";
 
 	@Override
 	public String getName() {
-		return "mult()";
+		return "mult";
 	}
 
 	@Override
@@ -47,7 +43,6 @@ public class MultFunction extends Function<Object, Object> {
 				if (i == null) {
 
 					return null;
-
 				}
 
 				try {
@@ -59,7 +54,6 @@ public class MultFunction extends Function<Object, Object> {
 					logException(caller, t, sources);
 
 					return t.getMessage();
-
 				}
 			}
 
@@ -70,9 +64,7 @@ public class MultFunction extends Function<Object, Object> {
 		}
 
 		return result;
-
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {
@@ -83,5 +75,4 @@ public class MultFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Multiplies the first argument by the second argument";
 	}
-
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -41,12 +41,18 @@ import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.app.App;
 import org.structr.core.app.StructrApp;
+import org.structr.core.datasources.DataSources;
 import org.structr.core.entity.AbstractSchemaNode;
+import org.structr.core.function.Functions;
 import org.structr.core.graph.NodeAttribute;
 import org.structr.core.graph.Tx;
 import org.structr.core.property.PropertyMap;
+import org.structr.flow.FlowDeploymentHandler;
+import org.structr.flow.datasource.FlowContainerDataSource;
+import org.structr.flow.impl.FlowFunction;
 import org.structr.module.StructrModule;
 import org.structr.module.api.APIBuilder;
+import org.structr.schema.SourceFile;
 import org.structr.schema.action.Actions;
 
 /**
@@ -58,7 +64,16 @@ public class APIBuilderModule implements StructrModule, APIBuilder {
 
 	@Override
 	public void onLoad(final LicenseManager licenseManager) {
-		// check and read configuration..
+
+		final boolean licensed = licenseManager == null || licenseManager.isModuleLicensed(getName());
+
+		DataSources.put(licensed, getName(), "flowDataSource", new FlowContainerDataSource());
+	}
+
+	@Override
+	public void registerModuleFunctions(final LicenseManager licenseManager) {
+
+		Functions.put(licenseManager, new FlowFunction(this));
 	}
 
 	@Override
@@ -77,11 +92,11 @@ public class APIBuilderModule implements StructrModule, APIBuilder {
 	}
 
 	@Override
-	public void insertImportStatements(final AbstractSchemaNode schemaNode, final StringBuilder buf) {
+	public void insertImportStatements(final AbstractSchemaNode schemaNode, final SourceFile buf) {
 	}
 
 	@Override
-	public void insertSourceCode(final AbstractSchemaNode schemaNode, final StringBuilder buf) {
+	public void insertSourceCode(final AbstractSchemaNode schemaNode, final SourceFile buf) {
 	}
 
 	@Override
@@ -90,7 +105,7 @@ public class APIBuilderModule implements StructrModule, APIBuilder {
 	}
 
 	@Override
-	public void insertSaveAction(final AbstractSchemaNode schemaNode, final StringBuilder buf, final Actions.Type type) {
+	public void insertSaveAction(final AbstractSchemaNode schemaNode, final SourceFile buf, final Actions.Type type) {
 	}
 
 	@Override
@@ -113,23 +128,23 @@ public class APIBuilderModule implements StructrModule, APIBuilder {
 				virtualTypes.add(entry);
 
 				entry.put("name",             virtualType.getProperty(VirtualType.name));
-				entry.put("sourceType",       virtualType.getProperty(VirtualType.sourceType));
-				entry.put("position",         virtualType.getProperty(VirtualType.position));
-				entry.put("filterExpression", virtualType.getProperty(VirtualType.filterExpression));
+				entry.put("sourceType",       virtualType.getSourceType());
+				entry.put("position",         virtualType.getPosition());
+				entry.put("filterExpression", virtualType.getFilterExpression());
 
 				final List<Map<String, Object>> properties = new LinkedList();
 				entry.put("properties", properties);
 
-				for (final VirtualProperty virtualProperty : virtualType.getProperty(VirtualType.properties)) {
+				for (final VirtualProperty virtualProperty : virtualType.getVirtualProperties()) {
 
 					final Map<String, Object> virtualPropEntry = new TreeMap<>();
 					properties.add(virtualPropEntry);
 
-					virtualPropEntry.put("sourceName",     virtualProperty.getProperty(VirtualProperty.sourceName));
-					virtualPropEntry.put("targetName",     virtualProperty.getProperty(VirtualProperty.targetName));
-					virtualPropEntry.put("inputFunction",  virtualProperty.getProperty(VirtualProperty.inputFunction));
-					virtualPropEntry.put("outputFunction", virtualProperty.getProperty(VirtualProperty.outputFunction));
-					virtualPropEntry.put("position",       virtualProperty.getProperty(VirtualProperty.position));
+					virtualPropEntry.put("sourceName",     virtualProperty.getSourceName());
+					virtualPropEntry.put("targetName",     virtualProperty.getTargetName());
+					virtualPropEntry.put("inputFunction",  virtualProperty.getInputFunction());
+					virtualPropEntry.put("outputFunction", virtualProperty.getOutputFunction());
+					virtualPropEntry.put("position",       virtualProperty.getPosition());
 
 				}
 			}
@@ -144,6 +159,8 @@ public class APIBuilderModule implements StructrModule, APIBuilder {
 		} catch (IOException ioex) {
 			logger.warn("", ioex);
 		}
+
+		FlowDeploymentHandler.exportDeploymentData(target, gson);
 	}
 
 	@Override
@@ -187,6 +204,8 @@ public class APIBuilderModule implements StructrModule, APIBuilder {
 				logger.warn("", ioex);
 			}
 		}
+
+		FlowDeploymentHandler.importDeploymentData(source, gson);
 	}
 
 	// ----- interface APIBuilder -----
@@ -196,8 +215,8 @@ public class APIBuilderModule implements StructrModule, APIBuilder {
 		try (final Tx tx = app.tx()) {
 
 			final VirtualType type = app.create(VirtualType.class,
-				new NodeAttribute<>(VirtualType.sourceType, sourceType),
-				new NodeAttribute<>(VirtualType.name, targetType)
+				new NodeAttribute<>(StructrApp.key(VirtualType.class, "sourceType"), sourceType),
+				new NodeAttribute<>(StructrApp.key(VirtualType.class, "name"),       targetType)
 			);
 
 			int i = 0;
@@ -208,11 +227,11 @@ public class APIBuilderModule implements StructrModule, APIBuilder {
 				final String targetProperty = entry.getValue();
 
 				app.create(VirtualProperty.class,
-					new NodeAttribute<>(VirtualProperty.virtualType, type),
-					new NodeAttribute<>(VirtualProperty.sourceName, sourceProperty),
-					new NodeAttribute<>(VirtualProperty.targetName, targetProperty),
-					new NodeAttribute<>(VirtualProperty.position, i++),
-					new NodeAttribute<>(VirtualProperty.inputFunction, transforms.get(sourceProperty))
+					new NodeAttribute<>(StructrApp.key(VirtualProperty.class, "virtualType"),   type),
+					new NodeAttribute<>(StructrApp.key(VirtualProperty.class, "sourceName"),    sourceProperty),
+					new NodeAttribute<>(StructrApp.key(VirtualProperty.class, "targetName"),    targetProperty),
+					new NodeAttribute<>(StructrApp.key(VirtualProperty.class, "position"),      i++),
+					new NodeAttribute<>(StructrApp.key(VirtualProperty.class, "inputFunction"), transforms.get(sourceProperty))
 				);
 			}
 
@@ -230,7 +249,7 @@ public class APIBuilderModule implements StructrModule, APIBuilder {
 			final VirtualType type = app.nodeQuery(VirtualType.class).andName(targetType).getFirst();
 			if (type != null) {
 
-				for (final VirtualProperty property : type.getProperty(VirtualType.properties)) {
+				for (final VirtualProperty property : type.getVirtualProperties()) {
 
 					app.delete(property);
 				}

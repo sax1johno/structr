@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -39,6 +39,8 @@ public class InsertBeforeCommand extends AbstractCommand {
 
 	@Override
 	public void processMessage(final WebSocketMessage webSocketData) {
+
+		setDoTransactionNotifications(true);
 
 		final String id                    = webSocketData.getId();
 		final Map<String, Object> nodeData = webSocketData.getNodeData();
@@ -84,7 +86,7 @@ public class InsertBeforeCommand extends AbstractCommand {
 			if (node != null) {
 
 				parentNode.insertBefore(node, refNode);
-				
+
 			}
 		} catch (DOMException dex) {
 

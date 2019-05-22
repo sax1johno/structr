@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -19,26 +19,26 @@
 package org.structr.core.function;
 
 import java.util.Arrays;
+import org.structr.common.error.ArgumentCountException;
+import org.structr.common.error.ArgumentNullException;
 import org.structr.common.error.FrameworkException;
 import org.structr.schema.action.ActionContext;
-import org.structr.schema.action.Function;
 
-/**
- *
- */
-public class SplitRegexFunction extends Function<Object, Object> {
+public class SplitRegexFunction extends CoreFunction {
 
 	public static final String ERROR_MESSAGE_SPLIT_REGEX = "Usage: ${split_regex(value)}. Example: ${split_regex('foo|bar', '|')}";
 
 	@Override
 	public String getName() {
-		return "split_regex()";
+		return "split_regex";
 	}
 
 	@Override
 	public Object apply(final ActionContext ctx, final Object caller, final Object[] sources) throws FrameworkException {
 
-		if (arrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 1, 2)) {
+		try {
+
+			assertArrayHasMinLengthAndMaxLengthAndAllElementsNotNull(sources, 1, 2);
 
 			final String toSplit = sources[0].toString();
 			String splitExpr = "[,;\\s]+";
@@ -46,17 +46,21 @@ public class SplitRegexFunction extends Function<Object, Object> {
 			if (sources.length >= 2) {
 				splitExpr = sources[1].toString();
 			}
-			
+
 			return Arrays.asList(toSplit.split(splitExpr));
 
-		} else {
+		} catch (ArgumentNullException pe) {
 
-			logParameterError(caller, sources, ctx.isJavaScriptContext());
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
+
+		} catch (ArgumentCountException pe) {
+
+			logParameterError(caller, sources, pe.getMessage(), ctx.isJavaScriptContext());
+			return usage(ctx.isJavaScriptContext());
 		}
 
 		return "";
 	}
-
 
 	@Override
 	public String usage(boolean inJavaScriptContext) {
@@ -67,6 +71,4 @@ public class SplitRegexFunction extends Function<Object, Object> {
 	public String shortDescription() {
 		return "Splits the given string by given regex";
 	}
-
-
 }

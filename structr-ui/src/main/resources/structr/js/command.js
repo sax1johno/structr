@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -26,16 +26,13 @@ var Command = {
 	/**
 	 * Send the LOGIN command to the server.
 	 */
-	login: function(username, password) {
+	login: function(data) {
 		var obj = {
 			command: 'LOGIN',
 			sessionId: Structr.getSessionId(),
-			data: {
-				username: username,
-				password: password
-			}
+			data: data
 		};
-		_Logger.log(_LogType.WS[obj.command], 'login()' + username + ' with ' + password);
+		_Logger.log(_LogType.WS[obj.command], 'login() with ' + JSON.stringify(data));
 		return sendObj(obj);
 	},
 	/**
@@ -67,10 +64,10 @@ var Command = {
 	 * Send a single GET command to the server.
 	 *
 	 * The server will return a list containing a single node with the given id to the sending client (no broadcast).
-	 * The returned properties can be customized vai the `properties` paramter. A comma-separated list of propertynames can be supplied.
+	 * The returned properties can be customized via the `properties` parameter. A comma-separated list of property names can be supplied.
 	 * If null is provided, all properties are returned.
 	 */
-	get: function(id, properties, callback) {
+	get: function(id, properties, callback, view) {
 		var obj = {
 			command: 'GET',
 			id: id
@@ -79,6 +76,9 @@ var Command = {
 			obj.data = {
 				properties: properties
 			};
+		}
+		if (view) {
+			obj.view = view;
 		}
 		_Logger.log(_LogType.WS[obj.command], 'get()', obj, callback);
 		return sendObj(obj, callback);
@@ -89,11 +89,12 @@ var Command = {
 	 * The server will return the result returned from the underlying
 	 * console infrastructure to the sending client (no broadcast).
 	 */
-	console: function(line, callback, completion) {
+	console: function(line, mode, callback, completion) {
 		var obj = {
 			command: 'CONSOLE',
 			data: {
 				line: line,
+				mode: mode,
 				completion: (completion === true ? true : false)
 			}
 		};
@@ -115,9 +116,7 @@ var Command = {
 			}
 		};
 		if (properties !== null) {
-			obj.data = {
-				properties: properties
-			};
+			obj.data.properties = properties
 		}
 		_Logger.log(_LogType.WS[obj.command], 'getRelationship()', obj, callback);
 		return sendObj(obj, callback);
@@ -129,12 +128,12 @@ var Command = {
 	 *
 	 * The optional callback function will be executed for each node in the result set.
 	 */
-	getByType: function(type, pageSize, page, sort, order, properties, includeDeletedAndHidden, callback) {
+	getByType: function(type, pageSize, page, sort, order, properties, includeHidden, callback) {
 		var obj = {
 			command: 'GET_BY_TYPE',
 			data: {
 				type: type,
-				includeDeletedAndHidden: includeDeletedAndHidden
+				includeHidden: includeHidden
 			}
 		};
 		if (pageSize) obj.pageSize = pageSize;
@@ -182,7 +181,7 @@ var Command = {
 	 * The server will return a result set containing all items of the given
 	 * type which are not children of another node to the sending client (no broadcast).
 	 *
-	 * The optional callback function will be executed for each node in the result set.
+	 * The optional callback function will be executed with the result set as parameter.
 	 */
 	list: function(type, rootOnly, pageSize, page, sort, order, properties, callback) {
 		var obj = {
@@ -206,9 +205,9 @@ var Command = {
 	 * The server will return a result set containing all query results that match the
 	 * given type and property values.
 	 *
-	 * The optional callback function will be executed for each node in the result set.
+	 * The optional callback function will be executed with the result set as parameter.
 	 */
-	query: function(type, pageSize, page, sort, order, properties, callback, exact, view) {
+	query: function(type, pageSize, page, sort, order, properties, callback, exact, view, customView) {
 		var obj = {
 			command: 'QUERY',
 			pageSize: pageSize,
@@ -222,6 +221,7 @@ var Command = {
 		if (properties) obj.data.properties = JSON.stringify(properties);
 		if (exact !== null) obj.data.exact = exact;
 		if (view) obj.view = view;
+		if (customView) obj.data.customView = customView;
 		_Logger.log(_LogType.WS[obj.command], 'query()', obj, callback);
 		return sendObj(obj, callback);
 	},
@@ -231,7 +231,7 @@ var Command = {
 	 * The server will return a result set containing all children of the
 	 * node with the given id to the sending client (no broadcast).
 	 *
-	 * The optional callback function will be executed for each node in the result set.
+	 * The optional callback function will be executed with the result set as parameter.
 	 */
 	children: function(id, callback) {
 		var obj = {
@@ -264,22 +264,6 @@ var Command = {
 			}
 		};
 		_Logger.log(_LogType.WS[obj.command], 'getProperty()', obj, callback);
-		return sendObj(obj, callback);
-	},
-	/**
-	 * Send a GET_PROPERTIES command to the server.
-	 *
-	 * The server will return the properties for the node with the given id.
-	 */
-	getProperties: function(id, properties, callback) {
-		var obj = {
-			command: 'GET_PROPERTIES',
-			id: id,
-			data: {
-				properties: properties
-			}
-		};
-		_Logger.log(_LogType.WS[obj.command], 'getProperties()', obj, callback);
 		return sendObj(obj, callback);
 	},
 	/**
@@ -343,7 +327,7 @@ var Command = {
 	 * The server will delete the node with the given id and broadcast
 	 * a deletion notification.
 	 */
-	deleteNode: function(id, recursive) {
+	deleteNode: function(id, recursive, callback) {
 		var obj = {
 			command: 'DELETE',
 			id: id,
@@ -351,7 +335,7 @@ var Command = {
 		};
 		if (recursive) obj.data.recursive = recursive;
 		_Logger.log(_LogType.WS[obj.command], 'deleteNode()', obj);
-		return sendObj(obj);
+		return sendObj(obj, callback);
 	},
 	/**
 	 * Send a DELETE_NODES command to the server.
@@ -409,14 +393,14 @@ var Command = {
 	 * The server will remove the node from the
 	 * tree and broadcast a removal notification.
 	 */
-	removeChild: function(id) {
+	removeChild: function(id, callback) {
 		var obj = {
 			command: 'REMOVE',
 			id: id,
 			data: {}
 		};
-		_Logger.log(_LogType.WS[obj.command], 'removeChild()', obj);
-		return sendObj(obj);
+		_Logger.log(_LogType.WS[obj.command], 'removeChild()', obj, callback);
+		return sendObj(obj, callback);
 	},
 	/**
 	 * Send a REMOVE_FROM_COLLECTION command to the server.
@@ -546,21 +530,21 @@ var Command = {
 		return sendObj(obj, callback);
 	},
 	/**
-	 * Send an APPEND_USER command to the server.
+	 * Send an APPEND_MEMBER command to the server.
 	 *
-	 * The server will append the user node with the given id
+	 * The server will append the user or group node with the given id
 	 * as child of the parent group node with the given group id.
 	 *
 	 */
-	appendUser: function(id, groupId) {
+	appendMember: function(id, groupId) {
 		var obj = {
-			command: 'APPEND_USER',
+			command: 'APPEND_MEMBER',
 			id: id,
 			data: {
 				parentId: groupId
 			}
 		};
-		_Logger.log(_LogType.WS[obj.command], 'appendUser()', obj);
+		_Logger.log(_LogType.WS[obj.command], 'appendMember()', obj);
 		return sendObj(obj);
 	},
 	/**
@@ -574,7 +558,7 @@ var Command = {
 	 * to the new one.
 	 *
 	 */
-	appendChild: function(id, parentId, key) {
+	appendChild: function(id, parentId, key, callback) {
 		var obj = {
 			command: 'APPEND_CHILD',
 			id: id,
@@ -584,7 +568,7 @@ var Command = {
 			}
 		};
 		_Logger.log(_LogType.WS[obj.command], 'appendChild()', obj, key);
-		return sendObj(obj);
+		return sendObj(obj, callback);
 	},
 	/**
 	 * Send an APPEND_WIDGET command to the server.
@@ -760,7 +744,7 @@ var Command = {
 	 * and append it to a the parent with given parentId.
 	 *
 	 */
-	cloneComponent: function(id, parentId) {
+	cloneComponent: function(id, parentId, callback) {
 		var obj = {
 			command: 'CLONE_COMPONENT',
 			id: id,
@@ -769,7 +753,25 @@ var Command = {
 			}
 		};
 		_Logger.log(_LogType.WS[obj.command], 'cloneComponent()', obj);
-		return sendObj(obj);
+		return sendObj(obj, callback);
+	},
+	/**
+	 * Send a REPLACE_TEMPLATE command to the server.
+	 *
+	 * The server will replace the template node with the given id
+	 * with the template node with given newTemplateId.
+	 *
+	 */
+	replaceTemplate: function(id, newTemplateId, callback) {
+		var obj = {
+			command: 'REPLACE_TEMPLATE',
+			id: id,
+			data: {
+				newTemplateId: newTemplateId
+			}
+		};
+		_Logger.log(_LogType.WS[obj.command], 'replaceTemplate()', obj);
+		return sendObj(obj, callback);
 	},
 	/**
 	 * Send a CREATE_LOCAL_WIDGET command to the server.
@@ -927,7 +929,7 @@ var Command = {
 	 * The server will broadcast CREATE and ADD notifications for each
 	 * node respective relationship created.
 	 */
-	importPage: function(code, address, name, publicVisible, authVisible, processDeploymentInfo) {
+	importPage: function(code, address, name, publicVisible, authVisible, includeInExport, processDeploymentInfo) {
 		var obj = {
 			command: 'IMPORT',
 			data: {
@@ -936,6 +938,7 @@ var Command = {
 				name: name,
 				publicVisible: publicVisible,
 				authVisible: authVisible,
+				includeInExport: includeInExport,
 				processDeploymentInfo: processDeploymentInfo
 			}
 		};
@@ -1076,103 +1079,6 @@ var Command = {
 		return sendObj(obj);
 	},
 	/**
-	 * Send a PUSH command to the server.
-	 *
-	 * The server will establish a socket connection to the post on the given
-	 * port, authenticate with given username and password, and push the node
-	 * with the given id to the server.
-	 *
-	 * The server gives no feedback on a LINK command.
-	 */
-	push: function(id, host, port, username, password, key, recursive) {
-		var obj = {
-			command: 'PUSH',
-			id: id,
-			data: {
-				host: host,
-				port: port,
-				username: username,
-				password: password,
-				key: key,
-				recursive: recursive
-			}
-		};
-		_Logger.log(_LogType.WS[obj.command], 'push()', obj);
-		return sendObj(obj);
-	},
-	/**
-	 * Send a PUSH_SCHEMA command to the server.
-	 *
-	 * The server will establish a socket connection to the post on the given
-	 * port, authenticate with given username and password, and push the node
-	 * with the given id to the server.
-	 *
-	 * The server gives no feedback on a LINK command.
-	 */
-	pushSchema: function(host, port, username, password, key, callback) {
-		var obj = {
-			command: 'PUSH_SCHEMA',
-			data: {
-				host: host,
-				port: port,
-				username: username,
-				password: password,
-				key: key
-			}
-		};
-		_Logger.log(_LogType.WS[obj.command], 'push_schema()', obj);
-		return sendObj(obj, callback);
-	},
-	/**
-	 * Send a PULL command to the server.
-	 *
-	 * The server will establish a socket connection to the post on the given
-	 * port, authenticate with given username and password, and pull the node
-	 * with the given id from the server.
-	 *
-	 * The server gives no feedback on a LINK command.
-	 */
-	pull: function(id, host, port, username, password, key, recursive, callback) {
-		var obj = {
-			command: 'PULL',
-			id: id,
-			data: {
-				host: host,
-				port: port,
-				username: username,
-				password: password,
-				key: key,
-				recursive: recursive
-			}
-		};
-		_Logger.log(_LogType.WS[obj.command], 'pull()', obj);
-		return sendObj(obj, callback);
-	},
-	/**
-	 * Send a LIST_SYNCABLES command to the server.
-	 *
-	 * The server will establish a socket connection to the post on the given
-	 * port, authenticate with given username and password, and pull the node
-	 * with the given id from the server.
-	 *
-	 * The server gives no feedback on a LINK command.
-	 */
-	listSyncables: function(host, port, username, password, key, type, callback) {
-		var obj = {
-			command: 'LIST_SYNCABLES',
-			data: {
-				host: host,
-				port: port,
-				username: username,
-				password: password,
-				key: key,
-				type: type
-			}
-		};
-		_Logger.log(_LogType.WS[obj.command], 'list_syncables()', obj);
-		return sendObj(obj, callback);
-	},
-	/**
 	 * Send a LIST_ACTIVE_ELEMENTS command to the server.
 	 *
 	 * The server will return a result set containing all active elements
@@ -1186,6 +1092,17 @@ var Command = {
 			id: pageId
 		};
 		_Logger.log(_LogType.WS[obj.command], 'list_active_elements()', obj);
+		return sendObj(obj, callback);
+	},
+	listLocalizations: function(pageId, locale, detailObjectId, callback) {
+		var obj = {
+			command: 'LIST_LOCALIZATIONS',
+			id: pageId,
+			data: {
+				locale: locale,
+				detailObjectId: detailObjectId
+			}
+		};
 		return sendObj(obj, callback);
 	},
 	/**
@@ -1281,7 +1198,7 @@ var Command = {
 	 *
 	 * No broadcast.
 	 */
-	autocomplete: function(id, type, currentToken, previousToken, thirdToken, line, cursorPosition, callback) {
+	autocomplete: function(id, type, currentToken, previousToken, thirdToken, line, cursorPosition, contentType, callback) {
 		var obj  = {
 			command: 'AUTOCOMPLETE',
 			id: id,
@@ -1296,43 +1213,6 @@ var Command = {
 			}
 		};
 		_Logger.log(_LogType.WS[obj.command], 'autocomplete()', obj, callback);
-		return sendObj(obj, callback);
-	},
-	/**
-	 * Send a WEBAPPDATA command to the server.
-	 *
-	 * The server will return the stored data items
-	 */
-	appData: function(mode, category, name, value, callback) {
-		var obj  = {
-			command: 'WEBAPPDATA',
-			data: {
-				category: category,
-				mode: mode,
-				name: name
-			}
-		};
-		if (value && value.length) {
-			obj.data.value = value;
-		}
-		return sendObj(obj, callback);
-	},
-	/**
-	 * Send a LAYOUTS command to the server.
-	 *
-	 * The server will return the stored layout filenames
-	 */
-	layouts: function(mode, name, schemaLayout, callback) {
-		var obj  = {
-			command: 'LAYOUTS',
-			data: {
-				mode: mode,
-				name: name
-			}
-		};
-		if (schemaLayout && schemaLayout.length) {
-			obj.data.schemaLayout = schemaLayout;
-		}
 		return sendObj(obj, callback);
 	},
 	/**
@@ -1397,5 +1277,103 @@ var Command = {
 			}
 		};
 		return sendObj(obj, callback);
-	}
+	},
+	/**
+	 * Shortcut to create an ApplicationConfigurationDataNode
+	 */
+	createApplicationConfigurationDataNode: function(configType, name, content, callback) {
+		Command.create({
+			type: 'ApplicationConfigurationDataNode',
+			name: name,
+			configType: configType,
+			content: content
+		}, callback);
+	},
+	/**
+	 * Shortcut to get all ApplicationConfigurationDataNodes for a specific configType
+	 */
+	getApplicationConfigurationDataNodes: function(configType, customView, callback) {
+		return Command.query('ApplicationConfigurationDataNode', 1000, 1, 'name', true, { configType: configType }, callback, true, null, customView);
+	},
+	/**
+	 * Shortcut to get all ApplicationConfigurationDataNodes for a specific configType grouped by user
+	 */
+	getApplicationConfigurationDataNodesGroupedByUser: function(configType, callback) {
+		return Command.query('ApplicationConfigurationDataNode', 1000, 1, 'name', true, { configType: configType }, function(data) {
+
+			var grouped = {};
+			var ownerlessConfigs = [];
+
+			data.forEach(function(n) {
+				if (n.owner) {
+					if (!grouped[n.owner.name]) {
+						grouped[n.owner.name] = [];
+					}
+					grouped[n.owner.name].push(n);
+				} else {
+					ownerlessConfigs.push(n);
+				}
+			});
+
+			var ownerNames = Object.keys(grouped);
+
+			// sort by name
+			ownerNames.sort(function (a, b) {
+				if (a > b) { return 1; }
+				if (a < b) { return -1; }
+				return 0;
+			});
+
+			var sortedAndGrouped = [];
+
+			// add current users config first
+			var myIndex = ownerNames.indexOf(me.username);
+			if (myIndex !== -1) {
+				ownerNames.splice(myIndex,1);
+
+				sortedAndGrouped.push({
+					ownerName: me.username,
+					configs: grouped[me.username]
+				});
+			}
+
+			// add ownerless configs
+			if (ownerlessConfigs.length > 0) {
+				sortedAndGrouped.push({
+					ownerName: 'Layouts without owner',
+					configs: ownerlessConfigs
+				});
+			}
+
+			// add the other configs grouped by owner and sorted by ownername
+			ownerNames.forEach(function (on) {
+				sortedAndGrouped.push({
+					ownerName: on,
+					configs: grouped[on]
+				});
+			});
+
+			callback(sortedAndGrouped);
+
+		}, true, null, 'id,name,owner');
+	},
+	/**
+	 * Shortcut to get a single ApplicationConfigurationDataNode
+	 */
+	getApplicationConfigurationDataNode: function(id, callback) {
+		return Command.get(id, 'content', callback);
+	},
+	/**
+     * Requests log snapshot from the server.
+     *
+     */
+    getServerLogSnapshot: function(numberOfLines, callback) {
+        var obj  = {
+            command: 'SERVER_LOG',
+            data: {
+                numberOfLines: numberOfLines
+            }
+        };
+        return sendObj(obj, callback);
+    }
 };

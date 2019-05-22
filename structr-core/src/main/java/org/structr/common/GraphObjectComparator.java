@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,18 +18,12 @@
  */
 package org.structr.common;
 
-import java.util.Collections;
 import java.util.Comparator;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.ViewTransformation;
 import org.structr.core.entity.AbstractNode;
 import org.structr.core.property.PropertyKey;
-
-//~--- classes ----------------------------------------------------------------
 
 /**
  * A comparator for structr entities that uses a given property key and sort
@@ -37,21 +31,15 @@ import org.structr.core.property.PropertyKey;
  *
  * Properties with null values (not existing properties) are always handled
  * as "lower than", so that any not-null value ranks higher.
- *
- *
  */
-public class GraphObjectComparator extends ViewTransformation<GraphObject> implements Comparator<GraphObject> {
+public class GraphObjectComparator implements Comparator<GraphObject> {
 
 	public static final String ASCENDING  = "asc";
 	public static final String DESCENDING = "desc";
 	private static final Logger logger    = LoggerFactory.getLogger(GraphObjectComparator.class.getName());
 
-	//~--- fields ---------------------------------------------------------
-
 	private PropertyKey sortKey;
 	private String sortOrder;
-
-	//~--- constructors ---------------------------------------------------
 
 	/**
 	 * Creates a new GraphObjectComparator with the given sort key and order.
@@ -67,8 +55,6 @@ public class GraphObjectComparator extends ViewTransformation<GraphObject> imple
 		this.sortKey   = sortKey;
 		this.sortOrder = sortOrder;
 	}
-
-	//~--- methods --------------------------------------------------------
 
 	@Override
 	public int compare(GraphObject n1, GraphObject n2) {
@@ -126,20 +112,5 @@ public class GraphObjectComparator extends ViewTransformation<GraphObject> imple
 		}
 
 		return 0;
-	}
-
-	@Override
-	public void apply(SecurityContext securityContext, List<GraphObject> obj) throws FrameworkException {
-		Collections.sort(obj, this);
-	}
-
-	@Override
-	public int getOrder() {
-		return 998;
-	}
-
-	@Override
-	public boolean evaluateWrappedResource() {
-		return true;
 	}
 }

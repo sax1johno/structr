@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,10 +18,10 @@
  */
 package org.structr.api.service;
 
+import org.structr.api.config.Settings;
+
 /**
  * The base class for services in structr.
- *
- *
  */
 public interface Service extends Feature {
 
@@ -44,7 +44,7 @@ public interface Service extends Feature {
 	 * @throws InstantiationException
 	 * @throws IllegalAccessException
 	 *
-	 * @returns whether the service was initialized successfully
+	 * @return a boolean indicating whether the service was initialized successfully
 	 */
 	boolean initialize(final StructrServices services) throws ClassNotFoundException, InstantiationException, IllegalAccessException;
 
@@ -75,7 +75,20 @@ public interface Service extends Feature {
 	 * Return true if Service is vital for the start of Structr. The failure
 	 * of vital services will stop Structr from starting and display an
 	 * appropriate error message.
-	 * @return a boolean
+	 * @return a boolean indicating whether the service is vital for startup
 	 */
 	boolean isVital();
+
+	/**
+	 * @return a boolean indicating whether the system should wait for this service to start and retry
+	 */
+	boolean waitAndRetry();
+
+	default int getRetryCount() {
+		return Settings.ServicesStartRetries.getValue(10);
+	}
+
+	default int getRetryDelay() {
+		return Settings.ServicesStartTimeout.getValue(30);
+	}
 }

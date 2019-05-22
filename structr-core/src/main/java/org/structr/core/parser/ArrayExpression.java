@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -20,8 +20,9 @@ package org.structr.core.parser;
 
 import java.util.Collection;
 import org.apache.commons.collections.CollectionUtils;
+import org.structr.api.util.Iterables;
 import org.structr.common.error.FrameworkException;
-import org.structr.common.error.UnlicensedException;
+import org.structr.common.error.UnlicensedScriptException;
 import org.structr.core.GraphObject;
 import org.structr.schema.action.ActionContext;
 
@@ -59,7 +60,7 @@ public class ArrayExpression extends Expression {
 	}
 
 	@Override
-	public Object evaluate(final ActionContext ctx, final GraphObject entity) throws FrameworkException, UnlicensedException {
+	public Object evaluate(final ActionContext ctx, final GraphObject entity) throws FrameworkException, UnlicensedScriptException {
 
 		switch (expressions.size()) {
 
@@ -78,7 +79,7 @@ public class ArrayExpression extends Expression {
 	}
 
 	@Override
-	public Object transform(final ActionContext ctx, final GraphObject entity, final Object value) throws FrameworkException, UnlicensedException {
+	public Object transform(final ActionContext ctx, final GraphObject entity, final Object value) throws FrameworkException, UnlicensedScriptException {
 
 		if (value == null) {
 			return null;
@@ -93,6 +94,14 @@ public class ArrayExpression extends Expression {
 
 					// silently ignore array index errors
 					return CollectionUtils.get(value, index);
+
+				} catch (Throwable t) {}
+
+			} else if (value instanceof Iterable) {
+
+				try {
+
+					return Iterables.nth((Iterable)value, index);
 
 				} catch (Throwable t) {}
 

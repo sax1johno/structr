@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -26,8 +26,6 @@ import org.structr.core.graph.Factory;
 import org.structr.core.graph.NodeFactory;
 import org.structr.core.graph.NodeInterface;
 
-//~--- classes ----------------------------------------------------------------
-
 /**
  * Search for nodes by their attributes.
  * <p>
@@ -49,8 +47,8 @@ import org.structr.core.graph.NodeInterface;
 public class SearchNodeCommand<T extends NodeInterface> extends SearchCommand<Node, T> {
 
 	@Override
-	public Factory<Node, T> getFactory(SecurityContext securityContext, boolean includeDeletedAndHidden, boolean publicOnly, int pageSize, int page) {
-		return new NodeFactory(securityContext, includeDeletedAndHidden, publicOnly, pageSize, page);
+	public Factory<Node, T> getFactory(SecurityContext securityContext, boolean includeHidden, boolean publicOnly, int pageSize, int page) {
+		return new NodeFactory(securityContext, includeHidden, publicOnly, pageSize, page);
 	}
 
 	@Override

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -33,8 +33,8 @@ import org.structr.core.graph.RelationshipInterface;
 public class SearchRelationshipCommand<T extends RelationshipInterface> extends SearchCommand<Relationship, T> {
 
 	@Override
-	public Factory<Relationship, T> getFactory(SecurityContext securityContext, boolean includeDeletedAndHidden, boolean publicOnly, int pageSize, int page) {
-		return new RelationshipFactory(securityContext, includeDeletedAndHidden, publicOnly, pageSize, page);
+	public Factory<Relationship, T> getFactory(SecurityContext securityContext, boolean includeHidden, boolean publicOnly, int pageSize, int page) {
+		return new RelationshipFactory(securityContext, includeHidden, publicOnly, pageSize, page);
 	}
 
 	@Override

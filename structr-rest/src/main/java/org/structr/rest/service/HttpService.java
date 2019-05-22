@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -22,12 +22,14 @@ import ch.qos.logback.access.jetty.RequestLogImpl;
 import ch.qos.logback.access.servlet.TeeFilter;
 import java.io.File;
 import java.io.IOException;
+import java.security.SecureRandom;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import javax.servlet.DispatcherType;
 import javax.servlet.http.HttpServlet;
@@ -44,11 +46,11 @@ import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.server.SessionIdManager;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.server.handler.DefaultHandler;
+import org.eclipse.jetty.server.handler.ErrorHandler;
 import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.server.handler.RequestLogHandler;
 import org.eclipse.jetty.server.handler.ResourceHandler;
@@ -69,15 +71,19 @@ import org.structr.api.config.Settings;
 import org.structr.api.service.Command;
 import org.structr.api.service.LicenseManager;
 import org.structr.api.service.RunnableService;
+import org.structr.api.service.ServiceDependency;
 import org.structr.api.service.StructrServices;
 import org.structr.core.Services;
 import org.structr.rest.ResourceProvider;
+import org.structr.rest.auth.SessionHelper;
+import org.structr.schema.SchemaService;
 import org.tuckey.web.filters.urlrewrite.UrlRewriteFilter;
 
 /**
  *
  *
  */
+@ServiceDependency(SchemaService.class)
 public class HttpService implements RunnableService {
 
 	private static final Logger logger = LoggerFactory.getLogger(HttpService.class.getName());
@@ -209,10 +215,14 @@ public class HttpService implements RunnableService {
 		contexts.addHandler(new DefaultHandler());
 
 		final ServletContextHandler servletContext = new ServletContextHandler(server, contextPath, true, true);
+		final ErrorHandler errorHandler = new ErrorHandler();
+
+		errorHandler.setShowStacks(false);
+		servletContext.setErrorHandler(errorHandler);
 
 		if (enableGzipCompression) {
 			gzipHandler = new GzipHandler();
-			gzipHandler.setIncludedMimeTypes("text/html", "text/plain", "text/css", "text/javascript", "application/json");
+			gzipHandler.setIncludedMimeTypes("text/html", "text/xml", "text/plain", "text/css", "text/javascript", "application/javascript", "application/json", "image/svg+xml");
 			gzipHandler.setInflateBufferSize(32768);
 			gzipHandler.setMinGzipSize(256);
 			gzipHandler.setCompressionLevel(9);
@@ -222,7 +232,7 @@ public class HttpService implements RunnableService {
 		}
 
 		servletContext.setGzipHandler(gzipHandler);
-		
+
 		final List<Connector> connectors = new LinkedList<>();
 
 		// create resource collection from base path & source JAR
@@ -266,26 +276,36 @@ public class HttpService implements RunnableService {
 		}
 
 		sessionCache = new DefaultSessionCache(servletContext.getSessionHandler());
-		
+
 		if (licenseManager != null) {
-			
+
 			final String hardwareId = licenseManager.getHardwareFingerprint();
-			
-			DefaultSessionIdManager idManager = new DefaultSessionIdManager(server);
+
+			DefaultSessionIdManager idManager = new DefaultSessionIdManager(server, new SecureRandom(hardwareId.getBytes()));
 			idManager.setWorkerName(hardwareId);
-			
+
 			sessionCache.getSessionHandler().setSessionIdManager(idManager);
 			
+			if (Settings.HttpOnly.getValue()) {
+				sessionCache.getSessionHandler().setHttpOnly(isTest);
+			}
+
+		}
+
+		if (Settings.ClearSessionsOnStartup.getValue()) {
+			SessionHelper.clearAllSessions();
 		}
 		
 		final StructrSessionDataStore sessionDataStore = new StructrSessionDataStore();
-		//sessionDataStore.setSavePeriodSec(60);
-	
+		//final FileSessionDataStore store = new FileSessionDataStore();
+		//store.setStoreDir(baseDir.toPath().resolve("sessions").toFile());
+
 		sessionCache.setSessionDataStore(sessionDataStore);
-		//sessionCache.setSaveOnCreate(true);
 		sessionCache.setSaveOnInactiveEviction(false);
 		sessionCache.setRemoveUnloadableSessions(true);
+		sessionCache.setEvictionPolicy(60);
 
+		servletContext.getSessionHandler().setMaxInactiveInterval(maxIdleTime);
 		servletContext.getSessionHandler().setSessionCache(sessionCache);
 
 		if (enableRewriteFilter) {
@@ -356,6 +376,8 @@ public class HttpService implements RunnableService {
 
 			final RequestLogImpl requestLog = new RequestLogImpl();
 			requestLog.setName("REQUESTLOG");
+			requestLog.start();
+
 			requestLogHandler.setRequestLog(requestLog);
 
 			final HandlerCollection handlers = new HandlerCollection();
@@ -424,15 +446,42 @@ public class HttpService implements RunnableService {
 				sslContextFactory.setKeyStorePath(keyStorePath);
 				sslContextFactory.setKeyStorePassword(keyStorePassword);
 
+				String excludedProtocols = Settings.excludedProtocols.getValue();
+				String includedProtocols = Settings.includedProtocols.getValue();
+				String disabledCiphers = Settings.disabledCipherSuites.getValue();
+
+				if (disabledCiphers.length() > 0) {
+					disabledCiphers = disabledCiphers.replaceAll("\\s+", "");
+					sslContextFactory.setExcludeCipherSuites(disabledCiphers.split(","));
+				}
+
+				if (excludedProtocols.length() > 0) {
+					excludedProtocols = excludedProtocols.replaceAll("\\s+", "");
+					sslContextFactory.setExcludeProtocols(excludedProtocols.split(","));
+				}
+
+				if (includedProtocols.length() > 0) {
+					includedProtocols = includedProtocols.replaceAll("\\s+", "");
+					sslContextFactory.setIncludeProtocols(includedProtocols.split(","));
+				}
+
 				final ServerConnector https = new ServerConnector(server,
 					new SslConnectionFactory(sslContextFactory, "http/1.1"),
 					new HttpConnectionFactory(httpsConfig));
 
+				if (Settings.ForceHttps.getValue()) {
+					sessionCache.getSessionHandler().setSecureRequestOnly(true);
+				}
+				
 				https.setPort(httpsPort);
 				https.setIdleTimeout(500000);
 
 				https.setHost(host);
 				https.setPort(httpsPort);
+
+				if (Settings.dumpJettyStartupConfig.getValue()) {
+					logger.info(https.dump());
+				}
 
 				connectors.add(https);
 
@@ -468,10 +517,15 @@ public class HttpService implements RunnableService {
 	@Override
 	public void shutdown() {
 
+		
 		if (server != null) {
 
 			try {
 				server.stop();
+
+				if (Settings.ClearSessionsOnShutdown.getValue()) {
+					SessionHelper.clearAllSessions();
+				}
 
 			} catch (Exception ex) {
 
@@ -491,6 +545,11 @@ public class HttpService implements RunnableService {
 	@Override
 	public boolean isVital() {
 		return true;
+	}
+
+	@Override
+	public boolean waitAndRetry() {
+		return false;
 	}
 
 	// ----- interface Feature -----
@@ -591,7 +650,11 @@ public class HttpService implements RunnableService {
 									// check license for servlet
 									if (licenseManager == null || licenseManager.isValid(httpServiceServlet)) {
 
-										httpServiceServlet.getConfig().initializeFromSettings(servletName, resourceProviders);
+										final StructrHttpServiceConfig cfg = httpServiceServlet.getConfig();
+										if (cfg != null) {
+
+											cfg.initializeFromSettings(servletName, resourceProviders);
+										}
 
 										if (servletPath.endsWith("*")) {
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,12 +18,22 @@
  */
 package org.structr.rest.resource;
 
+import java.util.Arrays;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import org.structr.api.util.PagingIterable;
+import org.structr.api.util.ResultStream;
+import org.structr.common.Permission;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.Result;
+import org.structr.core.app.App;
+import org.structr.core.app.StructrApp;
+import org.structr.core.entity.GenericNode;
+import org.structr.core.graph.NodeInterface;
+import org.structr.core.graph.RelationshipInterface;
+import org.structr.core.graph.Tx;
 import org.structr.core.graph.search.SearchCommand;
 import org.structr.core.property.PropertyKey;
 import org.structr.rest.RestMethodResult;
@@ -59,8 +69,8 @@ public class TypedIdResource extends FilterableResource {
 	}
 
 	@Override
-	public Result doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
-		return new Result(getEntity(), isPrimitiveArray());
+	public ResultStream doGet(PropertyKey sortKey, boolean sortDescending, int pageSize, int page) throws FrameworkException {
+		return new PagingIterable<>(Arrays.asList(getEntity()));
 	}
 
 	@Override
@@ -130,11 +140,45 @@ public class TypedIdResource extends FilterableResource {
 			final String type       = SchemaHelper.normalizeEntityName(typeResource.getRawType());
 			final String entityType = entity.getClass().getSimpleName();
 
-			if (SearchCommand.getAllSubtypesAsStringSet(type).contains(entityType)) {
+			if (GenericNode.class.equals(entity.getClass()) || SearchCommand.getAllSubtypesAsStringSet(type).contains(entityType)) {
 				return entity;
 			}
 		}
 
 		throw new NotFoundException("Entity with ID " + idResource.getUuid() + " not found");
+	}
+
+	@Override
+	public RestMethodResult doDelete() throws FrameworkException {
+
+		final App app = StructrApp.getInstance(securityContext);
+
+		try (final Tx tx = app.tx(false, false, false)) {
+
+			final GraphObject obj = getEntity();
+
+			if (obj.isNode()) {
+
+				final NodeInterface node = (NodeInterface)obj;
+
+				if (!node.isGranted(Permission.delete, securityContext)) {
+
+					return new RestMethodResult(HttpServletResponse.SC_FORBIDDEN);
+
+				} else {
+
+					app.delete(node);
+
+				}
+
+			} else {
+
+				app.delete((RelationshipInterface) obj);
+			}
+
+			tx.success();
+		}
+
+		return new RestMethodResult(HttpServletResponse.SC_OK);
 	}
 }

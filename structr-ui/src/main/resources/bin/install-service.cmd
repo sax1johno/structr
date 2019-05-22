@@ -1,0 +1,15 @@
+commons-daemon\amd64\prunsrv //IS//Structr --DisplayName="Structr" ^
+	--Install="%CD%\commons-daemon\amd64\prunsrv.exe" ^
+	--Startup=auto ^
+	--StartPath="%CD%\.." ^
+	--Classpath="lib\*" ^
+	--JavaHome="%CD%\..\jdk1.8.0_151" ^
+	--Jvm="%CD%\..\jdk1.8.0_151\jre\bin\server\jvm.dll" ^
+	--StartMode=jvm ^
+	--StartClass=org.structr.Server ^
+	--StopMode=jvm ^
+	--StopClass=org.structr.Shutdown ^
+	--LogPrefix=service ^
+	--LogPath="%CD%\..\logs" ^
+	--StdOutput="%CD%\..\logs\server.log" ^
+	--StdError="%CD%\..\logs\server.log"

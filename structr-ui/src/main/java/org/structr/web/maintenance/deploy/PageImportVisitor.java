@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -90,7 +90,7 @@ public class PageImportVisitor implements FileVisitor<Path> {
 						createPage(file, fileName);
 
 					} catch (FrameworkException fex) {
-						logger.warn("Exception while importing page {}: {}", new Object[] { fileName, fex.toString() });
+						logger.warn("Exception while importing page {}: {}", new Object[] { fileName, fex.toString()});
 					}
 				}
 			}
@@ -125,7 +125,7 @@ public class PageImportVisitor implements FileVisitor<Path> {
 		final Page page = app.nodeQuery(Page.class).andName(name).getFirst();
 		if (page != null) {
 
-			for (final DOMNode child : page.getProperty(Page.elements)) {
+			for (final DOMNode child : page.getElements()) {
 				app.delete(child);
 			}
 
@@ -184,6 +184,8 @@ public class PageImportVisitor implements FileVisitor<Path> {
 
 		try (final Tx tx = app.tx(true, false, false)) {
 
+			tx.disableChangelog();
+
 			final PropertyMap properties = getPropertiesForPage(name);
 
 			if (properties == null) {
@@ -199,12 +201,12 @@ public class PageImportVisitor implements FileVisitor<Path> {
 				}
 
 				final String src         = new String(Files.readAllBytes(file),Charset.forName("UTF-8"));
-				final String contentType = get(properties, Page.contentType, "text/html");
+				final String contentType = get(properties, StructrApp.key(Page.class, "contentType"), "text/html");
 
 				boolean visibleToPublic = get(properties, GraphObject.visibleToPublicUsers, false);
 				boolean visibleToAuth   = get(properties, GraphObject.visibleToAuthenticatedUsers, false);
 
-				final Importer importer = new Importer(securityContext, src, null, name, visibleToPublic, visibleToAuth);
+				final Importer importer = new Importer(securityContext, src, null, name, visibleToPublic, visibleToAuth, false);
 
 				// enable literal import of href attributes
 				importer.setIsDeployment(true);
@@ -228,10 +230,8 @@ public class PageImportVisitor implements FileVisitor<Path> {
 						// remove duplicate elements
 						fixDocumentElements(newPage);
 
-						// store properties from pages.json if present
-						if (properties != null) {
-							newPage.setProperties(securityContext, properties);
-						}
+						// store properties from pages.json
+						newPage.setProperties(securityContext, properties);
 					}
 
 				} else {
@@ -250,10 +250,8 @@ public class PageImportVisitor implements FileVisitor<Path> {
 						// parse page
 						final Page newPage = app.create(Page.class, name);
 
-						// store properties from pages.json if present
-						if (properties != null) {
-							newPage.setProperties(securityContext, properties);
-						}
+						// store properties from pages.json
+						newPage.setProperties(securityContext, properties);
 
 						// add children
 						importer.createChildNodes(newPage, newPage);

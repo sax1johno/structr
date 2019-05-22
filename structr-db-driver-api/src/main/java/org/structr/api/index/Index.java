@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,7 +18,7 @@
  */
 package org.structr.api.index;
 
-import org.structr.api.QueryResult;
+import org.structr.api.search.QueryContext;
 import org.structr.api.search.QueryPredicate;
 
 /**
@@ -26,10 +26,5 @@ import org.structr.api.search.QueryPredicate;
  */
 public interface Index<T> {
 
-	void add(final T t, final String key, final Object value, final Class typeHint);
-
-	void remove(final T t);
-	void remove(final T t, final String key);
-
-	QueryResult<T> query(final QueryPredicate predicate);
+	Iterable<T> query(final QueryContext context, final QueryPredicate predicate);
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2017 Structr GmbH
+ * Copyright (C) 2010-2019 Structr GmbH
  *
  * This file is part of Structr <http://structr.org>.
  *
@@ -18,8 +18,11 @@
  */
 package org.structr.core.property;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -29,34 +32,26 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.structr.api.Predicate;
-import org.structr.api.graph.Node;
-import org.structr.api.graph.Relationship;
-import org.structr.api.index.Index;
 import org.structr.api.search.Occurrence;
 import org.structr.bolt.index.AbstractCypherIndex;
 import org.structr.common.SecurityContext;
 import org.structr.common.error.FrameworkException;
 import org.structr.core.GraphObject;
-import org.structr.core.Services;
 import org.structr.core.app.Query;
 import org.structr.core.converter.PropertyConverter;
-import org.structr.core.entity.AbstractNode;
-import org.structr.core.entity.AbstractRelationship;
 import org.structr.core.graph.NodeInterface;
-import org.structr.core.graph.NodeService;
 import org.structr.core.graph.search.PropertySearchAttribute;
 import org.structr.core.graph.search.SearchAttribute;
 
 /**
  * Abstract base class for all property types.
- *
- *
  */
 public abstract class Property<T> implements PropertyKey<T> {
 
 	private static final Logger logger             = LoggerFactory.getLogger(Property.class.getName());
 	private static final Pattern rangeQueryPattern = Pattern.compile("\\[(.+) TO (.+)\\]");
 
+	protected List<String> transformators                  = new LinkedList<>();
 	protected Class<? extends GraphObject> declaringClass  = null;
 	protected T defaultValue                               = null;
 	protected boolean readOnly                             = false;
@@ -71,13 +66,17 @@ public abstract class Property<T> implements PropertyKey<T> {
 	protected boolean notNull                              = false;
 	protected boolean dynamic                              = false;
 	protected boolean isCMISProperty                       = false;
+	protected boolean isPartOfBuiltInSchema                = false;
+	protected boolean cachingEnabled                       = false;
 	protected String dbName                                = null;
 	protected String jsonName                              = null;
 	protected String format                                = null;
+	protected String typeHint                              = null;
 	protected String readFunction                          = null;
 	protected String writeFunction                         = null;
 	protected String hint                                  = null;
 	protected String category                              = null;
+	protected String sourceUuid                            = null;
 
 	private boolean requiresSynchronization                = false;
 
@@ -234,6 +233,21 @@ public abstract class Property<T> implements PropertyKey<T> {
 		return category;
 	}
 
+	public Property<T> setSourceUuid(final String sourceUuid) {
+		this.sourceUuid = sourceUuid;
+		return this;
+	}
+
+	@Override
+	public Property<T> partOfBuiltInSchema() {
+		this.isPartOfBuiltInSchema = true;
+		return this;
+	}
+
+	@Override
+	public boolean isPartOfBuiltInSchema() {
+		return this.isPartOfBuiltInSchema;
+	}
 
 	@Override
 	public boolean requiresSynchronization() {
@@ -263,6 +277,11 @@ public abstract class Property<T> implements PropertyKey<T> {
 	@Override
 	public Class getDeclaringClass() {
 		return declaringClass;
+	}
+
+	@Override
+	public String getSourceUuid() {
+		return sourceUuid;
 	}
 
 	@Override
@@ -353,6 +372,29 @@ public abstract class Property<T> implements PropertyKey<T> {
 	}
 
 	@Override
+	public Property<T> cachingEnabled(final boolean enabled) {
+		this.cachingEnabled = enabled;
+		return this;
+	}
+
+	@Override
+	public String typeHint() {
+		return typeHint;
+	}
+
+	@Override
+	public Property<T> typeHint(final String typeHint) {
+		this.typeHint = typeHint;
+		return this;
+	}
+
+	@Override
+	public Property<T> transformators(final String... transformators) {
+		this.transformators.addAll(Arrays.asList(transformators));
+		return this;
+	}
+
+	@Override
 	public int hashCode() {
 
 		// make hashCode funtion work for subtypes that override jsonName() etc. as well
@@ -438,79 +480,48 @@ public abstract class Property<T> implements PropertyKey<T> {
 		return dynamic;
 	}
 
-	/**
-	 * Default implementation of the existing index() method.
-	 *
-	 * Allows property classes to override the method and thus
-	 * to decide about the value to index.
-	 *
-	 * Default implementation
-	 *
-	 * @param obj
-	 */
 	@Override
-	public void index(final GraphObject obj) {
-		index(obj, obj.getProperty(this));
+	public boolean cachingEnabled() { return cachingEnabled; }
+
+	@Override
+	public Object getIndexValue(final Object value) {
+		return value;
 	}
 
 	@Override
-	public void index(final GraphObject entity, final Object value) {
+	public boolean isPropertyTypeIndexable() {
 
-		if (entity instanceof AbstractNode) {
+		final Class valueType = valueType();
+		if (valueType != null) {
 
-			final NodeService nodeService = Services.getInstance().getService(NodeService.class);
-			final AbstractNode node       = (AbstractNode)entity;
-			final Node dbNode             = node.getNode();
-			final Index<Node> index       = nodeService.getNodeIndex();
+			// indexable indicated by value type
+			if (AbstractCypherIndex.INDEXABLE.contains(valueType)) {
 
-			if (index != null) {
-
-				try {
-
-					index.remove(dbNode, dbName);
-
-					if (value != null || isIndexedWhenEmpty()) {
-						index.add(dbNode, dbName, value, valueType());
-					}
-
-				} catch (Throwable t) {
-
-					logger.info("Unable to index property with dbName {} and value {} of type {} on {}: {}", new Object[] { dbName, value, this.getClass().getSimpleName(), entity, t } );
-					logger.warn("", t);
-				}
+				return true;
 			}
 
-		} else if (entity instanceof AbstractRelationship) {
+			if (valueType.equals(Date.class)) {
+				return true;
+			}
 
-			final NodeService nodeService   = Services.getInstance().getService(NodeService.class);
-			final AbstractRelationship rel  = (AbstractRelationship)entity;
-			final Relationship dbRel        = rel.getRelationship();
-			final Index<Relationship> index = nodeService.getRelationshipIndex();
+			if (valueType.isEnum()) {
+				return true;
+			}
 
-			if (index != null) {
-
-				try {
-
-					index.remove(dbRel, dbName);
-
-					if (value != null || isIndexedWhenEmpty()) {
-						index.add(dbRel, dbName, value, valueType());
-					}
-
-				} catch (Throwable t) {
-
-					logger.info("Unable to index property with dbName {} and value {} of type {} on {}: {}", new Object[] { dbName, value, this.getClass().getSimpleName(), entity, t } );
-				}
+			if (valueType.isArray()) {
+				return true;
 			}
 		}
+
+		return false;
 	}
 
 	@Override
-	public boolean indexable(final Object value) {
+	public boolean isPropertyValueIndexable(final Object value) {
 
 		if (value != null) {
 
-			final Class valueType = valueType();
+			final Class valueType = value.getClass();
 			if (valueType != null) {
 
 				// indexable indicated by value type
@@ -531,9 +542,14 @@ public abstract class Property<T> implements PropertyKey<T> {
 					return true;
 				}
 			}
+
+		} else {
+
+			return isPassivelyIndexed();
 		}
 
-		return false;
+		// index empty as well
+		return isIndexedWhenEmpty();
 	}
 
 	@Override
@@ -686,6 +702,19 @@ public abstract class Property<T> implements PropertyKey<T> {
 
 				query.or(this, convertSearchValue(securityContext, requestParameter), exactMatch);
 			}
+
+		} else if (requestParameter.contains(",")) {
+
+			// descend into a new group
+			query.and();
+
+			for (final String part : requestParameter.split("[,]+")) {
+
+				query.and(this, convertSearchValue(securityContext, part), exactMatch);
+			}
+
+			// ascend to the last group
+			query.parent();
 
 		} else {
 
